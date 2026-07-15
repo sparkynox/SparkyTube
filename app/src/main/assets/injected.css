@@ -1,0 +1,97 @@
+/* SparkyTube always-on cosmetic layer.
+   Goal: YouTube's own mobile-web chrome should be INVISIBLE. Our native
+   top bar + bottom nav (activity_main.xml) is the only chrome the user
+   ever sees -- this file hides everything YouTube renders that would
+   otherwise duplicate it (masthead, "Open App" pill, YouTube's own
+   bottom tab bar, search icon row, mini player bar, etc).
+
+   IMPORTANT: selectors here are intentionally SPECIFIC (exact tag/class
+   names), not broad wildcards like [class*="topbar"] -- broad wildcards
+   were catching unrelated elements (e.g. parts of the suggested-videos
+   feed whose class names happened to contain a matching substring),
+   which is what caused the black boxes under playing videos. */
+
+/* ---- YouTube's masthead / top chrome ---- */
+ytm-mobile-topbar-renderer,
+ytm-mobile-topbar-logo-renderer,
+#header,
+.mobile-topbar-header,
+ytm-topbar-menu-button-renderer,
+ytm-searchbox,
+tp-yt-app-toolbar,
+ytm-app-bar-view-model {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+}
+
+/* ---- "Open App" pill + app-install banners ---- */
+.ytm-open-in-app-button,
+ytm-open-in-app-button-renderer,
+.mobile-topbar-header-open-in-app,
+ytm-you-are-here-renderer,
+ytm-install-app-banner-renderer,
+ytm-app-promo-renderer {
+  display: none !important;
+}
+
+/* ---- YouTube's own bottom tab bar (Home/Shorts/Subs/You) -- we already
+   render our own fixed bottom nav natively, this one just duplicates it ---- */
+ytm-pivot-bar-renderer,
+ytm-tabbed-page-header-renderer {
+  display: none !important;
+}
+
+/* Reclaim the space YouTube's chrome would have occupied so content
+   doesn't leave an awkward gap where the hidden header/footer used to be. */
+html, body,
+ytm-app,
+#page-manager {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+/* ---- Ad containers & slots (network-level blocking is primary; this is
+   the visual backstop for anything that still rendered). Specific renderer
+   tag names only -- no wildcards, so the related-videos feed is untouched. ---- */
+ytd-promoted-sparkles-web-renderer,
+ytd-display-ad-renderer,
+ytd-in-feed-ad-layout-renderer,
+ytd-ad-slot-renderer,
+ytd-companion-slot-renderer,
+ytd-action-companion-ad-renderer,
+ytd-statement-banner-renderer,
+ytd-mealbar-promo-renderer,
+ytm-companion-slot-renderer,
+ytm-promoted-sparkles-web-renderer,
+ytm-in-feed-ad-layout-renderer,
+#masthead-ad,
+.ytd-video-masthead-ad-v3-renderer,
+.video-ads.ytp-ad-module {
+  display: none !important;
+  height: 0 !important;
+  visibility: hidden !important;
+}
+
+/* ---- Consent / cookie / misc nag overlays ---- */
+ytd-consent-bump-v2-lightbox,
+tp-yt-paper-dialog[modal] {
+  display: none !important;
+}
+
+/* Force consistent dark surface even if YouTube serves a light-mode fragment */
+html, body {
+  background-color: #0A0A0A !important;
+}
+
+/* Hide YouTube's in-page video element visually once native ExoPlayer
+   takes over -- it stays in the DOM (muted/paused) so page JS doesn't
+   break, but shouldn't be seen or interactable underneath our PlayerView.
+   Scoped to the <video> tag itself only, not any wrapping container, so
+   the suggestions list beneath it renders normally. */
+body.sparkytube-native-active video {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
