@@ -1,0 +1,19 @@
+*.iml
+.gradle
+/local.properties
+.idea/
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+app/build/
+app/release.keystore
+*.keystore
+*.jks
+
+# Keep the wrapper jar itself if you generate it locally and commit it —
+# recommended so CI doesn't need network access to bootstrap Gradle each run.
+!gradle/wrapper/gradle-wrapper.jar
