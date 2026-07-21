@@ -86,7 +86,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
     companion object {
         private const val HOME_URL = "https://m.youtube.com/"
-        private const val CRUNCHYROLL_URL = "https://www.crunchyroll.com/"
+        private const val CRUNCHYROLL_URL = "https://www.anikoto.cz/home"
         private const val PREFS_NAME = "sparkytube_prefs"
         private const val KEY_FIRST_LAUNCH_DONE = "first_launch_done"
         private const val GITHUB_ISSUES_URL = "https://github.com/sparkynox/SparkyTube/issues"
