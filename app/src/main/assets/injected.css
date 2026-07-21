@@ -1,0 +1,221 @@
+/* ============================================================
+   SparkyTube always-on cosmetic layer.
+   Two jobs:
+   1. Hide every bit of YouTube's own mobile-web chrome (masthead,
+      "Open App" pill, YouTube's own bottom tab bar) since our native
+      top bar + bottom nav (activity_main.xml) is the only chrome
+      the user should ever see.
+   2. Restyle everything else (feed cards, thumbnails, typography,
+      spacing) so it reads as a native app screen, not a website
+      rendered in a browser -- while leaving the actual <video>
+      player element itself untouched/default.
+   ============================================================ */
+
+/* ---------- 1. Hide YouTube's own chrome ---------- */
+ytm-mobile-topbar-renderer,
+ytm-mobile-topbar-logo-renderer,
+#header,
+.mobile-topbar-header,
+ytm-topbar-menu-button-renderer,
+ytm-searchbox,
+tp-yt-app-toolbar,
+ytm-app-bar-view-model,
+.ytm-open-in-app-button,
+ytm-open-in-app-button-renderer,
+.mobile-topbar-header-open-in-app,
+ytm-you-are-here-renderer,
+ytm-install-app-banner-renderer,
+ytm-app-promo-renderer,
+ytm-pivot-bar-renderer,
+ytm-tabbed-page-header-renderer {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+}
+
+html, body,
+ytm-app,
+#page-manager {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  background-color: #0A0A0A !important;
+}
+
+/* ---------- Ad containers & slots (visual backstop; network-level
+   blocking in AdBlockEngine.kt is primary) ---------- */
+ytd-promoted-sparkles-web-renderer,
+ytd-display-ad-renderer,
+ytd-in-feed-ad-layout-renderer,
+ytd-ad-slot-renderer,
+ytd-companion-slot-renderer,
+ytd-action-companion-ad-renderer,
+ytd-statement-banner-renderer,
+ytd-mealbar-promo-renderer,
+ytm-companion-slot-renderer,
+ytm-promoted-sparkles-web-renderer,
+ytm-in-feed-ad-layout-renderer,
+ytm-promoted-video-renderer,
+ytm-ad-slot-renderer,
+ytm-display-ad-renderer,
+ytm-search-ad-renderer,
+ytm-statement-banner-renderer,
+ytm-carousel-ad-renderer,
+ytm-video-ad-renderer,
+ytm-companion-ad-renderer,
+ytm-masthead-ad-v3-renderer,
+#masthead-ad,
+.ytd-video-masthead-ad-v3-renderer,
+.video-ads.ytp-ad-module,
+[aria-label*="Sponsored" i] {
+  display: none !important;
+  height: 0 !important;
+  visibility: hidden !important;
+}
+
+ytd-consent-bump-v2-lightbox,
+tp-yt-paper-dialog[modal] {
+  display: none !important;
+}
+
+/* Hide the WebView's own player entirely once native ExoPlayer takes
+   over -- it stays in the DOM (muted/paused) so page JS doesn't break,
+   but must be visually collapsed completely. Hiding just the <video> tag
+   wasn't enough: YouTube's player *container* renders its own background/
+   poster frame independent of the video element, which is exactly the
+   leftover black/thumbnail area Sparky saw behind the ExoPlayer overlay. */
+body.sparkytube-native-active .html5-video-player,
+body.sparkytube-native-active #player-container-id,
+body.sparkytube-native-active #player-container,
+body.sparkytube-native-active ytd-player,
+body.sparkytube-native-active ytm-inline-player-renderer,
+body.sparkytube-native-active ytm-single-column-watch-next-results-renderer #player-container-inner,
+body.sparkytube-native-active video {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* ---------- Up Next / suggested videos -- watch-page sidebar rewrite ----------
+   Native-card treatment matching the home feed, so the "what's playing next"
+   list reads as part of the app rather than a plain web sidebar list. */
+ytm-item-section-renderer[data-content-type="watch-next"] ytm-compact-video-renderer,
+ytm-video-with-context-renderer.watch-next {
+  background-color: #141414 !important;
+  border-radius: 12px !important;
+  margin: 5px 10px !important;
+  padding: 6px !important;
+  border: none !important;
+}
+
+/* Autoplay "up next" end-screen countdown card -- native rounded overlay
+   instead of YouTube's default square web card */
+.ytp-autonav-endscreen-upnext-container {
+  border-radius: 14px !important;
+  overflow: hidden !important;
+}
+
+/* ============================================================
+   2. Native-app restyle of everything except the player itself.
+   ============================================================ */
+
+/* Global typography -- system font stack instead of YouTube's web
+   font loading, renders instantly and matches Android's native feel. */
+html, body,
+ytm-app, * {
+  font-family: -apple-system, "Roboto", "Segoe UI", sans-serif !important;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none; /* kills the browser-y pull-to-refresh glow */
+}
+
+/* Feed video cards -- rounded corners, card spacing, subtle elevation,
+   like a native RecyclerView list instead of a flat web page. */
+ytm-rich-item-renderer,
+ytm-video-with-context-renderer,
+ytm-compact-video-renderer {
+  background-color: #141414 !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  margin: 6px 10px !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4) !important;
+  border: none !important;
+}
+
+/* Thumbnails -- rounded top corners matching the card, no harsh
+   rectangular web-image look */
+ytm-rich-item-renderer img,
+ytm-video-with-context-renderer img,
+ytm-thumbnail-cover-view-model img {
+  border-radius: 14px 14px 0 0 !important;
+}
+
+/* Video title / metadata text -- native app type scale + spacing */
+ytm-rich-item-renderer h3,
+ytm-video-with-context-renderer h3,
+.yt-core-attributed-string {
+  color: #F5F5F5 !important;
+  font-weight: 500 !important;
+  line-height: 1.35 !important;
+}
+
+/* Channel name / view count / timestamp -- muted secondary tone,
+   consistent with the native app's text_secondary color */
+.ytm-video-with-context-renderer-metadata-line,
+.ytm-video-with-context-renderer-channel-name {
+  color: #9A9A9A !important;
+}
+
+/* Remove YouTube's own card dividers/borders -- our spacing/shadow
+   already separates cards, double lines look web-like */
+ytm-item-section-renderer > * {
+  border-bottom: none !important;
+}
+
+/* Chip-cloud filter row -- "All / From <channel> / For you / Watched" on
+   watch pages, and category filters ("All / Gaming / Mixes / Music") on
+   the home feed. Hidden entirely rather than styled, per request -- these
+   are YouTube's own navigation chrome, not part of the content itself. */
+ytm-chip-cloud-renderer,
+ytm-chip-cloud-chip-renderer {
+  display: none !important;
+  height: 0 !important;
+}
+
+/* Comments section -- card-style like a native comment list */
+ytm-comment-thread-renderer {
+  background-color: #141414 !important;
+  border-radius: 12px !important;
+  margin: 4px 10px !important;
+  padding: 8px !important;
+}
+
+/* Buttons (Subscribe, Like, Share, etc.) -- rounded native-pill style,
+   no web-default square corners */
+button, .ytm-button-renderer, tp-yt-paper-button {
+  border-radius: 18px !important;
+}
+
+/* Smooth scrolling everywhere -- removes the janky/stepped scroll feel
+   some WebKit builds default to */
+* {
+  scroll-behavior: smooth !important;
+}
+
+/* Kill the default blue tap-highlight flash on Android WebView --
+   that flash is one of the biggest "this is a browser" tells */
+* {
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+/* Hide horizontal scrollbars on chip rows / shelves -- native apps
+   don't show a visible scrollbar track */
+::-webkit-scrollbar {
+  display: none !important;
+}
