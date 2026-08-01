@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Core surfaces -->
+    <color name="bg_root">#0A0A0A</color>
+    <color name="bg_surface">#141414</color>
+    <color name="bg_surface_raised">#1C1C1C</color>
+    <color name="divider">#262626</color>
+
+    <!-- Accent -->
+    <color name="accent">#FF3B3B</color>
+    <color name="accent_dim">#7A1F1F</color>
+
+    <!-- Text -->
+    <color name="text_primary">#F5F5F5</color>
+    <color name="text_secondary">#9A9A9A</color>
+    <color name="text_disabled">#5A5A5A</color>
+
+    <color name="icon_active">#FFFFFF</color>
+    <color name="icon_inactive">#707070</color>
+
+    <color name="transparent">#00000000</color>
+</resources>

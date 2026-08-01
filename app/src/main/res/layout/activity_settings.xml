@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_root">
+
+    <LinearLayout
+        android:id="@+id/settingsTopBar"
+        android:layout_width="0dp"
+        android:layout_height="52dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@color/bg_root"
+        android:paddingStart="4dp"
+        android:paddingEnd="16dp"
+        android:elevation="4dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <ImageButton
+            android:id="@+id/settingsBackBtn"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            android:contentDescription="Back"
+            app:tint="@color/text_primary" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Settings"
+            android:textColor="@color/text_primary"
+            android:textSize="19sp"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif-medium"
+            android:paddingStart="4dp" />
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toBottomOf="@id/settingsTopBar"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="32dp">
+
+            <TextView
+                style="@style/SettingsSectionHeader"
+                android:text="Features" />
+
+            <include layout="@layout/settings_switch_row" android:id="@+id/rowAnimeStreaming" />
+            <include layout="@layout/settings_switch_row" android:id="@+id/rowAdBlock" />
+            <include layout="@layout/settings_switch_row" android:id="@+id/rowDownload" />
+
+            <TextView
+                style="@style/SettingsSectionHeader"
+                android:text="App behavior" />
+
+            <include layout="@layout/settings_switch_row" android:id="@+id/rowPopups" />
+            <include layout="@layout/settings_switch_row" android:id="@+id/rowUpdater" />
+            <include layout="@layout/settings_switch_row" android:id="@+id/rowExperimental" />
+
+            <TextView
+                style="@style/SettingsSectionHeader"
+                android:text="Appearance" />
+
+            <include layout="@layout/settings_switch_row" android:id="@+id/rowCustomCss" />
+
+            <EditText
+                android:id="@+id/customCssInput"
+                android:layout_width="match_parent"
+                android:layout_height="160dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:layout_marginTop="4dp"
+                android:background="@color/bg_surface"
+                android:padding="12dp"
+                android:gravity="top|start"
+                android:inputType="textMultiLine|textNoSuggestions"
+                android:typeface="monospace"
+                android:textSize="13sp"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_disabled"
+                android:hint="/* your CSS here, e.g. */&#10;ytm-comment-thread-renderer { display: none !important; }" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:layout_marginTop="6dp"
+                android:text="Applied on top of SparkyTube's own CSS. Bad CSS can only break the page's look, not the app — reopen Settings and clear it if something looks wrong."
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/saveCustomCssBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginTop="10dp"
+                android:text="Save CSS"
+                android:textColor="@color/text_primary"
+                android:backgroundTint="@color/bg_surface_raised" />
+
+        </LinearLayout>
+    </ScrollView>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
