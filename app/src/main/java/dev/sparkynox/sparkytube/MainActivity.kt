@@ -98,8 +98,10 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     }
 
     companion object {
+        const val EXTRA_OPEN_YT_SETTINGS = "open_yt_settings"
         private const val HOME_URL = "https://m.youtube.com/"
-        private const val CRUNCHYROLL_URL = "https://anikoto.cz/home"
+        private const val YT_SETTINGS_URL = "https://m.youtube.com/select_site"
+        private const val CRUNCHYROLL_URL = "crunchyroll.com"
         private const val PREFS_NAME = "sparkytube_prefs"
         private const val KEY_FIRST_LAUNCH_DONE = "first_launch_done"
         private const val GITHUB_ISSUES_URL = "https://github.com/sparkynox/SparkyTube/issues"
@@ -112,9 +114,9 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         // instead of followed. Google/YouTube domains stay allowed too
         // since Crunchyroll uses Google sign-in.
         private val CRUNCHYROLL_ALLOWED_HOST_SUFFIXES = listOf(
-            "anikoto.cz",
+            "crunchyroll.com",
             "vrv.co",
-            "anikoto.cz/home",
+            "static.crunchyroll.com",
             "accounts.google.com",
             "google.com"
         )
@@ -240,6 +242,13 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     }
 
     private var isPlayerFullscreen = false
+    // Holds whatever view WebChromeClient.onShowCustomView hands us
+    // (Crunchyroll's own fullscreen video element) and the callback to
+    // invoke when exiting -- separate from the native ExoPlayer fullscreen
+    // toggle above, since Crunchyroll plays through WebView's own player,
+    // not the native one.
+    private var fullscreenVideoView: android.view.View? = null
+    private var fullscreenVideoCallback: android.webkit.WebChromeClient.CustomViewCallback? = null
     // True while the player is collapsed into the floating mini-player box.
     // Mutually exclusive with isPlayerFullscreen in practice (you can't
     // fullscreen a video that's currently minimized -- the fullscreen
@@ -375,6 +384,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         val playPauseBtn = binding.exoPlayerView.findViewById<android.widget.ImageButton>(R.id.exo_play_pause)
         val nextBtn = binding.exoPlayerView.findViewById<View>(R.id.exo_next)
         val minimizeBtn = binding.exoPlayerView.findViewById<View>(R.id.exo_minimize_btn)
+        val suggestionsBtn = binding.exoPlayerView.findViewById<View>(R.id.exo_suggestions_btn)
 
         if (qualityGear == null || fullscreenBtn == null || playPauseBtn == null || downloadBtn == null) {
             // Controller layout hasn't inflated yet (PlayerView inflates it
@@ -393,6 +403,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         audioTrackBtnInPlayer?.setOnClickListener { showAudioTrackPicker() }
         audioTrackBtnInPlayer?.visibility = if (currentAudioTracks.size > 1) View.VISIBLE else View.GONE
         minimizeBtn?.setOnClickListener { enterMiniPlayerMode() }
+        suggestionsBtn?.setOnClickListener { showSuggestionsPanel() }
 
         // "Previous" and "Next" don't have a real queue behind them
         // (single-video playback, same limitation as the notification's
@@ -617,6 +628,68 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     private fun screenWidthPx() = resources.displayMetrics.widthPixels
     private fun screenHeightPx() = resources.displayMetrics.heightPixels
 
+    // --- Suggestions/up-next panel ------------------------------------------------------
+
+    private var suggestionsAdapter: dev.sparkynox.sparkytube.suggestions.SuggestionsAdapter? = null
+    private var suggestionsFetchJob: kotlinx.coroutines.Job? = null
+
+    /**
+     * Native suggestions/related-videos panel — a Kotlin-built list, not
+     * the WebView's own related-videos UI, so it works the same whether
+     * playing full-screen, minimized, or from a shared-link download.
+     * Fetches on demand (see StreamExtractor.fetchRelatedVideos) rather
+     * than as part of the normal playback resolve, since that extra
+     * getRelatedItems() call is exactly the network/parse overhead the
+     * speed optimization earlier deliberately skips for every video —
+     * this only pays that cost when the user actually opens the panel.
+     */
+    private fun showSuggestionsPanel() {
+        val videoId = lastResolvedVideoId
+        if (videoId == null) {
+            android.widget.Toast.makeText(this, "No video playing yet", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val panelRoot = binding.suggestionsPanelInclude.root
+        val recyclerView = panelRoot.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.suggestionsPanelList)
+        val loadingView = panelRoot.findViewById<View>(R.id.suggestionsPanelLoading)
+        val emptyView = panelRoot.findViewById<View>(R.id.suggestionsPanelEmpty)
+        val closeBtn = panelRoot.findViewById<View>(R.id.suggestionsPanelCloseBtn)
+
+        if (suggestionsAdapter == null) {
+            suggestionsAdapter = dev.sparkynox.sparkytube.suggestions.SuggestionsAdapter { tappedVideoId ->
+                hideSuggestionsPanel()
+                lastResolvedVideoId = null
+                resolveAndPlayNative(tappedVideoId, fallbackTitle = "")
+            }
+            recyclerView.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
+            recyclerView.adapter = suggestionsAdapter
+        }
+
+        closeBtn.setOnClickListener { hideSuggestionsPanel() }
+        panelRoot.visibility = View.VISIBLE
+        loadingView.visibility = View.VISIBLE
+        emptyView.visibility = View.GONE
+        recyclerView.visibility = View.GONE
+
+        suggestionsFetchJob?.cancel()
+        suggestionsFetchJob = lifecycleScope.launch {
+            val related = dev.sparkynox.sparkytube.extractor.StreamExtractor.fetchRelatedVideos(videoId)
+            loadingView.visibility = View.GONE
+            if (related.isEmpty()) {
+                emptyView.visibility = View.VISIBLE
+            } else {
+                recyclerView.visibility = View.VISIBLE
+                suggestionsAdapter?.submitList(related)
+            }
+        }
+    }
+
+    private fun hideSuggestionsPanel() {
+        suggestionsFetchJob?.cancel()
+        binding.suggestionsPanelInclude.root.visibility = View.GONE
+    }
+
     /**
      * Called when ExoPlayer finishes the current video. Just unmuting the
      * WebView's own <video> (the old stopNativePlayback behavior) doesn't
@@ -676,6 +749,14 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
+                if (fullscreenVideoView != null) {
+                    webView.webChromeClient?.onHideCustomView()
+                    return
+                }
+                if (binding.suggestionsPanelInclude.root.visibility == View.VISIBLE) {
+                    hideSuggestionsPanel()
+                    return
+                }
                 if (isNativePlaybackActive) {
                     stopNativePlayback()
                 }
@@ -689,8 +770,91 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             }
         })
 
-        webView.loadUrl(HOME_URL)
+        if (intent?.getBooleanExtra(EXTRA_OPEN_YT_SETTINGS, false) == true) {
+            webView.loadUrl(YT_SETTINGS_URL)
+        } else {
+            webView.loadUrl(HOME_URL)
+        }
         pollHandler.post(urlPollRunnable)
+
+        handleSendIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // MainActivity is singleTop, so tapping "YT Settings" while
+        // MainActivity is already alive in the background reuses this
+        // same instance instead of running onCreate again — without this,
+        // that path would silently do nothing.
+        if (intent.getBooleanExtra(EXTRA_OPEN_YT_SETTINGS, false)) {
+            browseMode = BrowseMode.YOUTUBE
+            binding.bottomNav.visibility = View.VISIBLE
+            webView.loadUrl(YT_SETTINGS_URL)
+        }
+        handleSendIntent(intent)
+    }
+
+    /**
+     * Handles being launched from the Android share sheet — someone
+     * shared a YouTube link from another app (official YouTube app,
+     * browser, WhatsApp, etc.) and picked SparkyTube. Extracts the video
+     * ID and downloads it directly using the exact same
+     * progressive-360p-guaranteed-audio logic the in-app download button
+     * uses (see showDownloadQualityPicker) — no UI navigation, no need to
+     * actually open/play the video first.
+     */
+    private fun handleSendIntent(intent: Intent?) {
+        if (intent?.action != Intent.ACTION_SEND) return
+        val sharedText = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return
+        // Shared text is often more than just the bare URL (e.g. "Check
+        // this out: https://youtu.be/xyz via YouTube") -- pull out the
+        // first http(s) URL rather than trying to Uri.parse the whole
+        // string, which would mis-extract on anything but a lone link.
+        val urlMatch = Regex("""https?://\S+""").find(sharedText)
+        val extractedUrl = urlMatch?.value ?: sharedText
+        val videoId = extractVideoId(extractedUrl)
+        if (videoId == null) {
+            android.widget.Toast.makeText(this, "That doesn't look like a YouTube video link", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        downloadVideoById(videoId)
+    }
+
+    /**
+     * Resolves and downloads a video by ID directly, independent of
+     * whatever is currently playing/loaded in the WebView or player —
+     * used by the share-sheet download flow, where the user never opened
+     * the video in SparkyTube's own UI at all.
+     */
+    private fun downloadVideoById(videoId: String) {
+        android.widget.Toast.makeText(this, "Resolving video…", android.widget.Toast.LENGTH_SHORT).show()
+        lifecycleScope.launch {
+            val resolved = dev.sparkynox.sparkytube.extractor.StreamExtractor.resolvePlayableUrl(videoId)
+            if (resolved == null) {
+                android.widget.Toast.makeText(this@MainActivity, "Couldn't resolve this video", android.widget.Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+
+            // Same rule as the in-app download button: only ever download
+            // a progressive (audio-baked-in) stream. No fallback to an
+            // adaptive video-only stream, since DownloadManager can't mux
+            // in a separate audio track and that fallback was the original
+            // "downloaded video has no sound" bug.
+            val progressiveOption = resolved.availableQualities.firstOrNull { it.audioUrl == null }
+            if (progressiveOption == null) {
+                android.widget.Toast.makeText(
+                    this@MainActivity,
+                    "This video has no audio+video combined stream available, so a download would have no sound.",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+                return@launch
+            }
+
+            dev.sparkynox.sparkytube.download.VideoDownloader.downloadVideo(
+                this@MainActivity, progressiveOption.url, progressiveOption.audioUrl,
+                resolved.title.ifBlank { videoId }, progressiveOption.label
+            )
+        }
     }
 
     // --- First launch welcome + About dialog ------------------------------------------
@@ -897,10 +1061,16 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             browseMode = BrowseMode.YOUTUBE
             stopNativePlayback()
             webView.loadUrl(HOME_URL)
+            binding.bottomNav.visibility = View.VISIBLE
         } else {
             stopNativePlayback()
             browseMode = BrowseMode.CRUNCHYROLL
             webView.loadUrl(CRUNCHYROLL_URL)
+            // Home/Shorts/Subs/Library only make sense for YouTube — hide
+            // it entirely while on Crunchyroll rather than leave dead
+            // buttons that do nothing (or worse, silently switch back to
+            // YouTube) sitting on screen.
+            binding.bottomNav.visibility = View.GONE
         }
         highlightNav(binding.navHome)
     }
@@ -1237,6 +1407,58 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 // instead of asking for a new window.
                 return false
             }
+
+            // WebView has no native fullscreen of its own — when a page's
+            // own JS calls video.requestFullscreen() (Crunchyroll's
+            // player), the WebView asks the app (via these two callbacks)
+            // to supply a view to render into and to restore things when
+            // fullscreen is exited. Without this pair, tapping fullscreen
+            // on Crunchyroll's player did nothing because there was
+            // nowhere for WebView to put the fullscreen content.
+            override fun onShowCustomView(view: android.view.View, callback: CustomViewCallback) {
+                if (fullscreenVideoView != null) {
+                    callback.onCustomViewHidden()
+                    return
+                }
+
+                fullscreenVideoView = view
+                fullscreenVideoCallback = callback
+
+                binding.fullscreenVideoContainer.addView(
+                    view,
+                    android.widget.FrameLayout.LayoutParams(
+                        android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                        android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+                    )
+                )
+                binding.fullscreenVideoContainer.visibility = View.VISIBLE
+                binding.topBar.visibility = View.GONE
+                binding.bottomNav.visibility = View.GONE
+
+                val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+                androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+                insetsController.systemBarsBehavior =
+                    androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                insetsController.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+                requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            }
+
+            override fun onHideCustomView() {
+                val view = fullscreenVideoView ?: return
+                binding.fullscreenVideoContainer.removeView(view)
+                binding.fullscreenVideoContainer.visibility = View.GONE
+                binding.topBar.visibility = View.VISIBLE
+                binding.bottomNav.visibility = View.VISIBLE
+
+                val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+                androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, true)
+                insetsController.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+                requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+
+                fullscreenVideoCallback?.onCustomViewHidden()
+                fullscreenVideoView = null
+                fullscreenVideoCallback = null
+            }
         }
 
         webView.webViewClient = object : WebViewClient() {
@@ -1427,7 +1649,17 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     private fun extractVideoId(url: String): String? {
         return try {
             val uri = Uri.parse(url)
-            if (uri.path?.startsWith("/watch") == true) uri.getQueryParameter("v") else null
+            when {
+                uri.path?.startsWith("/watch") == true -> uri.getQueryParameter("v")
+                // youtu.be/VIDEO_ID shortlinks -- what the official
+                // YouTube app's own Share sheet usually hands out, so the
+                // share-to-SparkyTube download flow needs this too, not
+                // just the m.youtube.com/watch?v= form the in-app WebView
+                // always uses.
+                uri.host?.endsWith("youtu.be") == true ->
+                    uri.pathSegments?.firstOrNull()?.takeIf { it.length == 11 }
+                else -> null
+            }
         } catch (e: Exception) {
             null
         }
