@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.downloader.Downloader
@@ -113,6 +114,59 @@ object StreamExtractor {
      */
     fun invalidate(videoId: String) {
         cache.remove(videoId)
+    }
+
+    /**
+     * One entry in the related-videos/suggestions panel. Deliberately
+     * lightweight — title, channel, duration, thumbnail URL, and the
+     * video ID to resolve/play if tapped — not a full StreamInfoItem,
+     * since the panel only ever needs to show a row and hand off a
+     * video ID on tap.
+     */
+    data class RelatedVideo(
+        val videoId: String,
+        val title: String,
+        val uploaderName: String,
+        val durationSeconds: Long,
+        val thumbnailUrl: String?
+    )
+
+    /**
+     * Fetches related/suggested videos for the given video — this is the
+     * getRelatedItems() call that tryNewPipe() deliberately skips (see the
+     * comment there) to keep normal playback resolves fast. Only called
+     * on demand when the user actually opens the suggestions panel, so it
+     * doesn't cost anything for people who never open it.
+     */
+    suspend fun fetchRelatedVideos(videoId: String): List<RelatedVideo> = withContext(Dispatchers.IO) {
+        try {
+            init()
+            val url = "https://www.youtube.com/watch?v=$videoId"
+            val extractor = ServiceList.YouTube.getStreamExtractor(url)
+            extractor.fetchPage()
+
+            val related = extractor.relatedItems ?: return@withContext emptyList()
+            related.items.mapNotNull { item ->
+                val itemUrl = item.url ?: return@mapNotNull null
+                val relatedVideoId = extractRelatedVideoId(itemUrl) ?: return@mapNotNull null
+                val duration = (item as? org.schabi.newpipe.extractor.stream.StreamInfoItem)?.duration ?: 0L
+                val uploader = (item as? org.schabi.newpipe.extractor.stream.StreamInfoItem)?.uploaderName ?: ""
+                RelatedVideo(
+                    videoId = relatedVideoId,
+                    title = item.name ?: "",
+                    uploaderName = uploader,
+                    durationSeconds = duration,
+                    thumbnailUrl = item.thumbnails.firstOrNull()?.url
+                )
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun extractRelatedVideoId(url: String): String? {
+        val match = Regex("""[?&]v=([a-zA-Z0-9_-]{11})""").find(url)
+        return match?.groupValues?.get(1)
     }
 
     private suspend fun doResolve(videoId: String): ResolvedStream? {
