@@ -22,6 +22,7 @@ object SettingsPrefs {
     private const val KEY_DOWNLOAD_ENABLED = "download_enabled"
     private const val KEY_CUSTOM_CSS = "custom_css"
     private const val KEY_CUSTOM_CSS_ENABLED = "custom_css_enabled"
+    private const val KEY_RELATED_VIDEOS_FETCHER = "related_videos_fetcher"
 
     private fun prefs(context: Context): SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -88,5 +89,31 @@ object SettingsPrefs {
 
     fun setCustomCss(context: Context, css: String) {
         prefs(context).edit().putString(KEY_CUSTOM_CSS, css).apply()
+    }
+
+    /**
+     * Which method the suggestions panel uses to fetch related videos.
+     * JAVASCRIPT reads the WebView's own already-rendered DOM (fast, no
+     * extra network call, but only works when the watch page is actually
+     * loaded there — fails in mini-player mode with WebView elsewhere).
+     * NEWPIPE always uses NewPipeExtractor's getRelatedItems() (works
+     * everywhere, slower, one more network round-trip). AUTO tries
+     * JavaScript first and falls back to NewPipe only if that comes back
+     * empty — the default, since it gets the JS speed win in the common
+     * case without breaking the mini-player scenario.
+     */
+    enum class RelatedVideosFetcher { JAVASCRIPT, NEWPIPE, AUTO }
+
+    fun getRelatedVideosFetcher(context: Context): RelatedVideosFetcher {
+        val stored = prefs(context).getString(KEY_RELATED_VIDEOS_FETCHER, RelatedVideosFetcher.AUTO.name)
+        return try {
+            RelatedVideosFetcher.valueOf(stored ?: RelatedVideosFetcher.AUTO.name)
+        } catch (e: IllegalArgumentException) {
+            RelatedVideosFetcher.AUTO
+        }
+    }
+
+    fun setRelatedVideosFetcher(context: Context, fetcher: RelatedVideosFetcher) {
+        prefs(context).edit().putString(KEY_RELATED_VIDEOS_FETCHER, fetcher.name).apply()
     }
 }

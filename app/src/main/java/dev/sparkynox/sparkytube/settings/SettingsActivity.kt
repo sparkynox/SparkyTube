@@ -46,6 +46,7 @@ class SettingsActivity : AppCompatActivity() {
             SettingsPrefs::isUpdaterEnabled, SettingsPrefs::setUpdaterEnabled
         )
         setupYtSettingsRow()
+        setupRelatedFetcherRow()
         setupLumiAiRow()
         setupRow(
             binding.rowCustomCss, "Custom CSS",
@@ -83,6 +84,48 @@ class SettingsActivity : AppCompatActivity() {
             }
             startActivity(intent)
             finish()
+        }
+    }
+
+    /**
+     * Which method the suggestions panel uses to fetch related videos —
+     * see SettingsPrefs.RelatedVideosFetcher for what each option means.
+     * A picker dialog rather than a switch since there are three options,
+     * not two.
+     */
+    private fun setupRelatedFetcherRow() {
+        binding.rowRelatedFetcher.rowTitle.text = "Related videos fetcher"
+        binding.rowRelatedFetcher.rowSwitch.visibility = android.view.View.GONE
+        val subtitleView: TextView = binding.rowRelatedFetcher.rowSubtitle
+        subtitleView.visibility = TextView.VISIBLE
+        refreshRelatedFetcherSubtitle(subtitleView)
+
+        binding.rowRelatedFetcher.root.setOnClickListener {
+            val options = arrayOf("Auto (recommended)", "JavaScript (fastest)", "NewPipe (most reliable)")
+            val values = arrayOf(
+                SettingsPrefs.RelatedVideosFetcher.AUTO,
+                SettingsPrefs.RelatedVideosFetcher.JAVASCRIPT,
+                SettingsPrefs.RelatedVideosFetcher.NEWPIPE
+            )
+            val currentIndex = values.indexOf(SettingsPrefs.getRelatedVideosFetcher(this))
+
+            AlertDialog.Builder(this)
+                .setTitle("Related videos fetcher")
+                .setSingleChoiceItems(options, currentIndex) { dialog, which ->
+                    SettingsPrefs.setRelatedVideosFetcher(this, values[which])
+                    refreshRelatedFetcherSubtitle(subtitleView)
+                    dialog.dismiss()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
+    }
+
+    private fun refreshRelatedFetcherSubtitle(subtitleView: TextView) {
+        subtitleView.text = when (SettingsPrefs.getRelatedVideosFetcher(this)) {
+            SettingsPrefs.RelatedVideosFetcher.AUTO -> "Auto — tries JavaScript first, falls back to NewPipe"
+            SettingsPrefs.RelatedVideosFetcher.JAVASCRIPT -> "JavaScript — fastest, only works while the video's page is loaded"
+            SettingsPrefs.RelatedVideosFetcher.NEWPIPE -> "NewPipe — always works, one extra network request"
         }
     }
 
