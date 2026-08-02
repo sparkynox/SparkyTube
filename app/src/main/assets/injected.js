@@ -312,6 +312,43 @@
     return related ? extractVideoIdFromHref(related.href) : null;
   };
 
+  // Scrapes the related-videos list straight from the watch page's own
+  // DOM -- YouTube already rendered this data (title, channel, duration,
+  // thumbnail) to show its own related-videos UI, so this reads it
+  // instead of making a second network request the way the
+  // NewPipeExtractor fallback (fetchRelatedVideos in StreamExtractor.kt)
+  // has to. Only works while the WebView is actually sitting on this
+  // video's watch page with the related list rendered -- returns an
+  // empty array otherwise, letting the native side fall back to
+  // NewPipeExtractor when that's the case (mini-player showing a
+  // different page, list not loaded yet, etc.).
+  window.__sparkyGetRelatedVideosJson = function () {
+    var rows = document.querySelectorAll(
+      'ytm-compact-video-renderer, ytm-video-with-context-renderer'
+    );
+    var results = [];
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var link = row.querySelector('a');
+      var videoId = link ? extractVideoIdFromHref(link.href) : null;
+      if (!videoId) continue;
+
+      var titleEl = row.querySelector('.yt-core-attributed-string, h3, .video-title');
+      var channelEl = row.querySelector('.ytm-channel-name, .yt-core-attributed-string--link-inherit-color');
+      var thumbEl = row.querySelector('img');
+      var durationEl = row.querySelector('.badge-shape-wiz__text, .ytm-thumbnail-overlay-time-status-renderer');
+
+      results.push({
+        videoId: videoId,
+        title: titleEl ? titleEl.textContent.trim() : '',
+        uploaderName: channelEl ? channelEl.textContent.trim() : '',
+        durationText: durationEl ? durationEl.textContent.trim() : '',
+        thumbnailUrl: thumbEl ? (thumbEl.src || thumbEl.getAttribute('data-src') || '') : ''
+      });
+    }
+    return JSON.stringify(results);
+  };
+
   // Prevents YouTube's own autoplay from independently navigating the
   // background HTML5 player to a different video than the one ExoPlayer
   // is currently showing. Without this, if the background player buffers
