@@ -101,7 +101,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         const val EXTRA_OPEN_YT_SETTINGS = "open_yt_settings"
         private const val HOME_URL = "https://m.youtube.com/"
         private const val YT_SETTINGS_URL = "https://m.youtube.com/select_site"
-        private const val CRUNCHYROLL_URL = "https://anikoto.cz/home"
+        private const val CRUNCHYROLL_URL = "crunchyroll.com"
         private const val PREFS_NAME = "sparkytube_prefs"
         private const val KEY_FIRST_LAUNCH_DONE = "first_launch_done"
         private const val GITHUB_ISSUES_URL = "https://github.com/sparkynox/SparkyTube/issues"
@@ -114,9 +114,9 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         // instead of followed. Google/YouTube domains stay allowed too
         // since Crunchyroll uses Google sign-in.
         private val CRUNCHYROLL_ALLOWED_HOST_SUFFIXES = listOf(
-            "anikoto.cz",
+            "crunchyroll.com",
             "vrv.co",
-            "anikoto.cz/home",
+            "static.crunchyroll.com",
             "accounts.google.com",
             "google.com"
         )
@@ -625,6 +625,65 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }
     }
 
+    /**
+     * Fast path for the suggestions panel: reads the related-videos list
+     * straight out of the WebView's own DOM via __sparkyGetRelatedVideosJson
+     * (see injected.js) -- YouTube already rendered this data to show its
+     * own related-videos UI, so this avoids the second network round-trip
+     * NewPipeExtractor's getRelatedItems() needs. Only works while the
+     * WebView is actually on this video's watch page with the list
+     * rendered; returns an empty list otherwise (e.g. mini-player mode
+     * with WebView elsewhere, or the list hasn't loaded yet), and the
+     * caller falls back to StreamExtractor.fetchRelatedVideos in that case.
+     */
+    private suspend fun fetchRelatedVideosViaJs(): List<StreamExtractor.RelatedVideo> =
+        kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
+            webView.evaluateJavascript(
+                "(function(){return window.__sparkyGetRelatedVideosJson ? window.__sparkyGetRelatedVideosJson() : '[]';})();"
+            ) { rawResult ->
+                val parsed = try {
+                    // evaluateJavascript double-JSON-encodes string results
+                    // (the JSON string itself comes back JSON-quoted), so
+                    // this needs one org.json decode to unwrap the outer
+                    // quoting before the actual array can be parsed.
+                    val unwrapped = org.json.JSONTokener(rawResult ?: "\"[]\"").nextValue() as? String ?: "[]"
+                    val array = org.json.JSONArray(unwrapped)
+                    (0 until array.length()).mapNotNull { i ->
+                        val obj = array.optJSONObject(i) ?: return@mapNotNull null
+                        val videoId = obj.optString("videoId").takeIf { it.length == 11 } ?: return@mapNotNull null
+                        StreamExtractor.RelatedVideo(
+                            videoId = videoId,
+                            title = obj.optString("title"),
+                            uploaderName = obj.optString("uploaderName"),
+                            durationSeconds = parseDurationText(obj.optString("durationText")),
+                            thumbnailUrl = obj.optString("thumbnailUrl").takeIf { it.isNotBlank() }
+                        )
+                    }
+                } catch (e: Exception) {
+                    emptyList()
+                }
+                if (continuation.isActive) continuation.resume(parsed) {}
+            }
+        }
+
+    /**
+     * "12:34" -> 754, "1:02:03" -> 3723. Returns 0 for anything
+     * unparseable (live badges like "LIVE", empty strings, etc.) rather
+     * than throwing -- a missing duration badge just means the row shows
+     * no duration text, same as a video NewPipeExtractor couldn't get a
+     * duration for either.
+     */
+    private fun parseDurationText(text: String): Long {
+        val parts = text.trim().split(":").mapNotNull { it.trim().toIntOrNull() }
+        if (parts.isEmpty()) return 0L
+        return when (parts.size) {
+            1 -> parts[0].toLong()
+            2 -> (parts[0] * 60L + parts[1])
+            3 -> (parts[0] * 3600L + parts[1] * 60L + parts[2])
+            else -> 0L
+        }
+    }
+
     private fun screenWidthPx() = resources.displayMetrics.widthPixels
     private fun screenHeightPx() = resources.displayMetrics.heightPixels
 
@@ -674,7 +733,22 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
         suggestionsFetchJob?.cancel()
         suggestionsFetchJob = lifecycleScope.launch {
-            val related = dev.sparkynox.sparkytube.extractor.StreamExtractor.fetchRelatedVideos(videoId)
+            val fetcherChoice = dev.sparkynox.sparkytube.settings.SettingsPrefs.getRelatedVideosFetcher(this@MainActivity)
+            val related = when (fetcherChoice) {
+                dev.sparkynox.sparkytube.settings.SettingsPrefs.RelatedVideosFetcher.JAVASCRIPT ->
+                    fetchRelatedVideosViaJs()
+                dev.sparkynox.sparkytube.settings.SettingsPrefs.RelatedVideosFetcher.NEWPIPE ->
+                    dev.sparkynox.sparkytube.extractor.StreamExtractor.fetchRelatedVideos(videoId)
+                dev.sparkynox.sparkytube.settings.SettingsPrefs.RelatedVideosFetcher.AUTO -> {
+                    // Try the fast JS path first (reads what's already on
+                    // screen); only pay for the NewPipeExtractor network
+                    // round-trip if that came back empty (mini-player mode
+                    // with WebView elsewhere, list not rendered yet, etc.)
+                    val jsResult = fetchRelatedVideosViaJs()
+                    if (jsResult.isNotEmpty()) jsResult
+                    else dev.sparkynox.sparkytube.extractor.StreamExtractor.fetchRelatedVideos(videoId)
+                }
+            }
             loadingView.visibility = View.GONE
             if (related.isEmpty()) {
                 emptyView.visibility = View.VISIBLE
