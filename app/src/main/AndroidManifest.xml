@@ -32,6 +32,16 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Lets SparkyTube show up in the Android share sheet when a
+                 YouTube link is shared from any app (official YouTube app,
+                 browser, WhatsApp, etc.) — the "download this video" flow
+                 without needing to be inside SparkyTube's own browsing UI
+                 first. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
         </activity>
 
         <activity
