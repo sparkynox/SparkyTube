@@ -45,6 +45,7 @@ class SettingsActivity : AppCompatActivity() {
             "Looks for a new SparkyTube version on app open",
             SettingsPrefs::isUpdaterEnabled, SettingsPrefs::setUpdaterEnabled
         )
+        setupYtSettingsRow()
         setupLumiAiRow()
         setupRow(
             binding.rowCustomCss, "Custom CSS",
@@ -56,6 +57,32 @@ class SettingsActivity : AppCompatActivity() {
         binding.saveCustomCssBtn.setOnClickListener {
             SettingsPrefs.setCustomCss(this, binding.customCssInput.text?.toString().orEmpty())
             Toast.makeText(this, "CSS saved", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /**
+     * Not a toggle — a navigation shortcut straight to YouTube's own
+     * settings page (https://m.youtube.com/select_site, confirmed by
+     * actually tapping through YouTube's own menu — there's no
+     * documented/stable URL for this, so this is what was found working
+     * rather than a guess). Reuses the switch-row layout for consistent
+     * styling but hides the switch itself since there's nothing to toggle
+     * — the whole row is the tap target instead.
+     */
+    private fun setupYtSettingsRow() {
+        binding.rowYtSettings.rowTitle.text = "YT Settings"
+        val subtitleView: TextView = binding.rowYtSettings.rowSubtitle
+        subtitleView.text = "Open YouTube's own settings page"
+        subtitleView.visibility = TextView.VISIBLE
+        binding.rowYtSettings.rowSwitch.visibility = android.view.View.GONE
+
+        binding.rowYtSettings.root.setOnClickListener {
+            val intent = android.content.Intent(this, dev.sparkynox.sparkytube.MainActivity::class.java).apply {
+                putExtra(dev.sparkynox.sparkytube.MainActivity.EXTRA_OPEN_YT_SETTINGS, true)
+                flags = android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+            startActivity(intent)
+            finish()
         }
     }
 
