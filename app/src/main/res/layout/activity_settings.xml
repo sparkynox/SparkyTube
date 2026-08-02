@@ -65,6 +65,12 @@
 
             <TextView
                 style="@style/SettingsSectionHeader"
+                android:text="YouTube" />
+
+            <include layout="@layout/settings_switch_row" android:id="@+id/rowYtSettings" />
+
+            <TextView
+                style="@style/SettingsSectionHeader"
                 android:text="App behavior" />
 
             <include layout="@layout/settings_switch_row" android:id="@+id/rowPopups" />

@@ -255,4 +255,29 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
+    <include
+        layout="@layout/view_suggestions_panel"
+        android:id="@+id/suggestionsPanelInclude"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- Holds the custom view WebChromeClient.onShowCustomView hands us
+         when a page (Crunchyroll) requests HTML5 video fullscreen —
+         WebView itself has no native fullscreen concept, the site's own
+         JS requestFullscreen() call expects the app to supply a view to
+         render into, which is what this container is for. Sits above
+         everything, including the connection-error overlay. -->
+    <FrameLayout
+        android:id="@+id/fullscreenVideoContainer"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="#000000"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

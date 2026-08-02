@@ -58,6 +58,14 @@
             android:visibility="gone" />
 
         <ImageButton
+            android:id="@+id/exo_suggestions_btn"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_sort_by_size"
+            android:contentDescription="Up next / suggestions" />
+
+        <ImageButton
             android:id="@+id/exo_quality_gear"
             android:layout_width="40dp"
             android:layout_height="40dp"
