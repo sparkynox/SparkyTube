@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/connectionErrorView"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:background="@color/bg_root"
+    android:visibility="gone"
+    android:paddingStart="32dp"
+    android:paddingEnd="32dp"
+    android:clickable="true"
+    android:focusable="true">
+
+    <ImageView
+        android:id="@+id/connectionErrorMascot"
+        android:layout_width="160dp"
+        android:layout_height="160dp"
+        android:src="@drawable/error_mascot"
+        android:contentDescription="Connection error" />
+
+    <TextView
+        android:id="@+id/connectionErrorTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:text="No internet connection"
+        android:textColor="@color/text_primary"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:fontFamily="sans-serif-medium" />
+
+    <TextView
+        android:id="@+id/connectionErrorReason"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:gravity="center"
+        android:text="Check your Wi-Fi or mobile data and try again."
+        android:textColor="@color/text_secondary"
+        android:textSize="14sp" />
+
+    <Button
+        android:id="@+id/connectionErrorRetryBtn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:text="Retry"
+        android:textColor="@color/text_primary"
+        android:backgroundTint="@color/bg_surface_raised" />
+
+</LinearLayout>
