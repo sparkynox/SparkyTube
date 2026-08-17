@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/profileCardRoot"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_margin="12dp"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp"
+    android:background="?attr/selectableItemBackground">
+
+    <FrameLayout
+        android:layout_width="88dp"
+        android:layout_height="88dp">
+
+        <ImageView
+            android:id="@+id/pfpImage"
+            android:layout_width="88dp"
+            android:layout_height="88dp"
+            android:background="@drawable/bg_pfp_circle"
+            android:scaleType="centerCrop"
+            android:clipToOutline="true"
+            android:src="@drawable/ic_default_pfp"
+            android:contentDescription="Profile photo" />
+
+        <View
+            android:id="@+id/activeIndicator"
+            android:layout_width="88dp"
+            android:layout_height="88dp"
+            android:background="@drawable/bg_pfp_active_ring"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/profileNameText"
+        android:layout_width="88dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:gravity="center"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textColor="@color/text_primary"
+        android:textSize="13sp"
+        android:fontFamily="sans-serif-medium" />
+
+</LinearLayout>
