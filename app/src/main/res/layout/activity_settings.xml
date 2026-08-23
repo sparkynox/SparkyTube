@@ -92,6 +92,12 @@
 
             <TextView
                 style="@style/SettingsSectionHeader"
+                android:text="Experimental" />
+
+            <include layout="@layout/settings_switch_row" android:id="@+id/rowNativeHomeFeed" />
+
+            <TextView
+                style="@style/SettingsSectionHeader"
                 android:text="App behavior" />
 
             <include layout="@layout/settings_switch_row" android:id="@+id/rowPopups" />

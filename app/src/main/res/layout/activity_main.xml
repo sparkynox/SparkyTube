@@ -100,6 +100,22 @@
             android:layout_gravity="center"
             android:indeterminateTint="@color/accent" />
 
+        <!-- v1.8 test: native (authenticated InnerTube) Home feed.
+             Hidden by default; toggled from Settings > Native Home
+             Feed. When shown, it sits on top of the WebView (which
+             keeps running invisibly underneath, same "real session
+             lives in the WebView" approach as the rest of the app);
+             MainActivity swaps this vs the WebView's visibility rather
+             than tearing either one down. -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/nativeHomeFeedList"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone"
+            android:clipToPadding="false"
+            android:paddingTop="8dp"
+            android:paddingBottom="16dp" />
+
         <androidx.media3.ui.PlayerView
             android:id="@+id/exoPlayerView"
             android:layout_width="match_parent"
