@@ -11,8 +11,8 @@ android {
         applicationId = "dev.sparkynox.sparkytube"
         minSdk = 24
         targetSdk = 34
-        versionCode = 9
-        versionName = "1.7"
+        versionCode = 10
+        versionName = "1.8"
 
         // ARMv7 (armeabi-v7a) + ARM64 (arm64-v8a) — covers basically every real device.
         // x86/x86_64 skipped on purpose (emulator-only, not needed per Sparky's spec).
@@ -113,6 +113,13 @@ dependencies {
     // user explicitly taps it. See support/SupportAdManager.kt.
     implementation("com.inmobi.monetization:inmobi-ads-kotlin:11.3.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // FFmpeg for on-device muxing/downloads — arthenica's original
+    // FFmpegKit retired in Jan 2025 (binaries pulled, repo archived),
+    // so builds can't resolve it anymore. This is a maintained
+    // continuation (Maven Central, not JitPack) that Echo Music itself
+    // switched to for the same reason.
+    implementation("io.github.maxrave-dev:ffmpeg-kit-audio:6.0.1")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

@@ -15,3 +15,11 @@
 -dontwarn javax.script.**
 -dontwarn jdk.dynalink.**
 -dontwarn org.mozilla.javascript.**
+
+## Rules for the FFmpegKit fork (io.github.maxrave-dev:ffmpeg-kit-audio)
+## used for adaptive-quality download muxing -- keeps its JNI-facing
+## classes intact (native code calls back into these by name/signature,
+## so R8 renaming/stripping them breaks the native<->Java bridge even
+## though nothing in Kotlin source appears to reference them directly).
+-keep class com.arthenica.ffmpegkit.** { *; }
+-dontwarn com.arthenica.ffmpegkit.**
