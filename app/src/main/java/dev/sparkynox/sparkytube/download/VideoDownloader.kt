@@ -20,7 +20,105 @@ object VideoDownloader {
      */
     fun downloadVideo(context: Context, videoUrl: String, audioUrl: String?, title: String, qualityLabel: String = "360p") {
         val safeName = sanitizeFileName(title).ifBlank { "sparkytube_video" }
-        startDirectDownload(context, videoUrl, safeName, qualityLabel)
+        if (audioUrl != null) {
+            // Adaptive quality (video-only stream + separate audio-only
+            // stream) -- DownloadManager alone can't combine two files
+            // into one playable video, so this path downloads both then
+            // muxes them with FFmpeg. This is the fix for the
+            // "downloads aren't working because of SABR" limitation
+            // downloadVideoById's caller used to refuse outright.
+            startAdaptiveDownloadAndMux(context, videoUrl, audioUrl, safeName, qualityLabel)
+        } else {
+            startDirectDownload(context, videoUrl, safeName, qualityLabel)
+        }
+    }
+
+    /**
+     * Downloads the video-only and audio-only streams to the app's private
+     * cache dir (not Downloads -- these are intermediate files, deleted
+     * once muxing finishes or fails), then runs them through FFmpegKit's
+     * "-c copy" mux (no re-encoding, just repackaging into one container
+     * -- fast, and lossless since neither stream is touched) into a
+     * single mp4 in the public Downloads folder.
+     */
+    private fun startAdaptiveDownloadAndMux(
+        context: Context,
+        videoUrl: String,
+        audioUrl: String,
+        safeName: String,
+        qualityLabel: String
+    ) {
+        val appContext = context.applicationContext
+        Handler(Looper.getMainLooper()).post {
+            Toast.makeText(appContext, "Downloading $qualityLabel (video + audio)…", Toast.LENGTH_SHORT).show()
+        }
+
+        Thread {
+            val cacheDir = appContext.cacheDir
+            val videoTemp = java.io.File(cacheDir, "dl_video_${System.currentTimeMillis()}.tmp")
+            val audioTemp = java.io.File(cacheDir, "dl_audio_${System.currentTimeMillis()}.tmp")
+
+            try {
+                downloadToFile(videoUrl, videoTemp)
+                downloadToFile(audioUrl, audioTemp)
+
+                val fileName = "${safeName}_$qualityLabel.mp4"
+                val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                if (!downloadsDir.exists()) downloadsDir.mkdirs()
+                val outputFile = java.io.File(downloadsDir, fileName)
+
+                // -c copy: remux only, no re-encode -- both streams keep
+                // their original quality exactly, this just repackages
+                // them into one mp4 container with both tracks.
+                val command = "-y -i \"${videoTemp.absolutePath}\" -i \"${audioTemp.absolutePath}\" " +
+                    "-c copy -map 0:v:0 -map 1:a:0 \"${outputFile.absolutePath}\""
+
+                val session = com.arthenica.ffmpegkit.FFmpegKit.execute(command)
+
+                videoTemp.delete()
+                audioTemp.delete()
+
+                Handler(Looper.getMainLooper()).post {
+                    if (com.arthenica.ffmpegkit.ReturnCode.isSuccess(session.returnCode)) {
+                        // MediaScanner needs to be told about the new file
+                        // explicitly -- files written directly to
+                        // Downloads via java.io.File (rather than through
+                        // DownloadManager or MediaStore) don't show up in
+                        // the Files/Downloads app or other media scanners
+                        // until a scan is requested for them.
+                        android.media.MediaScannerConnection.scanFile(
+                            appContext, arrayOf(outputFile.absolutePath), null, null
+                        )
+                        Toast.makeText(appContext, "Download complete: $fileName", Toast.LENGTH_LONG).show()
+                    } else {
+                        Toast.makeText(
+                            appContext,
+                            "Couldn't combine video and audio (FFmpeg error). Try a lower quality with combined audio+video instead.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            } catch (e: Exception) {
+                videoTemp.delete()
+                audioTemp.delete()
+                Handler(Looper.getMainLooper()).post {
+                    Toast.makeText(appContext, "Download failed: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }.start()
+    }
+
+    private fun downloadToFile(url: String, destination: java.io.File) {
+        val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+        connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) SparkyTube")
+        connection.connectTimeout = 15000
+        connection.readTimeout = 30000
+        connection.inputStream.use { input ->
+            java.io.FileOutputStream(destination).use { output ->
+                input.copyTo(output)
+            }
+        }
+        connection.disconnect()
     }
 
     private fun startDirectDownload(context: Context, videoUrl: String, safeName: String, qualityLabel: String) {
