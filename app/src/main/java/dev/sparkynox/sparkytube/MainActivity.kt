@@ -575,19 +575,10 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
      * qualities that will just fail with the same explanation.
      */
     private fun showDownloadQualityPicker() {
-        val progressiveDownload = currentQualities.firstOrNull { it.audioUrl == null }
-
-        if (progressiveDownload == null) {
+        if (currentQualities.isEmpty()) {
             AlertDialog.Builder(this)
-                .setTitle("Downloads aren't working right now")
-                .setMessage(
-                    "YouTube changed how it serves video/audio streams (something " +
-                    "called SABR), and it's currently blocking the combined " +
-                    "audio+video downloads this app needs. This is affecting every " +
-                    "YouTube extractor, not just this app — it isn't a SparkyTube bug. " +
-                    "Downloads will start working again once the underlying extraction " +
-                    "library catches up."
-                )
+                .setTitle("No download available")
+                .setMessage("Couldn't find a downloadable stream for this video.")
                 .setPositiveButton("OK", null)
                 .show()
             return
@@ -598,9 +589,10 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
         AlertDialog.Builder(this)
             .setTitle("Download quality")
-            .setItems(labels) { _, _ ->
+            .setItems(labels) { _, which ->
+                val chosen = currentQualities[which]
                 dev.sparkynox.sparkytube.download.VideoDownloader.downloadVideo(
-                    this, progressiveDownload.url, progressiveDownload.audioUrl, title, progressiveDownload.label
+                    this, chosen.url, chosen.audioUrl, title, chosen.label
                 )
             }
             .setNegativeButton("Cancel", null)
@@ -1080,24 +1072,30 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 return@launch
             }
 
-            // Same rule as the in-app download button: only ever download
-            // a progressive (audio-baked-in) stream. No fallback to an
-            // adaptive video-only stream, since DownloadManager can't mux
-            // in a separate audio track and that fallback was the original
-            // "downloaded video has no sound" bug.
+            // Prefer a progressive (audio-baked-in) stream when one is
+            // available -- no muxing needed, fastest path. Falls back to
+            // the best adaptive (video-only + separate audio-only) pair
+            // now that VideoDownloader can mux them with FFmpeg -- this
+            // used to be a hard refusal here (SABR mostly removed
+            // progressive streams for anything above 360p), so this
+            // fallback is what actually restores higher-quality downloads.
             val progressiveOption = resolved.availableQualities.firstOrNull { it.audioUrl == null }
-            if (progressiveOption == null) {
+            val chosenOption = progressiveOption
+                ?: resolved.availableQualities.filter { it.audioUrl != null }
+                    .maxByOrNull { it.resolutionValue }
+
+            if (chosenOption == null) {
                 android.widget.Toast.makeText(
                     this@MainActivity,
-                    "Downloads aren't working right now — YouTube's SABR changes are blocking combined audio+video streams for every extractor, not just this app.",
+                    "No downloadable stream found for this video.",
                     android.widget.Toast.LENGTH_LONG
                 ).show()
                 return@launch
             }
 
             dev.sparkynox.sparkytube.download.VideoDownloader.downloadVideo(
-                this@MainActivity, progressiveOption.url, progressiveOption.audioUrl,
-                resolved.title.ifBlank { videoId }, progressiveOption.label
+                this@MainActivity, chosenOption.url, chosenOption.audioUrl,
+                resolved.title.ifBlank { videoId }, chosenOption.label
             )
         }
     }
@@ -1879,6 +1877,14 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     private fun navigateToSection(navItem: LinearLayout, targetUrl: String) {
         highlightNav(navItem)
 
+        if (targetUrl == HOME_URL &&
+            dev.sparkynox.sparkytube.settings.SettingsPrefs.isNativeHomeFeedEnabled(this)
+        ) {
+            showNativeHomeFeed()
+            return
+        }
+        hideNativeHomeFeed()
+
         val alreadyThere = browseMode == BrowseMode.YOUTUBE &&
             webView.url?.trimEnd('/') == targetUrl.trimEnd('/')
 
@@ -1892,6 +1898,62 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }
         browseMode = BrowseMode.YOUTUBE
         webView.loadUrl(targetUrl)
+    }
+
+    private var nativeFeedAdapter: dev.sparkynox.sparkytube.homefeed.NativeFeedAdapter? = null
+
+    /**
+     * Shows the RecyclerView on top of the (still-running, invisible)
+     * WebView and kicks off an InnerTube fetch. The WebView is left
+     * alone rather than torn down -- same reasoning as the old
+     * native-feed system that was removed in v1.7 for Home/Search/Subs:
+     * it's still the thing holding the real logged-in session
+     * (CookieManager), just not what's currently on screen.
+     */
+    private fun showNativeHomeFeed() {
+        if (nativeFeedAdapter == null) {
+            nativeFeedAdapter = dev.sparkynox.sparkytube.homefeed.NativeFeedAdapter { item ->
+                hideNativeHomeFeed()
+                browseMode = BrowseMode.YOUTUBE
+                webView.loadUrl("https://m.youtube.com/watch?v=${item.videoId}")
+                lastResolvedVideoId = null
+                resolveAndPlayNative(item.videoId, fallbackTitle = item.title)
+            }
+            binding.nativeHomeFeedList.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
+            binding.nativeHomeFeedList.adapter = nativeFeedAdapter
+        }
+
+        binding.nativeHomeFeedList.visibility = View.VISIBLE
+        webView.visibility = View.INVISIBLE
+        binding.loadingSpinner.visibility = View.VISIBLE
+
+        lifecycleScope.launch {
+            val result = dev.sparkynox.sparkytube.homefeed.InnerTubeClient.fetchHomeFeed()
+            binding.loadingSpinner.visibility = View.GONE
+
+            if (!result.isLoggedIn) {
+                // No session yet, or the InnerTube request failed --
+                // fall back to the normal WebView Home feed rather than
+                // showing an empty native screen. This is the expected
+                // path for anyone who hasn't logged into YouTube at all.
+                hideNativeHomeFeed()
+                browseMode = BrowseMode.YOUTUBE
+                webView.loadUrl(HOME_URL)
+                android.widget.Toast.makeText(
+                    this@MainActivity,
+                    "Native Home Feed needs a YouTube login — showing the regular feed instead",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+                return@launch
+            }
+
+            nativeFeedAdapter?.submitItems(result.items)
+        }
+    }
+
+    private fun hideNativeHomeFeed() {
+        binding.nativeHomeFeedList.visibility = View.GONE
+        webView.visibility = View.VISIBLE
     }
 
     private fun highlightNav(selected: LinearLayout) {
