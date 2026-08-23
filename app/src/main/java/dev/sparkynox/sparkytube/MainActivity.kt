@@ -102,7 +102,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         const val EXTRA_PROFILE_SWITCHED = "profile_switched"
         private const val HOME_URL = "https://m.youtube.com/"
         private const val YT_SETTINGS_URL = "https://m.youtube.com/select_site"
-        private const val CRUNCHYROLL_URL = "crunchyroll.com"
+        private const val CRUNCHYROLL_URL = "https://anikoto.cz/home"
         private const val PREFS_NAME = "sparkytube_prefs"
         private const val KEY_FIRST_LAUNCH_DONE = "first_launch_done"
         private const val GITHUB_ISSUES_URL = "https://github.com/sparkynox/SparkyTube/issues"
@@ -115,9 +115,9 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         // instead of followed. Google/YouTube domains stay allowed too
         // since Crunchyroll uses Google sign-in.
         private val CRUNCHYROLL_ALLOWED_HOST_SUFFIXES = listOf(
-            "crunchyroll.com",
-            "vrv.co",
-            "static.crunchyroll.com",
+            "anikoto.cz",
+            "anikoto.cz/home",
+            "sparkynox.github.io/sparkynox",
             "accounts.google.com",
             "google.com"
         )
