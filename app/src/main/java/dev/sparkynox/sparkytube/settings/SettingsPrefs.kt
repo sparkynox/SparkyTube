@@ -23,6 +23,7 @@ object SettingsPrefs {
     private const val KEY_ANIME_STREAMING_ENABLED = "anime_streaming_enabled"
     private const val KEY_ADBLOCK_ENABLED = "adblock_enabled"
     private const val KEY_DATA_SAVER_ENABLED = "data_saver_enabled"
+    private const val KEY_NATIVE_HOME_FEED_ENABLED = "native_home_feed_enabled"
     private const val KEY_DOWNLOAD_ENABLED = "download_enabled"
     private const val KEY_CUSTOM_CSS = "custom_css"
     private const val KEY_CUSTOM_CSS_ENABLED = "custom_css_enabled"
@@ -92,6 +93,17 @@ object SettingsPrefs {
 
     fun setDataSaverEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_DATA_SAVER_ENABLED, enabled).apply()
+    }
+
+    // v1.8 test flag: native (authenticated InnerTube) Home feed instead
+    // of the WebView-rendered one. Off by default -- this is a fresh,
+    // hand-written client (see homefeed/InnerTubeClient.kt) being tested
+    // on Home only before any decision to expand it further.
+    fun isNativeHomeFeedEnabled(context: Context) =
+        prefs(context).getBoolean(KEY_NATIVE_HOME_FEED_ENABLED, false)
+
+    fun setNativeHomeFeedEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_NATIVE_HOME_FEED_ENABLED, enabled).apply()
     }
 
     fun isDownloadEnabled(context: Context) =

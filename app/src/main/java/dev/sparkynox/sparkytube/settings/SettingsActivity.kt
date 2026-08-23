@@ -62,6 +62,7 @@ class SettingsActivity : AppCompatActivity() {
         setupLocalServersRow()
         setupExtractorMethodRow()
         setupDataSaverRow()
+        setupNativeHomeFeedRow()
         setupLumiAiRow()
         setupRow(
             binding.rowCustomCss, "Custom CSS",
@@ -257,6 +258,27 @@ class SettingsActivity : AppCompatActivity() {
         switch.isChecked = SettingsPrefs.isDataSaverEnabled(this)
         switch.setOnCheckedChangeListener { _, isChecked ->
             SettingsPrefs.setDataSaverEnabled(this, isChecked)
+        }
+    }
+
+    /**
+     * v1.8 test: swaps the Home tab's WebView-rendered feed for a
+     * natively-rendered one built from a hand-written InnerTube client
+     * (homefeed/InnerTubeClient.kt), reusing whatever YouTube login
+     * session is already in the WebView's CookieManager. Deliberately
+     * scoped to Home only for now -- if this holds up, the same approach
+     * can extend to Search/Subs/other feeds later.
+     */
+    private fun setupNativeHomeFeedRow() {
+        binding.rowNativeHomeFeed.rowTitle.text = "Native Home Feed (Beta)"
+        val subtitleView: TextView = binding.rowNativeHomeFeed.rowSubtitle
+        subtitleView.text = "Renders Home natively instead of via WebView. Needs a YouTube login. Home only for now."
+        subtitleView.visibility = TextView.VISIBLE
+
+        val switch: SwitchCompat = binding.rowNativeHomeFeed.rowSwitch
+        switch.isChecked = SettingsPrefs.isNativeHomeFeedEnabled(this)
+        switch.setOnCheckedChangeListener { _, isChecked ->
+            SettingsPrefs.setNativeHomeFeedEnabled(this, isChecked)
         }
     }
 
