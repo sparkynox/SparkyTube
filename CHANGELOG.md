@@ -1,5 +1,17 @@
 # SparkyTube Changelog
 
+## v1.8
+
+### Native Home Feed (Beta, off by default)
+- New Settings > Experimental > Native Home Feed toggle — renders the Home tab natively instead of via WebView, using a hand-written InnerTube client (`homefeed/InnerTubeClient.kt`) that reuses whatever YouTube login session is already in the WebView's cookies.
+- Scoped to Home only for this release, as a test of the approach before deciding whether to extend it to Search/Subs/other feeds. Falls back to the normal WebView feed automatically if there's no YouTube login or the request fails.
+- NewPipeExtractor deliberately doesn't support authenticated feeds by design, so this is a new, from-scratch client rather than an extension of the existing extractor.
+
+### Downloads
+- Adaptive-quality downloads (any resolution above what a progressive stream offers) now work again — video-only and audio-only streams are downloaded separately and muxed into one file with FFmpeg, instead of refusing outright.
+- This replaces the "Downloads aren't working right now (SABR)" message that only allowed progressive (~360p) downloads.
+- Uses `io.github.maxrave-dev:ffmpeg-kit-audio`, a maintained continuation of FFmpegKit — the original arthenica FFmpegKit was officially retired in January 2025 and its binaries pulled from Maven, so it can no longer be added to new projects.
+
 ## v1.7
 
 ### Profiles
