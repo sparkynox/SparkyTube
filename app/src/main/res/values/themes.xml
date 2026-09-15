@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Material 3 parent — gives every stock M3 component (buttons, sliders,
+         cards, FABs, switches) modern rounded shapes and motion for free on
+         Android 8+ (Oreo, API 26) through 15, while Android 12+ additionally
+         hooks colorPrimary/colorSecondary etc into the system's dynamic
+         wallpaper-based palette via DynamicColors (see SparkyTubeApp.kt).
+         M3's DayNight variant still respects our forced-dark setup below. -->
+    <style name="Theme.SparkyTube" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/bg_root</item>
+        <item name="colorPrimary">@color/accent</item>
+        <item name="colorOnPrimary">@color/text_primary</item>
+        <item name="colorSecondary">@color/accent</item>
+        <item name="colorSurface">@color/bg_surface</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorSurfaceVariant">@color/bg_surface_raised</item>
+        <item name="colorOnSurfaceVariant">@color/text_secondary</item>
+        <item name="colorOutline">@color/divider</item>
+        <item name="colorPrimaryDark">@color/bg_root</item>
+        <item name="colorAccent">@color/accent</item>
+        <item name="android:statusBarColor">@color/bg_root</item>
+        <item name="android:navigationBarColor">@color/bg_root</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
+        <item name="android:forceDarkAllowed" tools:targetApi="q">false</item>
+
+        <!-- Rounded-corner shape scale used by M3 components app-wide
+             (cards, dialogs, bottom sheets, buttons pick these up
+             automatically) -->
+        <item name="shapeAppearanceSmallComponent">@style/ShapeAppearance.Sparky.Small</item>
+        <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.Sparky.Medium</item>
+        <item name="shapeAppearanceLargeComponent">@style/ShapeAppearance.Sparky.Large</item>
+    </style>
+
+    <style name="Theme.SparkyTube.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+
+    <!-- Sparky's ultra-rounded "Android 12 feel" corner scale -->
+    <style name="ShapeAppearance.Sparky.Small" parent="ShapeAppearance.Material3.Corner.Small">
+        <item name="cornerSize">12dp</item>
+    </style>
+
+    <style name="ShapeAppearance.Sparky.Medium" parent="ShapeAppearance.Material3.Corner.Medium">
+        <item name="cornerSize">18dp</item>
+    </style>
+
+    <style name="ShapeAppearance.Sparky.Large" parent="ShapeAppearance.Material3.Corner.Large">
+        <item name="cornerSize">24dp</item>
+    </style>
+
+    <!-- Fully circular shape override for the player's center play/pause FAB -->
+    <style name="ShapeAppearance.Sparky.Circle" parent="ShapeAppearance.Material3.Corner.Full" />
+
+    <style name="SettingsSectionHeader">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:paddingStart">20dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="android:paddingTop">22dp</item>
+        <item name="android:paddingBottom">8dp</item>
+        <item name="android:textColor">@color/accent</item>
+        <item name="android:textSize">12.5sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.08</item>
+        <item name="android:textAllCaps">true</item>
+    </style>
+
+</resources>

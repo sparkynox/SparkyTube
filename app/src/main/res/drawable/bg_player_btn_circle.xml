@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Subtle glass-morphism circle behind player control icons — translucent
+     white fill + ripple, matches the "modern floating controls" look
+     instead of bare icons floating on the scrim with no touch target
+     definition. -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#33FFFFFF">
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="#26FFFFFF" />
+        </shape>
+    </item>
+</ripple>

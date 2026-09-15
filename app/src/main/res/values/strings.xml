@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SparkyTube</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_shorts">Shorts</string>
+    <string name="nav_subscriptions">Subs</string>
+    <string name="nav_library">Library</string>
+    <string name="playback_channel_name">SparkyTube Playback</string>
+    <string name="notif_playing">Playing</string>
+    <string name="notif_paused">Paused</string>
+    <string name="tracking_blocked_toast">%1$d useless trackers blocked this session</string>
+</resources>
