@@ -1,0 +1,399 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/rootLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_root">
+
+    <!-- Top bar: logo + search icon, fixed position, mimics official app header -->
+    <LinearLayout
+        android:id="@+id/topBar"
+        android:layout_width="0dp"
+        android:layout_height="52dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@color/bg_root"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:elevation="4dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:id="@+id/logoText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="SparkyTube"
+            android:textColor="@color/text_primary"
+            android:textSize="19sp"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif-medium" />
+
+        <ImageButton
+            android:id="@+id/audioTrackBtn"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_audio_track"
+            android:contentDescription="Audio track"
+            android:visibility="gone"
+            app:tint="@color/text_primary" />
+
+        <ImageButton
+            android:id="@+id/qualityBtn"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_quality"
+            android:contentDescription="Video quality"
+            android:visibility="gone"
+            app:tint="@color/text_primary" />
+
+        <ImageButton
+            android:id="@+id/searchBtn"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_search"
+            android:contentDescription="Search"
+            app:tint="@color/text_primary" />
+
+        <ImageButton
+            android:id="@+id/settingsBtn"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_manage"
+            android:contentDescription="Settings"
+            app:tint="@color/text_primary" />
+
+        <ImageButton
+            android:id="@+id/overflowMenuBtn"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_more"
+            android:contentDescription="More options"
+            app:tint="@color/text_primary" />
+    </LinearLayout>
+
+    <!-- WebView container -->
+    <FrameLayout
+        android:id="@+id/webViewContainer"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="@color/bg_root"
+        app:layout_constraintTop_toBottomOf="@id/topBar"
+        app:layout_constraintBottom_toTopOf="@id/bottomNav"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <ProgressBar
+            android:id="@+id/loadingSpinner"
+            style="?android:attr/progressBarStyleLarge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:indeterminateTint="@color/accent" />
+
+        <!-- v1.9: native (authenticated InnerTube) Home feed with
+             infinite scroll + pull-to-refresh. Hidden by default;
+             toggled from Settings > Native Home Feed. When shown, it
+             sits on top of the WebView (which keeps running invisibly
+             underneath, same "real session lives in the WebView"
+             approach as the rest of the app); MainActivity swaps this
+             vs the WebView's visibility rather than tearing either one
+             down. SwipeRefreshLayout wraps the list so pulling down
+             re-fetches the feed from scratch, same gesture the real
+             YouTube app uses. -->
+        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+            android:id="@+id/nativeHomeFeedSwipeRefresh"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/nativeHomeFeedList"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingTop="8dp"
+                android:paddingBottom="16dp" />
+        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+        <!-- Music/audio mode background thumbnail: sits BEHIND
+             exoPlayerView (declared before it, so it's earlier in
+             z-order) rather than as an overlay on top of it. Only the
+             video surface inside exoPlayerView (exo_content_frame) is
+             hidden in music mode, not the whole PlayerView — so its
+             controller (play/pause/seek/music-mode-off button, all of
+             it) keeps receiving touches completely normally and this
+             thumbnail just shows through wherever the video surface
+             would otherwise be black. See applyMusicModeVisual in
+             MainActivity.
+
+             Bug fix: exoPlayerView below uses surface_type="texture_view"
+             instead of the default "surface_view" specifically so this
+             layering actually works. A SurfaceView renders on its own
+             separate compositing layer outside the normal view
+             hierarchy's z-order — which is why the background WebView's
+             real (still-playing, muted) video could randomly show
+             through underneath this thumbnail in music mode, or peek
+             through other overlays. TextureView draws as a normal part
+             of the view tree like any other View, so it respects the
+             same z-order/visibility rules everything else here does, and
+             that flickering-through stops entirely. -->
+        <ImageView
+            android:id="@+id/musicModeThumbnail"
+            android:layout_width="match_parent"
+            android:layout_height="220dp"
+            android:layout_gravity="top"
+            android:background="#000000"
+            android:scaleType="centerCrop"
+            android:visibility="gone"
+            android:clickable="false"
+            android:focusable="false"
+            android:contentDescription="Now playing thumbnail" />
+
+        <androidx.media3.ui.PlayerView
+            android:id="@+id/exoPlayerView"
+            android:layout_width="match_parent"
+            android:layout_height="220dp"
+            android:layout_gravity="top"
+            android:background="@android:color/black"
+            android:visibility="gone"
+            app:use_controller="true"
+            app:controller_layout_id="@layout/exo_player_controls"
+            app:show_shuffle_button="false"
+            app:show_next_button="false"
+            app:show_previous_button="false"
+            app:show_timeout="0"
+            app:resize_mode="fit"
+            app:surface_type="texture_view" />
+
+        <!-- Volume/brightness gesture indicator (VidMate-style) — shown
+             centered over the player while the user is swiping to
+             change volume or brightness (see adjustVolume/adjustBrightness
+             in MainActivity), replacing the old bottom Toast popup.
+             Auto-hidden the rest of the time. -->
+        <LinearLayout
+            android:id="@+id/gestureOverlay"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center|top"
+            android:layout_marginTop="40dp"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="@drawable/bg_gesture_overlay"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:paddingTop="14dp"
+            android:paddingBottom="14dp"
+            android:visibility="gone"
+            android:elevation="6dp">
+
+            <ImageView
+                android:id="@+id/gestureOverlayMascot"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:layout_marginBottom="6dp"
+                android:scaleType="fitCenter"
+                android:contentDescription="Mascot" />
+
+            <ImageView
+                android:id="@+id/gestureOverlayIcon"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_marginBottom="8dp"
+                android:src="@drawable/ic_volume_up"
+                android:contentDescription="Volume/brightness icon" />
+
+            <ProgressBar
+                android:id="@+id/gestureOverlayBar"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="90dp"
+                android:layout_height="6dp"
+                android:max="100"
+                android:progressTint="@color/accent"
+                android:progressBackgroundTint="#33FFFFFF" />
+
+            <TextView
+                android:id="@+id/gestureOverlayPercent"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:textColor="#FFFFFF"
+                android:textSize="12.5sp"
+                android:fontFamily="sans-serif-medium" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- Fixed bottom nav — always same position, 4 tabs like official app -->
+    <LinearLayout
+        android:id="@+id/bottomNav"
+        android:layout_width="0dp"
+        android:layout_height="56dp"
+        android:orientation="horizontal"
+        android:background="@color/bg_surface"
+        android:elevation="8dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:id="@+id/navHome"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="?attr/selectableItemBackgroundBorderless">
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_home"
+                app:tint="@drawable/nav_item_color" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="@string/nav_home"
+                android:textSize="10sp"
+                android:textColor="@drawable/nav_item_color" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/navShorts"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="?attr/selectableItemBackgroundBorderless">
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_shorts"
+                app:tint="@drawable/nav_item_color" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="@string/nav_shorts"
+                android:textSize="10sp"
+                android:textColor="@drawable/nav_item_color" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/navSubs"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="?attr/selectableItemBackgroundBorderless">
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_subscriptions"
+                app:tint="@drawable/nav_item_color" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="@string/nav_subscriptions"
+                android:textSize="10sp"
+                android:textColor="@drawable/nav_item_color" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/navLibrary"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="?attr/selectableItemBackgroundBorderless">
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_library"
+                app:tint="@drawable/nav_item_color" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="@string/nav_library"
+                android:textSize="10sp"
+                android:textColor="@drawable/nav_item_color" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- Floating mini-player: shown when the user collapses a video via the
+         down-chevron on the full player. Holds the SAME PlayerView instance
+         (moved here, not duplicated) so ExoPlayer keeps playing without any
+         interruption across the transition. Draggable — position is just
+         updated via layout params in MainActivity's touch handler, no
+         special drag library needed for a single free-floating box. -->
+    <FrameLayout
+        android:id="@+id/miniPlayerContainer"
+        android:layout_width="160dp"
+        android:layout_height="90dp"
+        android:background="#000000"
+        android:elevation="12dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginEnd="8dp"
+        android:layout_marginBottom="64dp">
+
+        <ImageButton
+            android:id="@+id/miniPlayerCloseBtn"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_gravity="top|end"
+            android:background="#80000000"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            android:contentDescription="Close mini player"
+            app:tint="@color/text_primary" />
+    </FrameLayout>
+
+    <include
+        layout="@layout/view_connection_error"
+        android:id="@+id/connectionErrorInclude"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <include
+        layout="@layout/view_suggestions_panel"
+        android:id="@+id/suggestionsPanelInclude"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- Holds the custom view WebChromeClient.onShowCustomView hands us
+         when a page (Crunchyroll) requests HTML5 video fullscreen —
+         WebView itself has no native fullscreen concept, the site's own
+         JS requestFullscreen() call expects the app to supply a view to
+         render into, which is what this container is for. Sits above
+         everything, including the connection-error overlay. -->
+    <FrameLayout
+        android:id="@+id/fullscreenVideoContainer"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="#000000"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

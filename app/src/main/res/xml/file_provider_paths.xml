@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- LogRecorder writes sparky_session_log.txt and sparky_last_crash.txt
+         directly under filesDir (context.filesDir root), so this exposes
+         just that root - not the whole app-private storage tree - to
+         keep the share surface minimal. -->
+    <files-path name="logs" path="." />
+</paths>

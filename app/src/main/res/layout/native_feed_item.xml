@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingBottom="16dp"
+    android:background="?attr/selectableItemBackground">
+
+    <!-- Fixed 16:9 thumbnail via dimensionRatio instead of the old
+         0dp+layout_weight trick, which never actually worked here (that
+         only distributes space along the parent's MAIN axis; this
+         LinearLayout's height is wrap_content, so there was no space to
+         distribute and the thumbnail's real height came from whatever
+         happened to load, not a real aspect ratio) — fixes inconsistent/
+         squished thumbnails across cards. -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <ImageView
+            android:id="@+id/thumbnailImage"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:scaleType="centerCrop"
+            android:background="@color/bg_surface_raised"
+            android:contentDescription="Video thumbnail"
+            app:layout_constraintDimensionRatio="H,16:9"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <TextView
+            android:id="@+id/durationText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_margin="6dp"
+            android:paddingStart="5dp"
+            android:paddingEnd="5dp"
+            android:paddingTop="1dp"
+            android:paddingBottom="1dp"
+            android:background="#CC000000"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:fontFamily="sans-serif-medium"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <!-- Mix/Playlist badge — real YouTube shows a small stacked-
+             cards icon + item count on those card types instead of a
+             plain duration; playlistBadgeText doubles as that (reuses
+             durationText's spot when a card is a playlist rather than
+             showing both at once). -->
+        <TextView
+            android:id="@+id/playlistBadgeText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_margin="6dp"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:background="#CC000000"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:fontFamily="sans-serif-medium"
+            android:drawablePadding="3dp"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingTop="10dp"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp">
+
+        <!-- Channel avatar circle — real YouTube feed cards always show
+             this next to the title; previously missing entirely, cards
+             looked flatter/less "real app" than the actual site. -->
+        <ImageView
+            android:id="@+id/channelAvatarImage"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginTop="1dp"
+            android:background="@drawable/bg_channel_avatar"
+            android:scaleType="centerCrop"
+            android:contentDescription="Channel avatar" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="10dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/titleText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:textSize="14.5sp"
+                android:fontFamily="sans-serif-medium"
+                android:maxLines="2"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/metaText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:textColor="@color/text_secondary"
+                android:textSize="12.5sp"
+                android:maxLines="1"
+                android:ellipsize="end" />
+        </LinearLayout>
+    </LinearLayout>
+
+</LinearLayout>
