@@ -129,6 +129,12 @@ dependencies {
     implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
     implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")
 
+    // Luno Voice (Beta) -- offline speech recognition. Model itself
+    // (vosk-model-small-en-us-0.15) is NOT a gradle dependency -- it's a
+    // ~40MB zip that must be unpacked into app/src/main/assets/ before
+    // building, see voice/LunoVoiceManager.kt's top comment.
+    implementation("com.alphacephei:vosk-android:0.3.75")
+
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
 }

@@ -48,3 +48,13 @@
 -keepclassmembers class * {
     @com.chaquo.python.PyIgnore *;
 }
+
+## Luno Voice (Beta) -- Vosk uses JNA to call its native recognition
+## library via reflection, same class of issue as yt-dlp's Chaquopy
+## binaries above. Rules match vosk-android's own recommended proguard
+## setup (JNA needs both the interface AND its generated proxy kept).
+-keep class org.vosk.** { *; }
+-keep class com.sun.jna.** { *; }
+-keepclassmembers class * extends com.sun.jna.** { public *; }
+-dontwarn org.vosk.**
+-dontwarn com.sun.jna.**
