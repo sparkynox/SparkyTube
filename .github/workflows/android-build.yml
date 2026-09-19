@@ -35,6 +35,20 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Download Luno Voice (Vosk) model
+        # Model is ~40MB, way past GitHub's 25MB single-file upload limit,
+        # so it can't just be committed to the repo -- fetched fresh on
+        # every CI run instead and unpacked straight into assets/ before
+        # the build. Zip includes conf/, am/, graph/ folders AND a uuid
+        # file at the model root that Vosk's native loader also needs, so
+        # this is a full unzip, not just grabbing specific subfolders.
+        run: |
+          mkdir -p app/src/main/assets
+          curl -L -o vosk-model.zip https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
+          unzip -q vosk-model.zip -d app/src/main/assets
+          rm vosk-model.zip
+          ls -la app/src/main/assets/vosk-model-small-en-us-0.15
+
       - name: Build debug APKs (all ABI splits + universal)
         run: |
           set -o pipefail
@@ -75,6 +89,14 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Download Luno Voice (Vosk) model
+        run: |
+          mkdir -p app/src/main/assets
+          curl -L -o vosk-model.zip https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
+          unzip -q vosk-model.zip -d app/src/main/assets
+          rm vosk-model.zip
+          ls -la app/src/main/assets/vosk-model-small-en-us-0.15
+
       - name: Decode signing keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
@@ -107,3 +129,4 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: app/build/outputs/apk/release/*.apk
+          
