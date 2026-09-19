@@ -63,6 +63,16 @@
             app:tint="@color/text_primary" />
 
         <ImageButton
+            android:id="@+id/lunoVoiceBtn"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_btn_speak_now"
+            android:contentDescription="Luno Voice"
+            android:visibility="gone"
+            app:tint="@color/text_primary" />
+
+        <ImageButton
             android:id="@+id/settingsBtn"
             android:layout_width="40dp"
             android:layout_height="40dp"

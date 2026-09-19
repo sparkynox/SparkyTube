@@ -74,6 +74,13 @@
 
             <TextView
                 style="@style/SettingsSectionHeader"
+                android:text="Luno Voice (Beta)" />
+
+            <include layout="@layout/settings_switch_row" android:id="@+id/rowLunoVoiceEnabled" />
+            <include layout="@layout/settings_switch_row" android:id="@+id/rowLunoVoiceMode" />
+
+            <TextView
+                style="@style/SettingsSectionHeader"
                 android:text="Extraction" />
 
             <include layout="@layout/settings_switch_row" android:id="@+id/rowLocalServers" />
