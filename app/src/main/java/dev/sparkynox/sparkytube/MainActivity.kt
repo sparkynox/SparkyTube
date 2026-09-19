@@ -1103,6 +1103,15 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* granting triggers the next play-state notification automatically */ }
 
+    private val micPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                startLunoVoiceSession()
+            } else {
+                android.widget.Toast.makeText(this, "Luno Voice needs microphone access", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -1420,6 +1429,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
     private fun setupTopBar() {
         binding.searchBtn.setOnClickListener { showSearchDialog() }
+        setupLunoVoice()
         binding.qualityBtn.setOnClickListener { showQualityPicker() }
         binding.audioTrackBtn.setOnClickListener { showAudioTrackPicker() }
         binding.settingsBtn.setOnClickListener {
@@ -1478,6 +1488,108 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             binding.bottomNav.visibility = View.GONE
         }
         highlightNav(binding.navHome)
+    }
+
+    /**
+     * Wires the mic button + does the initial model-load kickoff. The
+     * button itself stays gone unless "Enable Luno Voice" is on in
+     * Settings — same shown-only-if-relevant treatment the download
+     * button gets. Push-to-talk taps the button and speaks one command;
+     * always-listening mode instead starts LunoWakeWordLoop from
+     * onResume() further down and the button is hidden since there's
+     * nothing to tap.
+     */
+    private fun setupLunoVoice() {
+        refreshLunoVoiceButtonVisibility()
+        binding.lunoVoiceBtn.setOnClickListener {
+            if (androidx.core.content.ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                == PackageManager.PERMISSION_GRANTED
+            ) {
+                startLunoVoiceSession()
+            } else {
+                micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        }
+    }
+
+    private fun refreshLunoVoiceButtonVisibility() {
+        val voiceEnabled = dev.sparkynox.sparkytube.settings.SettingsPrefs.isLunoVoiceEnabled(this)
+        val wakeWordMode = dev.sparkynox.sparkytube.settings.SettingsPrefs.isLunoVoiceWakeWordModeEnabled(this)
+        // Push-to-talk needs the button; wake-word mode listens on its
+        // own via onResume(), so the button would just be dead weight.
+        binding.lunoVoiceBtn.visibility = if (voiceEnabled && !wakeWordMode) View.VISIBLE else View.GONE
+    }
+
+    /** One push-to-talk cycle: load model if needed, listen once, run whatever command came back. */
+    private fun startLunoVoiceSession() {
+        dev.sparkynox.sparkytube.voice.LunoVoiceManager.ensureModelLoaded(this) { ready ->
+            if (!ready) {
+                android.widget.Toast.makeText(this, "Luno Voice model isn't ready yet", android.widget.Toast.LENGTH_SHORT).show()
+                return@ensureModelLoaded
+            }
+            android.widget.Toast.makeText(this, "Listening...", android.widget.Toast.LENGTH_SHORT).show()
+            dev.sparkynox.sparkytube.voice.LunoVoiceManager.startListening(
+                onFinalResult = { text ->
+                    val command = dev.sparkynox.sparkytube.voice.LunoVoiceManager.parseCommand(text)
+                    if (command != null) {
+                        runOnUiThread { executeLunoCommand(command) }
+                    } else {
+                        runOnUiThread {
+                            android.widget.Toast.makeText(this, "Didn't catch that — try \"Luno search...\"", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                },
+                onError = { message ->
+                    runOnUiThread {
+                        android.widget.Toast.makeText(this, "Luno Voice error: $message", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+            )
+        }
+    }
+
+    /**
+     * Turns a parsed LunoCommand into the same actions the equivalent UI
+     * taps already trigger — reuses showSearchDialog/navigateToSection/
+     * showDownloadQualityPicker rather than duplicating that logic here.
+     */
+    private fun executeLunoCommand(command: dev.sparkynox.sparkytube.voice.LunoCommand) {
+        when (command) {
+            is dev.sparkynox.sparkytube.voice.LunoCommand.Search -> {
+                val encoded = Uri.encode(command.query)
+                stopNativePlayback()
+                browseMode = BrowseMode.YOUTUBE
+                webView.loadUrl("https://m.youtube.com/results?search_query=$encoded")
+            }
+            is dev.sparkynox.sparkytube.voice.LunoCommand.OpenHome ->
+                navigateToSection(binding.navHome, HOME_URL)
+            is dev.sparkynox.sparkytube.voice.LunoCommand.OpenShorts ->
+                navigateToSection(binding.navShorts, "https://m.youtube.com/shorts")
+            is dev.sparkynox.sparkytube.voice.LunoCommand.OpenSubscriptions ->
+                navigateToSection(binding.navSubs, "https://m.youtube.com/feed/subscriptions")
+            is dev.sparkynox.sparkytube.voice.LunoCommand.OpenLibrary ->
+                navigateToSection(binding.navLibrary, "https://m.youtube.com/feed/library")
+            is dev.sparkynox.sparkytube.voice.LunoCommand.OpenSearchBar ->
+                showSearchDialog()
+            is dev.sparkynox.sparkytube.voice.LunoCommand.DownloadCurrentVideo -> {
+                if (currentQualities.isEmpty()) {
+                    android.widget.Toast.makeText(this, "No video playing to download", android.widget.Toast.LENGTH_SHORT).show()
+                    return
+                }
+                // Requested quality if the user said one (e.g. "in 1080p"),
+                // otherwise fall back to whichever quality is highest —
+                // matches the "Default 1080p or else [highest available]"
+                // behavior asked for, since not every video actually has 1080p.
+                val chosen = command.qualityLabel?.let { label -> currentQualities.find { it.label == label } }
+                    ?: currentQualities.maxByOrNull { it.resolutionValue }
+                    ?: currentQualities.first()
+                val title = mediaController?.mediaMetadata?.title?.toString() ?: "video"
+                dev.sparkynox.sparkytube.download.VideoDownloader.downloadVideo(
+                    this, chosen.url, chosen.audioUrl, title, chosen.label, lastResolvedVideoId
+                )
+                android.widget.Toast.makeText(this, "Downloading in ${chosen.label}", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun showSearchDialog() {
@@ -2689,6 +2801,8 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     override fun onPause() {
         super.onPause()
 
+        dev.sparkynox.sparkytube.voice.LunoWakeWordLoop.stop()
+
         // CRITICAL: do NOT let the WebView throttle/pause its JS timers here.
         // Android's default WebView behavior pauses JS execution when the
         // Activity backgrounds (like a browser tab losing focus) — that's
@@ -2728,6 +2842,29 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         // SettingsActivity itself uses for its Local Servers summary line.
         webView.settings.loadsImagesAutomatically =
             !dev.sparkynox.sparkytube.settings.SettingsPrefs.isDataSaverEnabled(this)
+
+        refreshLunoVoiceButtonVisibility()
+        // Always-listening wake-word mode only ever runs while this
+        // Activity is actually on screen -- see LunoWakeWordLoop's own
+        // comment for why this is deliberately NOT a background Service.
+        val voiceEnabled = dev.sparkynox.sparkytube.settings.SettingsPrefs.isLunoVoiceEnabled(this)
+        val wakeWordMode = dev.sparkynox.sparkytube.settings.SettingsPrefs.isLunoVoiceWakeWordModeEnabled(this)
+        if (voiceEnabled && wakeWordMode) {
+            if (androidx.core.content.ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                == PackageManager.PERMISSION_GRANTED
+            ) {
+                dev.sparkynox.sparkytube.voice.LunoVoiceManager.ensureModelLoaded(this) { ready ->
+                    if (ready) {
+                        dev.sparkynox.sparkytube.voice.LunoWakeWordLoop.start(
+                            onCommand = { command -> runOnUiThread { executeLunoCommand(command) } },
+                            onHeardButUnrecognized = { }
+                        )
+                    }
+                }
+            } else {
+                micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
