@@ -45,9 +45,16 @@ jobs:
         run: |
           mkdir -p app/src/main/assets
           curl -L -o vosk-model.zip https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
-          unzip -q vosk-model.zip -d app/src/main/assets
+          unzip -q vosk-model.zip -d /tmp/vosk-extract
+          mv /tmp/vosk-extract/vosk-model-small-en-us-0.15 app/src/main/assets/vosk-model-small-en-in
           rm vosk-model.zip
-          ls -la app/src/main/assets/vosk-model-small-en-us-0.15
+          # StorageService.unpack() looks for a "uuid" file inside the model
+          # folder to track the unpacked version - Vosk models don't ship
+          # with one, we have to generate it ourselves or unpack() throws
+          # "Failed to unpack the model: vosk-model-small-en-in/uuid"
+          uuidgen > app/src/main/assets/vosk-model-small-en-in/uuid
+          echo "Model contents:"
+          find app/src/main/assets/vosk-model-small-en-in -maxdepth 1
 
       - name: Build debug APKs (all ABI splits + universal)
         run: |
