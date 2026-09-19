@@ -62,6 +62,7 @@ class SettingsActivity : AppCompatActivity() {
         setupYtSettingsRow()
         setupRelatedFetcherRow()
         setupSponsorBlockRow()
+        setupLunoVoiceRows()
         setupLocalServersRow()
         setupExtractorMethodRow()
         setupDefaultQualityRow()
@@ -130,6 +131,65 @@ class SettingsActivity : AppCompatActivity() {
         switch.isChecked = SettingsPrefs.isSponsorBlockEnabled(this)
         switch.setOnCheckedChangeListener { _, isChecked ->
             SettingsPrefs.setSponsorBlockEnabled(this, isChecked)
+        }
+    }
+
+    /**
+     * Two rows: master on/off for the whole Luno Voice feature (needs
+     * RECORD_AUDIO + unpacks the ~40MB Vosk model on first enable, so
+     * kept off by default), and a trigger-mode picker that only makes
+     * sense once voice is on — push-to-talk (tap a mic button, speak one
+     * command) vs always-listening wake-word (mic stays open for "Luno"
+     * the whole time the app's in the foreground, see LunoWakeWordLoop).
+     * Mode row is disabled/greyed when the master toggle is off so it's
+     * obvious the two are linked.
+     */
+    private fun setupLunoVoiceRows() {
+        binding.rowLunoVoiceEnabled.rowTitle.text = "Enable Luno Voice"
+        val enabledSubtitle: TextView = binding.rowLunoVoiceEnabled.rowSubtitle
+        enabledSubtitle.text = "Offline voice commands (\"Luno search...\", \"Luno open library\", etc) — needs microphone access"
+        enabledSubtitle.visibility = TextView.VISIBLE
+
+        val modeSubtitle: TextView = binding.rowLunoVoiceMode.rowSubtitle
+        fun refreshModeRowSubtitle() {
+            modeSubtitle.text = if (SettingsPrefs.isLunoVoiceWakeWordModeEnabled(this))
+                "Always listening for \"Luno\" while the app is open"
+            else
+                "Tap the mic button, then speak one command"
+        }
+
+        binding.rowLunoVoiceMode.rowTitle.text = "Voice trigger"
+        modeSubtitle.visibility = TextView.VISIBLE
+        binding.rowLunoVoiceMode.rowSwitch.visibility = android.view.View.GONE
+        refreshModeRowSubtitle()
+
+        fun refreshModeRowEnabledState() {
+            val voiceEnabled = SettingsPrefs.isLunoVoiceEnabled(this)
+            binding.rowLunoVoiceMode.root.isEnabled = voiceEnabled
+            binding.rowLunoVoiceMode.root.alpha = if (voiceEnabled) 1f else 0.4f
+        }
+        refreshModeRowEnabledState()
+
+        val enabledSwitch: SwitchCompat = binding.rowLunoVoiceEnabled.rowSwitch
+        enabledSwitch.isChecked = SettingsPrefs.isLunoVoiceEnabled(this)
+        enabledSwitch.setOnCheckedChangeListener { _, isChecked ->
+            SettingsPrefs.setLunoVoiceEnabled(this, isChecked)
+            refreshModeRowEnabledState()
+        }
+
+        binding.rowLunoVoiceMode.root.setOnClickListener {
+            if (!SettingsPrefs.isLunoVoiceEnabled(this)) return@setOnClickListener
+            val options = arrayOf("Push-to-talk (tap mic button)", "Always listening (wake word \"Luno\")")
+            val currentIndex = if (SettingsPrefs.isLunoVoiceWakeWordModeEnabled(this)) 1 else 0
+            AlertDialog.Builder(this)
+                .setTitle("Voice trigger")
+                .setSingleChoiceItems(options, currentIndex) { dialog, which ->
+                    SettingsPrefs.setLunoVoiceWakeWordModeEnabled(this, which == 1)
+                    refreshModeRowSubtitle()
+                    dialog.dismiss()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
         }
     }
 

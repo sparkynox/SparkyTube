@@ -42,6 +42,8 @@ object SettingsPrefs {
     private const val KEY_SPONSORBLOCK_CATEGORIES = "sponsorblock_categories"
     private const val KEY_DEFAULT_QUALITY = "default_quality_value"
     private const val KEY_MUSIC_MODE_ACTIVE = "music_mode_active"
+    private const val KEY_LUNO_VOICE_ENABLED = "luno_voice_enabled"
+    private const val KEY_LUNO_VOICE_WAKE_WORD_MODE = "luno_voice_wake_word_mode"
 
     @Volatile
     private var migrated = false
@@ -331,6 +333,29 @@ object SettingsPrefs {
 
     fun setMusicModeActive(context: Context, active: Boolean) {
         prefs(context).edit().putBoolean(KEY_MUSIC_MODE_ACTIVE, active).apply()
+    }
+
+    // Luno Voice (Beta) -- offline Vosk-based voice commands ("Luno search
+    // X", "Luno open library", etc). Master toggle off by default since
+    // it needs RECORD_AUDIO permission + unpacks a ~40MB model on first
+    // enable. wakeWordMode picks between push-to-talk (user taps a mic
+    // button to speak one command) and always-listening (LunoVoiceService
+    // keeps the mic open for the "Luno" wake word the whole time the app
+    // is in the foreground) -- see LunoVoiceService.kt for the mode itself.
+    fun isLunoVoiceEnabled(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_LUNO_VOICE_ENABLED, false)
+
+    fun setLunoVoiceEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_LUNO_VOICE_ENABLED, enabled).apply()
+    }
+
+    // true = always-listening wake-word mode, false = push-to-talk (default,
+    // since it doesn't need the mic running constantly in the background)
+    fun isLunoVoiceWakeWordModeEnabled(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_LUNO_VOICE_WAKE_WORD_MODE, false)
+
+    fun setLunoVoiceWakeWordModeEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_LUNO_VOICE_WAKE_WORD_MODE, enabled).apply()
     }
 
     // SponsorBlock: auto-skips sponsor/self-promo/intro/outro/etc segments
