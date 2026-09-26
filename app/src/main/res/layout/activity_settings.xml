@@ -100,6 +100,7 @@
                 android:text="Experimental" />
 
             <include layout="@layout/settings_switch_row" android:id="@+id/rowNativeHomeFeed" />
+            <include layout="@layout/settings_switch_row" android:id="@+id/rowFeedStyle" />
 
             <TextView
                 style="@style/SettingsSectionHeader"
