@@ -124,13 +124,6 @@ jobs:
           set -o pipefail
           ./gradlew assembleRelease --stacktrace 2>&1 | grep -v "D8: An error occurred when parsing kotlin metadata\|To find compatible kotlin versions"
 
-      - name: Upload release APKs
-        uses: actions/upload-artifact@v4
-        with:
-          name: SparkyTube-release-apks
-          path: app/build/outputs/apk/release/*.apk
-          if-no-files-found: error
-
       - name: Attach APKs to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
