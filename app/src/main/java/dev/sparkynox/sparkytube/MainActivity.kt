@@ -134,7 +134,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
     // Which site the WebView is currently showing — controls ad-domain
     // matching scope and popup/redirect filtering behavior.
-    private enum class BrowseMode { YOUTUBE, CRUNCHYROLL }
+    private enum class BrowseMode { YOUTUBE, CRUNCHYROLL, CUSTOM_FEED }
     private var browseMode = BrowseMode.YOUTUBE
 
     /**
@@ -2003,6 +2003,13 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             ): WebResourceResponse? {
                 val url = request.url.toString()
 
+                // custom_feed.html + youtube_skin.css/js all load from
+                // appassets.androidplatform.net (WebViewAssetLoader) instead
+                // of file:// -- file:// URLs get treated as a different
+                // origin than https://m.youtube.com by the WebView, which
+                // breaks CORS/localStorage/cookie access these need.
+                assetLoader.shouldInterceptRequest(request.url)?.let { return it }
+
                 if (dev.sparkynox.sparkytube.settings.SettingsPrefs.isAdBlockEnabled(this@MainActivity) &&
                     adBlockEngine.shouldBlock(url)
                 ) {
@@ -2085,7 +2092,14 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             override fun onPageFinished(view: WebView, url: String?) {
                 super.onPageFinished(view, url)
                 binding.loadingSpinner.visibility = View.GONE
+
+                if (browseMode == BrowseMode.CUSTOM_FEED && url?.contains("custom_feed.html") == true) {
+                    fetchAndRenderCustomFeed()
+                    return
+                }
+
                 injectAlwaysOnLayer(view)
+                if (isYoutubeSkinActive) injectYoutubeSkinAssets()
             }
         }
     }
@@ -2164,10 +2178,15 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         if (targetUrl == HOME_URL &&
             dev.sparkynox.sparkytube.settings.SettingsPrefs.isNativeHomeFeedEnabled(this)
         ) {
-            showNativeHomeFeed()
+            when (dev.sparkynox.sparkytube.settings.SettingsPrefs.getFeedStyle(this)) {
+                dev.sparkynox.sparkytube.settings.SettingsPrefs.FeedStyle.KOTLIN_NATIVE -> showNativeHomeFeed()
+                dev.sparkynox.sparkytube.settings.SettingsPrefs.FeedStyle.YOUTUBE_SKIN -> showYoutubeSkinFeed()
+                dev.sparkynox.sparkytube.settings.SettingsPrefs.FeedStyle.CUSTOM_HTML -> showCustomHtmlFeed()
+            }
             return
         }
         hideNativeHomeFeed()
+        isYoutubeSkinActive = false
 
         val alreadyThere = browseMode == BrowseMode.YOUTUBE &&
             webView.url?.trimEnd('/') == targetUrl.trimEnd('/')
@@ -2185,6 +2204,17 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     }
 
     private var nativeFeedAdapter: dev.sparkynox.sparkytube.homefeed.NativeFeedAdapter? = null
+    private val assetLoader by lazy {
+        androidx.webkit.WebViewAssetLoader.Builder()
+            .addPathHandler("/assets/", androidx.webkit.WebViewAssetLoader.AssetsPathHandler(this))
+            .build()
+    }
+    private var isYoutubeSkinActive = false
+    private val youtubeSkinJsCache: String? by lazy {
+        try {
+            assets.open("youtube_skin.js").bufferedReader().use { it.readText() }
+        } catch (e: Exception) { null }
+    }
 
     /**
      * Shows the RecyclerView on top of the (still-running, invisible)
@@ -2314,6 +2344,116 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }
     }
 
+    /**
+     * YOUTUBE_SKIN style -- just loads the real Home URL like the normal
+     * WebView path always did, but flags isYoutubeSkinActive so
+     * onPageFinished injects youtube_skin.css/js alongside the usual
+     * injected.css/js. Real YouTube DOM, real data, restyled -- see
+     * assets/youtube_skin.css for what actually changes visually.
+     */
+    private fun showYoutubeSkinFeed() {
+        hideNativeHomeFeed()
+        isYoutubeSkinActive = true
+        browseMode = BrowseMode.YOUTUBE
+        if (webView.url?.trimEnd('/') != HOME_URL.trimEnd('/')) {
+            webView.loadUrl(HOME_URL)
+        } else {
+            // already on Home -- page won't re-fire onPageFinished, so inject now
+            injectYoutubeSkinAssets()
+        }
+    }
+
+    private fun injectYoutubeSkinAssets() {
+        webView.evaluateJavascript(youtubeSkinJsCache ?: return, null)
+    }
+
+    /**
+     * CUSTOM_HTML style -- throws the real YouTube page away and loads
+     * custom_feed.html instead, then calls __sparkyRenderFeed with data
+     * from the same InnerTubeClient the Kotlin RecyclerView path uses.
+     * Tap/scroll events come back through JsBridge (onFeedVideoTapped
+     * etc, wired in onVideoState's implementation further down).
+     */
+    private fun showCustomHtmlFeed() {
+        hideNativeHomeFeed()
+        webView.visibility = View.VISIBLE
+        browseMode = BrowseMode.CUSTOM_FEED
+        binding.loadingSpinner.visibility = View.VISIBLE
+        webView.loadUrl("https://appassets.androidplatform.net/assets/custom_feed.html")
+        customFeedContinuationToken = null
+        isLoadingMoreCustomFeed = false
+    }
+
+    /** Called from onPageFinished once custom_feed.html itself has loaded, then fetches+renders. */
+    private fun fetchAndRenderCustomFeed() {
+        lifecycleScope.launch {
+            val result = dev.sparkynox.sparkytube.homefeed.InnerTubeClient.fetchHomeFeed()
+            binding.loadingSpinner.visibility = View.GONE
+
+            if (!result.isLoggedIn) {
+                android.widget.Toast.makeText(
+                    this@MainActivity,
+                    "Custom feed needs a YouTube login — showing the regular feed instead",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+                browseMode = BrowseMode.YOUTUBE
+                webView.loadUrl(HOME_URL)
+                return@launch
+            }
+
+            customFeedContinuationToken = result.continuationToken
+            // single shelf for now -- custom_feed.html's renderer supports
+            // multiple named shelves (shelf grouping) but InnerTubeClient
+            // doesn't split items into sections yet, so everything goes
+            // in one "Recommended" shelf until that's built out
+            val json = org.json.JSONObject().apply {
+                put("shelves", org.json.JSONArray().put(
+                    org.json.JSONObject().apply {
+                        put("title", "Recommended")
+                        put("horizontal", false)
+                        put("items", org.json.JSONArray(result.items.map { feedItemToJson(it) }))
+                    }
+                ))
+            }
+            webView.evaluateJavascript("__sparkyRenderFeed(${org.json.JSONObject.quote(json.toString())})", null)
+        }
+    }
+
+    private var customFeedContinuationToken: String? = null
+    private var isLoadingMoreCustomFeed = false
+
+    private fun loadMoreCustomFeed() {
+        val token = customFeedContinuationToken ?: return
+        if (isLoadingMoreCustomFeed) return
+        isLoadingMoreCustomFeed = true
+
+        lifecycleScope.launch {
+            val result = dev.sparkynox.sparkytube.homefeed.InnerTubeClient.fetchHomeFeedContinuation(token)
+            isLoadingMoreCustomFeed = false
+            customFeedContinuationToken = result.continuationToken
+            if (result.items.isNotEmpty()) {
+                val json = org.json.JSONObject().apply {
+                    put("items", org.json.JSONArray(result.items.map { feedItemToJson(it) }))
+                }
+                webView.evaluateJavascript("__sparkyAppendFeed(${org.json.JSONObject.quote(json.toString())})", null)
+            }
+        }
+    }
+
+    private fun feedItemToJson(item: dev.sparkynox.sparkytube.homefeed.HomeFeedItem): org.json.JSONObject {
+        return org.json.JSONObject().apply {
+            put("videoId", item.videoId)
+            put("playlistId", item.playlistId)
+            put("title", item.title)
+            put("channelName", item.channelName)
+            put("thumbnailUrl", item.thumbnailUrl)
+            put("channelAvatarUrl", item.channelAvatarUrl)
+            put("durationText", item.durationText)
+            put("viewCountText", item.viewCountText)
+            put("itemCountText", item.itemCountText)
+        }
+    }
+
     private fun hideNativeHomeFeed() {
         binding.nativeHomeFeedSwipeRefresh.visibility = View.GONE
         webView.visibility = View.VISIBLE
@@ -2373,6 +2513,26 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         fetchSponsorSegmentsForCurrentVideo(videoId)
 
         resolveAndPlayNative(videoId, title)
+    }
+
+    override fun onFeedVideoTapped(videoId: String) {
+        runOnUiThread {
+            browseMode = BrowseMode.YOUTUBE
+            webView.loadUrl("https://m.youtube.com/watch?v=$videoId")
+            lastResolvedVideoId = null
+            resolveAndPlayNative(videoId, fallbackTitle = "")
+        }
+    }
+
+    override fun onFeedPlaylistTapped(playlistId: String) {
+        runOnUiThread {
+            browseMode = BrowseMode.YOUTUBE
+            webView.loadUrl("https://m.youtube.com/playlist?list=$playlistId")
+        }
+    }
+
+    override fun onFeedNearBottom() {
+        runOnUiThread { loadMoreCustomFeed() }
     }
 
     /**

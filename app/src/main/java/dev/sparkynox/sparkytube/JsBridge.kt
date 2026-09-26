@@ -13,6 +13,11 @@ class JsBridge(private val listener: VideoStateListener) {
 
     interface VideoStateListener {
         fun onVideoState(streamUrl: String, title: String, isPaused: Boolean, adShowing: Boolean, currentTime: Double, duration: Double)
+        // custom_feed.html card taps -- separate from onVideoState since
+        // these come from the feed page, not the player page
+        fun onFeedVideoTapped(videoId: String) {}
+        fun onFeedPlaylistTapped(playlistId: String) {}
+        fun onFeedNearBottom() {}
     }
 
     @JavascriptInterface
@@ -31,5 +36,20 @@ class JsBridge(private val listener: VideoStateListener) {
             // Malformed payload from a page transition mid-write — just skip this tick,
             // next 800ms interval will report fresh state.
         }
+    }
+
+    @JavascriptInterface
+    fun onFeedVideoTapped(videoId: String) {
+        listener.onFeedVideoTapped(videoId)
+    }
+
+    @JavascriptInterface
+    fun onFeedPlaylistTapped(playlistId: String) {
+        listener.onFeedPlaylistTapped(playlistId)
+    }
+
+    @JavascriptInterface
+    fun onFeedNearBottom() {
+        listener.onFeedNearBottom()
     }
 }
