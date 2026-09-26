@@ -5,6 +5,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.downloader.Downloader
@@ -22,7 +23,8 @@ import java.net.URL
  * exactly that churn, a boilerplate-local solution would break constantly.
  *
  * NewPipeExtractor needs a Downloader implementation wired in once per
- * process (init() below) — this is the plain HttpURLConnection version,
+ * process (init() below) — backed by a shared OkHttp client for connection
+ * pooling/HTTP2 (see SparkyDownloader further down),
  * no third-party HTTP client required.
  */
 object StreamExtractor {
@@ -599,42 +601,60 @@ object StreamExtractor {
     )
 }
 
+/**
+ * NewPipeExtractor fires several HTTP calls per video resolve (player
+ * response, config, sometimes an innertube call or two) -- the old
+ * HttpURLConnection version opened a fresh TCP+TLS connection every
+ * single time since there's no pooling/keep-alive with that API, which
+ * was the actual bottleneck (not NewPipe's parsing itself). OkHttp
+ * reuses connections to the same host automatically and speaks HTTP/2,
+ * so back-to-back calls to googlevideo/youtube domains land way faster.
+ */
+private val sharedHttpClient = okhttp3.OkHttpClient.Builder()
+    .connectTimeout(8, java.util.concurrent.TimeUnit.SECONDS)
+    .readTimeout(8, java.util.concurrent.TimeUnit.SECONDS)
+    .connectionPool(okhttp3.ConnectionPool(8, 5, java.util.concurrent.TimeUnit.MINUTES))
+    .build()
+
 /** Minimal blocking Downloader impl required by NewPipeExtractor. */
 private object SparkyDownloader : Downloader() {
     override fun execute(request: Request): Response {
-        val conn = URL(request.url()).openConnection() as HttpURLConnection
-        conn.requestMethod = request.httpMethod()
-        conn.instanceFollowRedirects = true
-        conn.connectTimeout = 8000
-        conn.readTimeout = 8000
+        val builder = okhttp3.Request.Builder().url(request.url())
 
+        val headers = okhttp3.Headers.Builder()
         request.headers().forEach { (key, values) ->
-            values.forEach { v -> conn.addRequestProperty(key, v) }
+            values.forEach { v -> headers.add(key, v) }
         }
-        if (conn.getRequestProperty("User-Agent") == null) {
-            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) SparkyTube")
+        if (request.headers()["User-Agent"] == null) {
+            headers.add("User-Agent", "Mozilla/5.0 (Linux; Android 13) SparkyTube")
         }
+        builder.headers(headers.build())
 
-        request.dataToSend()?.let { body ->
-            conn.doOutput = true
-            conn.outputStream.use { it.write(body) }
-        }
-
-        val code = conn.responseCode
-        val message = conn.responseMessage ?: ""
-        val bodyStream = if (code in 200..299) conn.inputStream else conn.errorStream
-        val bodyBytes = bodyStream?.use { it.readBytes() } ?: ByteArray(0)
-        val bodyString = String(bodyBytes, Charsets.UTF_8)
-
-        val headers = mutableMapOf<String, MutableList<String>>()
-        conn.headerFields?.forEach { (k, v) ->
-            if (k != null) headers[k] = v.toMutableList()
+        val body = request.dataToSend()
+        val method = request.httpMethod()
+        if (body != null) {
+            builder.method(method, body.toRequestBody())
+        } else if (method == "POST" || method == "PUT") {
+            // some NewPipe calls are POST with no body -- OkHttp requires
+            // a non-null body for those methods or it throws
+            builder.method(method, ByteArray(0).toRequestBody())
+        } else {
+            builder.method(method, null)
         }
 
-        if (code == 429) {
-            throw IOException("Rate limited (429) while extracting stream info")
-        }
+        sharedHttpClient.newCall(builder.build()).execute().use { resp ->
+            val bodyString = resp.body?.string() ?: ""
 
-        return Response(code, message, headers, bodyString, conn.url.toString())
+            if (resp.code == 429) {
+                throw IOException("Rate limited (429) while extracting stream info")
+            }
+
+            val respHeaders = mutableMapOf<String, MutableList<String>>()
+            resp.headers.forEach { (k, v) ->
+                respHeaders.getOrPut(k) { mutableListOf() }.add(v)
+            }
+
+            return Response(resp.code, resp.message, respHeaders, bodyString, resp.request.url.toString())
+        }
     }
 }
