@@ -19,6 +19,13 @@ android {
         ndk {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a")
         }
+
+        // App has zero translated strings anyway, but bundled libraries
+        // (media3, okhttp, appcompat etc) all ship their own locale
+        // resource files for every language they support -- this strips
+        // those down to just English, which is a real chunk of dead
+        // weight in a release build.
+        resourceConfigurations += listOf("en")
     }
 
     splits {
@@ -46,6 +53,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // If no KEYSTORE_PASSWORD secret is configured (e.g. first CI run,
             // or building locally from Termux without signing set up), this
