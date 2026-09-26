@@ -1,0 +1,93 @@
+/* YouTube Skin feed style -- restyles the real m.youtube.com feed DOM
+   instead of replacing it. Loaded only when
+   SettingsPrefs.FeedStyle.YOUTUBE_SKIN is picked, injected same way as
+   injected.css (MainActivity pushes it via evaluateJavascript on page
+   load). Targets the actual ytm-* element classes YouTube ships, so this
+   can break if YouTube renames stuff -- that's the tradeoff for getting
+   real DOM + real data for free instead of hand-parsing everything. */
+
+ytm-rich-item-renderer {
+  border-radius: 16px;
+  overflow: hidden;
+  margin: 6px 8px;
+  background: #181818;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+ytm-rich-item-renderer:active {
+  transform: scale(0.97);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+}
+
+ytm-rich-item-renderer ytm-thumbnail-cover {
+  border-radius: 12px 12px 0 0;
+  overflow: hidden;
+}
+
+ytm-rich-item-renderer .compact-media-item-headline,
+ytm-rich-item-renderer h3 {
+  font-weight: 600;
+  padding: 8px 10px 2px;
+}
+
+ytm-rich-item-renderer .compact-media-item-metadata {
+  padding: 0 10px 8px;
+  opacity: 0.75;
+}
+
+/* shelf/section headers -- YouTube's own ones are cramped, give them room + a subtle divider */
+ytm-shelf-renderer .shelf-header-layout,
+ytm-rich-section-renderer .rich-shelf-title {
+  padding: 14px 12px 8px;
+  font-size: 16px;
+  font-weight: 700;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  margin-top: 4px;
+}
+
+/* horizontal shelf scroller (used for Mix rows, "For you" rows etc) --
+   snap scrolling makes swiping through cards feel native instead of
+   the default janky free-scroll */
+ytm-horizontal-list-renderer,
+.horizontal-list-container {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+ytm-horizontal-list-renderer > *,
+.horizontal-list-container > * {
+  scroll-snap-align: start;
+}
+
+/* Shorts shelf -- give it a pill-shaped accent header so it stands out
+   from regular video shelves the way it does in the real app */
+ytm-reel-shelf-renderer .shelf-header-layout {
+  position: relative;
+}
+ytm-reel-shelf-renderer .shelf-header-layout::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 16px;
+  background: #ff3b3b;
+  border-radius: 2px;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+ytm-reel-item-renderer {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* pull-to-refresh spinner recolor to match app accent instead of default red */
+tp-yt-paper-spinner, tp-yt-paper-spinner-lite {
+  --paper-spinner-color: #ff3b3b;
+}
+
+/* fade-in on new items appearing (continuation loads) */
+@keyframes sparkyFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+ytm-rich-item-renderer {
+  animation: sparkyFadeIn 0.25s ease both;
+}

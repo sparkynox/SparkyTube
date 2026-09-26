@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<!--
+  Custom HTML feed -- used when FeedStyle.CUSTOM_HTML is picked. This is
+  a blank shell; MainActivity loads it via loadDataWithBaseURL and then
+  calls window.__sparkyRenderFeed(jsonString) with HomeFeedItem list data
+  (serialized from InnerTubeClient.fetchHomeFeed()) to actually populate
+  it. Tap handling posts back to native through SparkyBridge same as the
+  Kotlin RecyclerView version does -- videoId -> play, playlistId -> open
+  playlist, same branch MainActivity.executeLunoCommand-style dispatch
+  already does elsewhere.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    background: #0f0f0f;
+    color: #fff;
+    font-family: Roboto, sans-serif;
+    overflow-x: hidden;
+  }
+  .shelf { margin: 4px 0 10px; }
+  .shelf-title {
+    font-size: 16px;
+    font-weight: 700;
+    padding: 14px 12px 8px;
+  }
+  .shelf-scroll {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 8px 4px;
+    gap: 8px;
+  }
+  .shelf-scroll::-webkit-scrollbar { display: none; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 4px;
+    padding: 4px 0;
+  }
+
+  .card {
+    background: #181818;
+    border-radius: 14px;
+    overflow: hidden;
+    margin: 4px 8px;
+    transition: transform 0.15s ease;
+  }
+  .card:active { transform: scale(0.97); }
+  .card.wide { flex: 0 0 220px; scroll-snap-align: start; margin: 0; }
+
+  .thumb-wrap { position: relative; width: 100%; aspect-ratio: 16/9; background: #222; }
+  .thumb-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .badge {
+    position: absolute; bottom: 6px; right: 6px;
+    background: rgba(0,0,0,0.8); color: #fff;
+    font-size: 11px; padding: 2px 5px; border-radius: 4px;
+  }
+
+  .meta { display: flex; padding: 8px 10px; gap: 8px; }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; background: #333; object-fit: cover; }
+  .text-col { min-width: 0; }
+  .title { font-size: 14px; font-weight: 500; line-height: 1.3;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .sub { font-size: 12px; color: #aaa; margin-top: 3px; }
+
+  .loader { text-align: center; padding: 24px; color: #888; font-size: 13px; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .card { animation: fadeIn 0.25s ease both; }
+</style>
+</head>
+<body>
+  <div id="feedRoot"></div>
+  <div id="loader" class="loader">Loading...</div>
+
+<script>
+  function el(tag, cls, html) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (html !== undefined) e.innerHTML = html;
+    return e;
+  }
+
+  function buildCard(item, wide) {
+    var card = el('div', 'card' + (wide ? ' wide' : ''));
+    var thumbWrap = el('div', 'thumb-wrap');
+    var img = el('img');
+    img.src = item.thumbnailUrl;
+    img.loading = 'lazy';
+    thumbWrap.appendChild(img);
+
+    var badgeText = item.itemCountText || item.durationText;
+    if (badgeText) thumbWrap.appendChild(el('div', 'badge', badgeText));
+    card.appendChild(thumbWrap);
+
+    var meta = el('div', 'meta');
+    if (item.channelAvatarUrl) {
+      var avatar = el('img', 'avatar');
+      avatar.src = item.channelAvatarUrl;
+      meta.appendChild(avatar);
+    }
+    var textCol = el('div', 'text-col');
+    textCol.appendChild(el('div', 'title', item.title));
+    var subParts = [item.channelName, item.viewCountText].filter(Boolean);
+    textCol.appendChild(el('div', 'sub', subParts.join(' • ')));
+    meta.appendChild(textCol);
+    card.appendChild(meta);
+
+    card.onclick = function () {
+      if (window.SparkyBridge) {
+        if (item.videoId) {
+          SparkyBridge.onFeedVideoTapped(item.videoId);
+        } else if (item.playlistId) {
+          SparkyBridge.onFeedPlaylistTapped(item.playlistId);
+        }
+      }
+    };
+    return card;
+  }
+
+  // items come pre-grouped into shelves from the Kotlin side (each shelf
+  // just a title + list of items) -- rendering doesn't care whether a
+  // shelf came from a real YT section or is just "everything" dumped
+  // into one shelf for a simpler feed
+  window.__sparkyRenderFeed = function (jsonString) {
+    var data = JSON.parse(jsonString);
+    var root = document.getElementById('feedRoot');
+    document.getElementById('loader').style.display = 'none';
+
+    (data.shelves || []).forEach(function (shelf) {
+      var shelfEl = el('div', 'shelf');
+      if (shelf.title) shelfEl.appendChild(el('div', 'shelf-title', shelf.title));
+
+      var isHorizontal = shelf.horizontal === true;
+      var containerEl = el('div', isHorizontal ? 'shelf-scroll' : 'grid');
+      shelf.items.forEach(function (item) {
+        containerEl.appendChild(buildCard(item, isHorizontal));
+      });
+      shelfEl.appendChild(containerEl);
+      root.appendChild(shelfEl);
+    });
+  };
+
+  window.__sparkyAppendFeed = function (jsonString) {
+    // continuation load -- same shape as render but appends to the last
+    // shelf's grid instead of creating a new one, since pagination in
+    // this simple layout is one continuous vertical grid, not per-shelf
+    var data = JSON.parse(jsonString);
+    var grids = document.querySelectorAll('#feedRoot .grid');
+    var lastGrid = grids[grids.length - 1];
+    if (!lastGrid) return;
+    (data.items || []).forEach(function (item) {
+      lastGrid.appendChild(buildCard(item, false));
+    });
+  };
+
+  window.__sparkyShowFeedLoading = function (show) {
+    document.getElementById('loader').style.display = show ? 'block' : 'none';
+  };
+
+  // report scroll-near-bottom to native for continuation loading, same
+  // trigger distance the RecyclerView version uses (6 rows before end --
+  // approximated here as a pixel threshold since there's no fixed row height concept)
+  var lastReported = 0;
+  window.addEventListener('scroll', function () {
+    var scrollBottom = window.scrollY + window.innerHeight;
+    var docHeight = document.body.scrollHeight;
+    if (docHeight - scrollBottom < 800 && Date.now() - lastReported > 1000) {
+      lastReported = Date.now();
+      if (window.SparkyBridge) SparkyBridge.onFeedNearBottom();
+    }
+  }, { passive: true });
+</script>
+</body>
+</html>
