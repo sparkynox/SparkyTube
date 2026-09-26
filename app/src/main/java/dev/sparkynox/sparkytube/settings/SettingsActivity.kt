@@ -497,7 +497,55 @@ class SettingsActivity : AppCompatActivity() {
         switch.isChecked = SettingsPrefs.isNativeHomeFeedEnabled(this)
         switch.setOnCheckedChangeListener { _, isChecked ->
             SettingsPrefs.setNativeHomeFeedEnabled(this, isChecked)
+            refreshFeedStyleRowEnabledState()
         }
+
+        setupFeedStyleRow()
+    }
+
+    /**
+     * Only matters once Native Home Feed is on -- picks HOW it renders.
+     * KOTLIN_NATIVE is the original RecyclerView. YOUTUBE_SKIN and
+     * CUSTOM_HTML both render inside the WebView instead (real YT page
+     * reskinned vs a from-scratch page built from the same InnerTube
+     * data) -- easier to get smooth animations/shelf layouts right in
+     * CSS than in Kotlin XML, which is the whole reason these exist.
+     */
+    private fun setupFeedStyleRow() {
+        val subtitle: TextView = binding.rowFeedStyle.rowSubtitle
+        binding.rowFeedStyle.rowTitle.text = "Feed style"
+        subtitle.visibility = TextView.VISIBLE
+        binding.rowFeedStyle.rowSwitch.visibility = android.view.View.GONE
+
+        fun label(style: SettingsPrefs.FeedStyle) = when (style) {
+            SettingsPrefs.FeedStyle.KOTLIN_NATIVE -> "Native (RecyclerView)"
+            SettingsPrefs.FeedStyle.YOUTUBE_SKIN -> "YouTube Skin (restyled real page)"
+            SettingsPrefs.FeedStyle.CUSTOM_HTML -> "Custom HTML (built from scratch)"
+        }
+        subtitle.text = label(SettingsPrefs.getFeedStyle(this))
+        refreshFeedStyleRowEnabledState()
+
+        binding.rowFeedStyle.root.setOnClickListener {
+            if (!SettingsPrefs.isNativeHomeFeedEnabled(this)) return@setOnClickListener
+            val styles = SettingsPrefs.FeedStyle.entries.toTypedArray()
+            val options = styles.map { label(it) }.toTypedArray()
+            val currentIndex = styles.indexOf(SettingsPrefs.getFeedStyle(this))
+            AlertDialog.Builder(this)
+                .setTitle("Feed style")
+                .setSingleChoiceItems(options, currentIndex) { dialog, which ->
+                    SettingsPrefs.setFeedStyle(this, styles[which])
+                    subtitle.text = label(styles[which])
+                    dialog.dismiss()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
+    }
+
+    private fun refreshFeedStyleRowEnabledState() {
+        val enabled = SettingsPrefs.isNativeHomeFeedEnabled(this)
+        binding.rowFeedStyle.root.isEnabled = enabled
+        binding.rowFeedStyle.root.alpha = if (enabled) 1f else 0.4f
     }
 
     /**

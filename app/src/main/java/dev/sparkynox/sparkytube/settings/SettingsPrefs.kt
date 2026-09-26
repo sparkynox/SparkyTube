@@ -26,6 +26,7 @@ object SettingsPrefs {
     private const val KEY_ADBLOCK_ENABLED = "adblock_enabled"
     private const val KEY_DATA_SAVER_ENABLED = "data_saver_enabled"
     private const val KEY_NATIVE_HOME_FEED_ENABLED = "native_home_feed_enabled"
+    private const val KEY_FEED_STYLE = "feed_style"
     private const val KEY_DOWNLOAD_ENABLED = "download_enabled"
     private const val KEY_CUSTOM_CSS = "custom_css"
     private const val KEY_CUSTOM_CSS_ENABLED = "custom_css_enabled"
@@ -154,6 +155,28 @@ object SettingsPrefs {
 
     fun setNativeHomeFeedEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_NATIVE_HOME_FEED_ENABLED, enabled).apply()
+    }
+
+    // Once native feed is on, this picks HOW it's rendered. KOTLIN_NATIVE
+    // is the original RecyclerView-based one (native_feed_item.xml) --
+    // fine but animations/shelf-layouts are a pain to make smooth in
+    // Kotlin XML. The other two both render inside the existing WebView
+    // instead: YOUTUBE_SKIN just restyles YouTube's own real page with
+    // injected CSS/JS (real DOM, real YT behavior, just reskinned).
+    // CUSTOM_HTML throws YouTube's page away entirely and builds a fresh
+    // HTML page from InnerTubeClient's data (feed_template.html) -- full
+    // control over layout/animation, but every interaction (tap to play,
+    // scroll pagination) has to be hand-wired in JS since there's no real
+    // YouTube page underneath anymore.
+    enum class FeedStyle { KOTLIN_NATIVE, YOUTUBE_SKIN, CUSTOM_HTML }
+
+    fun getFeedStyle(context: Context): FeedStyle {
+        val raw = prefs(context).getString(KEY_FEED_STYLE, FeedStyle.KOTLIN_NATIVE.name)
+        return try { FeedStyle.valueOf(raw ?: FeedStyle.KOTLIN_NATIVE.name) } catch (e: Exception) { FeedStyle.KOTLIN_NATIVE }
+    }
+
+    fun setFeedStyle(context: Context, style: FeedStyle) {
+        prefs(context).edit().putString(KEY_FEED_STYLE, style.name).apply()
     }
 
     fun isDownloadEnabled(context: Context) =
