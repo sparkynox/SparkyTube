@@ -394,6 +394,11 @@ object StreamExtractor {
                 extractor.fetchPage()
 
                 val streamName = extractor.name
+                // Just the raw text -- used only for chapter timestamp
+                // parsing. Wrapped in runCatching since a missing/blocked
+                // description shouldn't fail the whole resolve, chapters
+                // are a nice-to-have.
+                val streamDescription = runCatching { extractor.description?.content }.getOrNull()
                 val streamDuration = extractor.length
                 val streamType = extractor.streamType
                 val streamHlsUrl = extractor.hlsUrl
@@ -501,7 +506,8 @@ object StreamExtractor {
                         isLive = isLiveStream,
                         defaultAudioUrl = defaultQuality.audioUrl,
                         defaultQualityLabel = defaultQuality.label,
-                        availableAudioTracks = if (audioTrackOptions.size > 1) audioTrackOptions else emptyList()
+                        availableAudioTracks = if (audioTrackOptions.size > 1) audioTrackOptions else emptyList(),
+                        description = streamDescription
                     )
                 } else {
                     // Fallback: HLS manifest if YouTube only offered adaptive/live
@@ -580,7 +586,11 @@ object StreamExtractor {
         // originally-selected (default: original-language) track.
         // Empty for progressive-only videos, since those bundle audio
         // into the video stream itself with no separate track to pick.
-        val availableAudioTracks: List<AudioTrackOption> = emptyList()
+        val availableAudioTracks: List<AudioTrackOption> = emptyList(),
+        // Raw description text -- only used to pull chapter timestamps out
+        // of it (see ChapterParser). Null on resolvers that don't expose
+        // it, in which case chapters just don't show for that video.
+        val description: String? = null
     )
 
     data class QualityOption(
