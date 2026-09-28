@@ -138,6 +138,27 @@
             android:contentDescription="Next" />
     </LinearLayout>
 
+    <!-- Current chapter name, sits right above the seek bar row. Hidden
+         unless the video actually has chapters; tap opens the full list -->
+    <TextView
+        android:id="@+id/exo_chapter_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_marginStart="12dp"
+        android:layout_marginBottom="38dp"
+        android:maxWidth="240dp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:paddingTop="2dp"
+        android:paddingBottom="2dp"
+        android:background="@drawable/bg_player_btn_circle"
+        android:textColor="#FFFFFF"
+        android:textSize="11sp"
+        android:visibility="gone" />
+
     <!-- Bottom row: elapsed time, seek bar, duration, fullscreen -->
     <LinearLayout
         android:layout_width="match_parent"
