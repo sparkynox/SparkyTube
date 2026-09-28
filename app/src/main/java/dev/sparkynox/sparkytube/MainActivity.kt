@@ -168,6 +168,15 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         if (ticksSinceLastPositionSave < 8) return
         ticksSinceLastPositionSave = 0
 
+        // isResolving guards the window where lastResolvedVideoId has
+        // already flipped to the NEW video (checkCurrentUrlForVideo sets
+        // it as soon as the URL changes, before the async resolve/network
+        // call even finishes) but controller.currentPosition still
+        // reflects the OLD video's stream, since setMediaItem hasn't run
+        // yet. Saving here would write the old video's timestamp under
+        // the new video's id -- skip until resolve is actually done.
+        if (isResolving) return
+
         val controller = mediaController ?: return
         val videoId = lastResolvedVideoId ?: return
         if (controller.duration <= 0) return
@@ -534,6 +543,16 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         val gestureDetector = android.view.GestureDetector(
             this,
             object : android.view.GestureDetector.SimpleOnGestureListener() {
+                override fun onDown(e: android.view.MotionEvent): Boolean {
+                    // Reset so a fresh swipe seeds from the system's
+                    // actual current volume, not a stale value left over
+                    // from the last swipe (which could be off if the
+                    // user changed volume via the hardware buttons or
+                    // notification slider in between).
+                    volumeFraction = -1f
+                    return false
+                }
+
                 override fun onDoubleTap(e: android.view.MotionEvent): Boolean {
                     if (videoScale > 1f) {
                         // Already zoomed in — double-tap resets back to normal
@@ -624,19 +643,36 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     // brightness drastically.
     private val gestureSwipeRangePx = 600f
 
+    // System STREAM_MUSIC only has ~15 discrete steps on most phones, so
+    // naively converting a swipe delta straight to an int volume every
+    // single onScroll call means each call rounds independently -- small
+    // swipes either do nothing (rounds back to the same int) or jump by
+    // a whole step at once (6-7% on a 15-step range), which is what was
+    // reading as "jumps 5-7% randomly" instead of smooth. Fix: track the
+    // real position as a float across calls, only push it to the system
+    // once it's crossed into a new int step.
+    private var volumeFraction: Float = -1f
+
     private fun adjustVolume(distanceY: Float) {
         val audioManager = getSystemService(AUDIO_SERVICE) as? android.media.AudioManager ?: return
         val maxVolume = audioManager.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
-        val currentVolume = audioManager.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
 
-        // distanceY > 0 means finger moved up (onScroll reports the delta
-        // from the previous event to this one) -- up should increase volume.
+        if (volumeFraction < 0f) {
+            // first call of a new swipe (or first call ever) -- seed from
+            // whatever the system actually has right now
+            volumeFraction = audioManager.getStreamVolume(android.media.AudioManager.STREAM_MUSIC).toFloat()
+        }
+
         val delta = (distanceY / gestureSwipeRangePx) * maxVolume
-        val newVolume = (currentVolume + delta).toInt().coerceIn(0, maxVolume)
-        if (newVolume != currentVolume) {
+        volumeFraction = (volumeFraction + delta).coerceIn(0f, maxVolume.toFloat())
+
+        val newVolume = volumeFraction.toInt()
+        if (newVolume != audioManager.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)) {
             audioManager.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, newVolume, 0)
         }
-        val percent = (newVolume * 100f / maxVolume).toInt()
+        // percent uses the smooth fractional value, not the stepped int,
+        // so the on-screen number/bar itself feels continuous too
+        val percent = (volumeFraction * 100f / maxVolume).toInt()
         showGestureFeedback("Volume", percent)
     }
 
@@ -1812,6 +1848,16 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         controller.prepare()
         if (startPositionMs > 0) controller.seekTo(startPositionMs)
         controller.play()
+
+        // Fresh media item just got set -- reset the save-throttle counter
+        // so the next periodic save happens ~5s into THIS video, not
+        // whenever the old counter happened to hit 8. Without this, a
+        // save could land right after a video switch while currentPosition
+        // still briefly reflects the previous stream (setMediaItem/prepare
+        // aren't instant), which was saving the wrong video's position
+        // under the new video's id -- exactly the "new video resumes from
+        // the old one's timestamp" bug.
+        ticksSinceLastPositionSave = 0
 
         setPlayerTitle(title)
     }
