@@ -2,7 +2,6 @@
 
 **SparkyTube** is a fast, lightweight, and modern open-source YouTube client built for Android. Enjoy seamless video playback and audio streaming with zero ad interruptions and a clean, user-focused interface.
 
-```
 
 ---
 
@@ -72,6 +71,4 @@ Contributions, bug reports, and feature requests are welcome!
 
 Distributed under the MIT License. See `LICENSE` for more information.
 
-```
-
-```
+Enjoy :3
