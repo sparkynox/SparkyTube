@@ -96,8 +96,84 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             checkCurrentUrlForVideo()
             maybePrefetchNextVideo()
             maybeSkipSponsorSegment()
+            maybeSaveWatchPosition()
             pollHandler.postDelayed(this, 600)
         }
+    }
+
+    /**
+     * Saves the current playback position every ~5s while a native video
+     * is playing, so resume works even if the app gets killed mid-video
+     * instead of only on a clean stopNativePlayback(). Throttled to every
+     * ~8th poll tick (600ms * 8 ≈ 5s) rather than every single tick --
+     * a SharedPreferences write every 600ms for the whole video is
+     * unnecessary I/O for something that just needs to be roughly current.
+     */
+    private var ticksSinceLastPositionSave = 0
+
+    // chapters for the video currently playing natively, empty = none
+    private var currentChapters: List<dev.sparkynox.sparkytube.extractor.Chapter> = emptyList()
+
+    private fun applyChapters(description: String?, durationMs: Long) {
+        currentChapters = dev.sparkynox.sparkytube.extractor.ChapterParser.parse(description)
+        val label = binding.exoPlayerView.findViewById<android.widget.TextView>(R.id.exo_chapter_label)
+        val timeBar = binding.exoPlayerView.findViewById<androidx.media3.ui.DefaultTimeBar>(androidx.media3.ui.R.id.exo_progress)
+
+        if (currentChapters.isEmpty()) {
+            label?.visibility = View.GONE
+            timeBar?.setAdGroupTimesMs(null, null, 0)
+            return
+        }
+
+        // reuse the time bar's ad-marker ticks as chapter dividers, skip
+        // the first one (0:00) since a tick at the very start looks like a glitch
+        val markers = currentChapters.drop(1).map { it.startMs }.toLongArray()
+        timeBar?.setAdGroupTimesMs(markers, BooleanArray(markers.size), markers.size)
+
+        label?.visibility = View.VISIBLE
+        label?.setOnClickListener { showChapterList() }
+        updateChapterLabel()
+    }
+
+    private fun updateChapterLabel() {
+        if (currentChapters.isEmpty()) return
+        val pos = mediaController?.currentPosition ?: return
+        val current = currentChapters.lastOrNull { it.startMs <= pos } ?: currentChapters.first()
+        binding.exoPlayerView.findViewById<android.widget.TextView>(R.id.exo_chapter_label)?.text = current.title
+    }
+
+    private fun showChapterList() {
+        if (currentChapters.isEmpty()) return
+        val labels = currentChapters.map { "${formatChapterTime(it.startMs)}  ${it.title}" }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Chapters")
+            .setItems(labels) { _, which ->
+                mediaController?.seekTo(currentChapters[which].startMs)
+            }
+            .setNegativeButton("Close", null)
+            .show()
+    }
+
+    private fun formatChapterTime(ms: Long): String {
+        val total = ms / 1000
+        val h = total / 3600
+        val m = (total % 3600) / 60
+        val s = total % 60
+        return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
+    }
+    private fun maybeSaveWatchPosition() {
+        if (!isNativePlaybackActive) return
+        updateChapterLabel()
+        ticksSinceLastPositionSave++
+        if (ticksSinceLastPositionSave < 8) return
+        ticksSinceLastPositionSave = 0
+
+        val controller = mediaController ?: return
+        val videoId = lastResolvedVideoId ?: return
+        if (controller.duration <= 0) return
+        dev.sparkynox.sparkytube.history.WatchHistoryStore.savePosition(
+            this, videoId, controller.currentPosition, controller.duration
+        )
     }
 
     // SponsorBlock segments for the currently-playing video -- fetched
@@ -1480,6 +1556,101 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         highlightNav(binding.navHome)
     }
 
+    /**
+     * Long-press-on-feed-card download flow -- resolves the video in the
+     * background (spinner dialog) without ever opening it in the player,
+     * then asks Audio-or-Video first, then the actual quality/bitrate
+     * list for whichever the user picked. Reuses StreamExtractor's normal
+     * resolve path and VideoDownloader, same as the in-player download
+     * button -- this is just a different entry point into the same flow.
+     */
+    private fun showFeedDownloadDialog(item: dev.sparkynox.sparkytube.homefeed.HomeFeedItem) {
+        val videoId = item.videoId ?: return
+
+        val progressDialog = AlertDialog.Builder(this)
+            .setTitle("Resolving…")
+            .setMessage("Getting download options for \"${item.title}\"")
+            .setCancelable(true)
+            .create()
+        progressDialog.show()
+
+        lifecycleScope.launch {
+            val resolved = resolveStream(videoId)
+            progressDialog.dismiss()
+
+            if (resolved == null || resolved.availableQualities.isEmpty()) {
+                android.widget.Toast.makeText(this@MainActivity, "Couldn't get download options for this video", android.widget.Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+
+            val videoOptions = resolved.availableQualities
+            // Audio-only entries: same video-only+bestAudio pairing every
+            // resolver already builds, just surfaced as their own pickable
+            // list here instead of always being muxed into a video quality.
+            val audioOptions = videoOptions.mapNotNull { it.audioUrl }.distinct()
+
+            AlertDialog.Builder(this@MainActivity)
+                .setTitle("Download")
+                .setItems(arrayOf("Video", "Audio only")) { _, which ->
+                    if (which == 0) {
+                        showFeedQualityPicker(videoId, item.title, videoOptions)
+                    } else {
+                        showFeedAudioPicker(videoId, item.title, audioOptions)
+                    }
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
+    }
+
+    private fun showFeedQualityPicker(videoId: String, title: String, qualities: List<StreamExtractor.QualityOption>) {
+        val labels = qualities.map { it.label }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Video quality")
+            .setItems(labels) { _, which ->
+                val chosen = qualities[which]
+                dev.sparkynox.sparkytube.download.VideoDownloader.downloadVideo(
+                    this, chosen.url, chosen.audioUrl, title, chosen.label, videoId
+                )
+                android.widget.Toast.makeText(this, "Downloading ${chosen.label}", android.widget.Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    /**
+     * Audio-only download -- no video track, just the raw audio URL
+     * downloaded directly (no muxing needed since it's already a single
+     * stream). Label is a made-up "Audio" since individual bitrate isn't
+     * tracked per-URL in QualityOption -- if only one audio URL exists
+     * (the common case, since most resolvers only expose one "best"
+     * audio track), this is just one tap with no picker needed.
+     */
+    private fun showFeedAudioPicker(videoId: String, title: String, audioUrls: List<String>) {
+        if (audioUrls.isEmpty()) {
+            android.widget.Toast.makeText(this, "No separate audio track found for this video", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (audioUrls.size == 1) {
+            dev.sparkynox.sparkytube.download.VideoDownloader.downloadVideo(
+                this, audioUrls[0], null, title, "Audio", videoId
+            )
+            android.widget.Toast.makeText(this, "Downloading audio", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        val labels = audioUrls.mapIndexed { i, _ -> "Audio track ${i + 1}" }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Audio track")
+            .setItems(labels) { _, which ->
+                dev.sparkynox.sparkytube.download.VideoDownloader.downloadVideo(
+                    this, audioUrls[which], null, title, labels[which], videoId
+                )
+                android.widget.Toast.makeText(this, "Downloading ${labels[which]}", android.widget.Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
     private fun showSearchDialog() {
         val input = EditText(this).apply {
             hint = "Search YouTube"
@@ -2114,30 +2285,33 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
      */
     private fun showNativeHomeFeed() {
         if (nativeFeedAdapter == null) {
-            nativeFeedAdapter = dev.sparkynox.sparkytube.homefeed.NativeFeedAdapter { item ->
-                hideNativeHomeFeed()
-                browseMode = BrowseMode.YOUTUBE
+            nativeFeedAdapter = dev.sparkynox.sparkytube.homefeed.NativeFeedAdapter(
+                onItemClick = { item ->
+                    hideNativeHomeFeed()
+                    browseMode = BrowseMode.YOUTUBE
 
-                if (item.videoId != null) {
-                    // Plain video, or a Mix/Playlist card that happened to
-                    // expose its first track's id directly -- play it
-                    // right away, same as before.
-                    webView.loadUrl("https://m.youtube.com/watch?v=${item.videoId}")
-                    lastResolvedVideoId = null
-                    resolveAndPlayNative(item.videoId, fallbackTitle = item.title)
-                } else if (item.playlistId != null) {
-                    // Mix/Playlist card with no first-track id exposed --
-                    // this was the actual tap-does-nothing bug: these
-                    // cards used to build "watch?v=null" and silently
-                    // fail. Load the playlist page itself in the WebView
-                    // instead; the URL poller picks up whatever video
-                    // YouTube resolves as the first track from there, the
-                    // same way tapping this card on the real site would.
-                    webView.loadUrl("https://m.youtube.com/playlist?list=${item.playlistId}")
-                } else {
-                    android.widget.Toast.makeText(this, "Couldn't open this item", android.widget.Toast.LENGTH_SHORT).show()
-                }
-            }
+                    if (item.videoId != null) {
+                        // Plain video, or a Mix/Playlist card that happened to
+                        // expose its first track's id directly -- play it
+                        // right away, same as before.
+                        webView.loadUrl("https://m.youtube.com/watch?v=${item.videoId}")
+                        lastResolvedVideoId = null
+                        resolveAndPlayNative(item.videoId, fallbackTitle = item.title)
+                    } else if (item.playlistId != null) {
+                        // Mix/Playlist card with no first-track id exposed --
+                        // this was the actual tap-does-nothing bug: these
+                        // cards used to build "watch?v=null" and silently
+                        // fail. Load the playlist page itself in the WebView
+                        // instead; the URL poller picks up whatever video
+                        // YouTube resolves as the first track from there, the
+                        // same way tapping this card on the real site would.
+                        webView.loadUrl("https://m.youtube.com/playlist?list=${item.playlistId}")
+                    } else {
+                        android.widget.Toast.makeText(this, "Couldn't open this item", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                },
+                onItemLongClick = { item -> showFeedDownloadDialog(item) }
+            )
             binding.nativeHomeFeedList.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
             binding.nativeHomeFeedList.adapter = nativeFeedAdapter
 
@@ -2601,13 +2775,19 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 )
             }, 3000L)
 
+            val savedPosition = dev.sparkynox.sparkytube.history.WatchHistoryStore.getPosition(this@MainActivity, videoId) ?: 0L
             playOnController(
                 streamUrl = dataSaverQuality?.url ?: resolved.url,
                 title = resolved.title.ifBlank { fallbackTitle },
                 isHls = resolved.isHls,
+                startPositionMs = savedPosition,
                 audioUrl = dataSaverQuality?.audioUrl ?: resolved.defaultAudioUrl,
                 videoId = videoId
             )
+            if (savedPosition > 0) {
+                android.widget.Toast.makeText(this@MainActivity, "Resumed from where you left off", android.widget.Toast.LENGTH_SHORT).show()
+            }
+            applyChapters(resolved.description, resolved.durationSeconds * 1000)
             binding.exoPlayerView.visibility = View.VISIBLE
             isNativePlaybackActive = true
             prefetchedForVideoId = null
@@ -2653,6 +2833,14 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
     private fun stopNativePlayback() {
         if (!isNativePlaybackActive) return
+        // final save before the controller gets torn down, so leaving a
+        // video mid-way always keeps the latest position, not just the
+        // last 5s-throttled tick
+        mediaController?.let { c ->
+            lastResolvedVideoId?.let { id ->
+                dev.sparkynox.sparkytube.history.WatchHistoryStore.savePosition(this, id, c.currentPosition, c.duration)
+            }
+        }
         pendingPlay = null
         prefetchedForVideoId = null
         mediaController?.stop()
@@ -2665,6 +2853,8 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         lastResolvedVideoId = null
         currentQualities = emptyList()
         currentAudioTracks = emptyList()
+        currentChapters = emptyList()
+        binding.exoPlayerView.findViewById<android.widget.TextView>(R.id.exo_chapter_label)?.visibility = View.GONE
         webView.evaluateJavascript(
             "(function(){document.body.classList.remove('sparkytube-native-active'); var v=document.querySelector('video'); if(v){v.muted=false;}})();",
             null
