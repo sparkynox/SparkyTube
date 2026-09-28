@@ -15,7 +15,8 @@ import dev.sparkynox.sparkytube.R
  * top of the original single-batch submitItems().
  */
 class NativeFeedAdapter(
-    private val onItemClick: (HomeFeedItem) -> Unit
+    private val onItemClick: (HomeFeedItem) -> Unit,
+    private val onItemLongClick: (HomeFeedItem) -> Unit = {}
 ) : RecyclerView.Adapter<NativeFeedAdapter.ViewHolder>() {
 
     private val items = mutableListOf<HomeFeedItem>()
@@ -87,6 +88,18 @@ class NativeFeedAdapter(
             holder.channelAvatar.setImageDrawable(null)
         }
         holder.itemView.setOnClickListener { onItemClick(item) }
+        // Long-press downloads straight from the feed -- no need to open
+        // the video first. Only makes sense for a plain video card
+        // (needs a single videoId to resolve); Mix/Playlist cards skip
+        // this since there's no one video to download.
+        holder.itemView.setOnLongClickListener {
+            if (item.videoId != null) {
+                onItemLongClick(item)
+                true
+            } else {
+                false
+            }
+        }
     }
 
     override fun getItemCount() = items.size
