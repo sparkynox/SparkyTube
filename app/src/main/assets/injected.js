@@ -244,34 +244,55 @@
   // Mix/playlist (from cache, so it works even with the panel closed),
   // or the first related video (in that priority order).
   window.__sparkyPlayNext = function () {
+    var currentId = (window.location.href.match(/[?&]v=([a-zA-Z0-9_-]{11})/) || [])[1];
+
+    function videoIdFromHref(href) {
+      if (!href) return null;
+      var m = href.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+      return m ? m[1] : null;
+    }
+
+    // ytp-* classes are desktop/embed player UI -- on m.youtube.com these
+    // elements are usually absent, but when an embedded player frame IS
+    // present it can carry a stale href still pointing at the CURRENT
+    // video (observed as "URL changes but the same video keeps looping"):
+    // clicking it just reloads the same watch page. Skip any candidate
+    // whose own href resolves back to currentId instead of blindly
+    // clicking the first DOM match.
     var autoplayCard = document.querySelector(
       '.ytp-autonav-endscreen-upnext-container a, ' +
       '.ytp-videowall-still, ' +
       'a.ytp-next-button'
     );
     if (autoplayCard) {
-      autoplayCard.click();
-      return true;
+      var cardId = videoIdFromHref(autoplayCard.href);
+      if (!cardId || cardId !== currentId) {
+        autoplayCard.click();
+        return true;
+      }
     }
     var mixNextId = findMixNextVideoId();
-    if (mixNextId) {
+    if (mixNextId && mixNextId !== currentId) {
       var listId = getListIdFromUrl();
       window.location.href = 'https://m.youtube.com/watch?v=' + mixNextId +
         (listId ? '&list=' + listId : '');
       return true;
     }
     var mixNextHref = findMixNextHref();
-    if (mixNextHref) {
+    if (mixNextHref && videoIdFromHref(mixNextHref) !== currentId) {
       window.location.href = mixNextHref;
       return true;
     }
-    var related = document.querySelector(
+    var relatedCandidates = document.querySelectorAll(
       'ytm-compact-video-renderer a, ' +
       'ytm-video-with-context-renderer a'
     );
-    if (related && related.href) {
-      window.location.href = related.href;
-      return true;
+    for (var i = 0; i < relatedCandidates.length; i++) {
+      var href = relatedCandidates[i].href;
+      if (href && videoIdFromHref(href) !== currentId) {
+        window.location.href = href;
+        return true;
+      }
     }
     return false;
   };
@@ -291,25 +312,31 @@
   }
 
   window.__sparkyPredictNextVideoId = function () {
+    var currentId = (window.location.href.match(/[?&]v=([a-zA-Z0-9_-]{11})/) || [])[1];
+
     var autoplayCard = document.querySelector(
       '.ytp-autonav-endscreen-upnext-container a, ' +
       '.ytp-videowall-still, ' +
       'a.ytp-next-button'
     );
     var fromAutoplay = autoplayCard ? extractVideoIdFromHref(autoplayCard.href) : null;
-    if (fromAutoplay) return fromAutoplay;
+    if (fromAutoplay && fromAutoplay !== currentId) return fromAutoplay;
 
     var fromMixCache = findMixNextVideoId();
-    if (fromMixCache) return fromMixCache;
+    if (fromMixCache && fromMixCache !== currentId) return fromMixCache;
 
     var fromMixLive = extractVideoIdFromHref(findMixNextHref());
-    if (fromMixLive) return fromMixLive;
+    if (fromMixLive && fromMixLive !== currentId) return fromMixLive;
 
-    var related = document.querySelector(
+    var relatedCandidates = document.querySelectorAll(
       'ytm-compact-video-renderer a, ' +
       'ytm-video-with-context-renderer a'
     );
-    return related ? extractVideoIdFromHref(related.href) : null;
+    for (var i = 0; i < relatedCandidates.length; i++) {
+      var candidateId = extractVideoIdFromHref(relatedCandidates[i].href);
+      if (candidateId && candidateId !== currentId) return candidateId;
+    }
+    return null;
   };
 
   // Scrapes the related-videos list straight from the watch page's own
