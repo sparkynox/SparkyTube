@@ -71,6 +71,15 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     private var consecutivePlayerErrorCount = 0
     private var lastErroredVideoId: String? = null
     private var isResolving = false
+    // Bumped on every resolveAndPlayNative() call -- if a slower, older
+    // resolve (yt-dlp especially can take several seconds since it's a
+    // Python subprocess) finishes AFTER a newer one already started, its
+    // result is stale and must be thrown away instead of calling
+    // playOnController with a stream for a video that isn't current
+    // anymore. This was the "new video plays for 1s then snaps back to
+    // the old one" bug -- two resolves racing, whichever finished LAST
+    // was winning even when it was the older request.
+    private var resolveGeneration = 0
 
     // Qualities available for the currently-playing video, populated once
     // StreamExtractor resolves them — used by the quality-picker dialog.
@@ -2756,6 +2765,11 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
         isResolving = true
         binding.loadingSpinner.visibility = View.VISIBLE
+        // Snapshot the generation for THIS call -- if resolveGeneration
+        // has moved on by the time the async resolve below finishes
+        // (meaning a newer resolveAndPlayNative call started since), this
+        // call's result is stale and gets discarded.
+        val myGeneration = ++resolveGeneration
         // Music mode is a global toggle now (see toggleMusicMode) -- it
         // stays whatever the user last set it to, applying to every new
         // video, instead of resetting to off each time a video loads.
@@ -2767,6 +2781,15 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             val resolved = resolveStream(videoId)
             isResolving = false
             binding.loadingSpinner.visibility = View.GONE
+
+            if (myGeneration != resolveGeneration) {
+                // A newer video started loading while this one was still
+                // resolving -- drop this result on the floor, the newer
+                // call's own coroutine will (or already did) handle
+                // playback. Don't touch isNativePlaybackActive/player
+                // state here, that belongs to whichever call is current.
+                return@launch
+            }
 
             if (resolved == null) {
                 // Extraction failed. YouTube's own player is permanently
