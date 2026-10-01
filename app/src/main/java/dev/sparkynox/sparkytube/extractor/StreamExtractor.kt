@@ -337,8 +337,8 @@ object StreamExtractor {
         }
 
         if (dev.sparkynox.sparkytube.settings.SettingsPrefs.isYtDlpFallbackEnabled(appContextRef)) {
-            YtDlpResolver.init(appContextRef)
-            val ytDlpResult = YtDlpResolver.resolve(videoId)
+            PyYtDlp.init(appContextRef)
+            val ytDlpResult = PyYtDlp.resolve(videoId)
             if (ytDlpResult != null) {
                 cacheResolved(videoId, ytDlpResult)
                 return ytDlpResult
