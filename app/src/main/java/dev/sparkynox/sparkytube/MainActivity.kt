@@ -2726,9 +2726,9 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 // binaries on app start -- see SparkyTubeApp.onCreate);
                 // if it's off, this falls through to null same as any
                 // other unavailable method would.
-                dev.sparkynox.sparkytube.extractor.YtDlpResolver.init(this)
+                dev.sparkynox.sparkytube.extractor.PyYtDlp.init(this)
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    dev.sparkynox.sparkytube.extractor.YtDlpResolver.resolve(videoId)
+                    dev.sparkynox.sparkytube.extractor.PyYtDlp.resolve(videoId)
                 }
             }
             dev.sparkynox.sparkytube.settings.SettingsPrefs.ExtractorMethod.AUTO ->
@@ -2892,7 +2892,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         // failing, but nothing showed why.
         val method = dev.sparkynox.sparkytube.settings.SettingsPrefs.getExtractorMethod(this)
         if (method == dev.sparkynox.sparkytube.settings.SettingsPrefs.ExtractorMethod.YT_DLP) {
-            val error = dev.sparkynox.sparkytube.extractor.YtDlpResolver.lastErrorMessage
+            val error = dev.sparkynox.sparkytube.extractor.PyYtDlp.lastErrorMessage
             AlertDialog.Builder(this)
                 .setTitle("yt-dlp couldn't play this video")
                 .setMessage(error ?: "yt-dlp failed with no specific error message.")

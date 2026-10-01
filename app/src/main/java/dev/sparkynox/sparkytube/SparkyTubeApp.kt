@@ -30,15 +30,16 @@ class SparkyTubeApp : Application() {
             DynamicColors.applyToActivitiesIfAvailable(this)
         }
 
-        // yt-dlp fallback (see extractor/YtDlpResolver.kt): only init if the
-        // user has actually turned this on in Settings -- unpacking the
-        // bundled Python/yt-dlp binaries on first run takes a moment, so
-        // doing it here (background thread, app startup) means it's ready
-        // by the time a video actually needs it instead of stalling
-        // playback the first time the fallback fires.
+        // yt-dlp fallback (see extractor/PyYtDlp.kt): only init if the
+        // user has actually turned this on in Settings. Chaquopy's Python
+        // interpreter starts once here on a background thread and then
+        // stays resident for the app's whole process lifetime -- unlike
+        // the old youtubedl-android version, nothing here needs to run
+        // again before a video resolve, there's no per-call subprocess
+        // boot cost anymore.
         if (dev.sparkynox.sparkytube.settings.SettingsPrefs.isYtDlpFallbackEnabled(this)) {
             Thread {
-                dev.sparkynox.sparkytube.extractor.YtDlpResolver.init(this)
+                dev.sparkynox.sparkytube.extractor.PyYtDlp.init(this)
             }.start()
         }
     }
