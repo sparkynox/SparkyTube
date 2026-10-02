@@ -38,6 +38,7 @@ object SettingsPrefs {
     private const val KEY_LOCAL_SERVER_API_KEY = "local_server_api_key"
     private const val KEY_PIPED_FALLBACK_ENABLED = "piped_fallback_enabled"
     private const val KEY_YTDLP_FALLBACK_ENABLED = "ytdlp_fallback_enabled"
+    private const val KEY_YTDLP_DATA_SAVER = "ytdlp_data_saver"
     private const val KEY_DYNAMIC_COLOR_ENABLED = "dynamic_color_enabled"
     private const val KEY_SPONSORBLOCK_ENABLED = "sponsorblock_enabled"
     private const val KEY_SPONSORBLOCK_CATEGORIES = "sponsorblock_categories"
@@ -320,6 +321,14 @@ object SettingsPrefs {
 
     fun setYtDlpFallbackEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_YTDLP_FALLBACK_ENABLED, enabled).apply()
+    }
+
+    // yt-dlp Data Saver: on (default) = only 360p, off = every quality yt-dlp finds
+    fun isYtDlpDataSaverEnabled(context: Context) =
+        prefs(context).getBoolean(KEY_YTDLP_DATA_SAVER, true)
+
+    fun setYtDlpDataSaverEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_YTDLP_DATA_SAVER, enabled).apply()
     }
 
     // Dynamic Color (Material You wallpaper theming, Android 12+). Off by
