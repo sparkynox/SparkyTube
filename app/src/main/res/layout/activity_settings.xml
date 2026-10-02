@@ -81,6 +81,7 @@
             <include layout="@layout/settings_switch_row" android:id="@+id/rowDefaultQuality" />
             <include layout="@layout/settings_switch_row" android:id="@+id/rowPipedFallback" />
             <include layout="@layout/settings_switch_row" android:id="@+id/rowYtDlpFallback" />
+            <include layout="@layout/settings_switch_row" android:id="@+id/rowYtDlpDataSaver" />
 
             <TextView
                 style="@style/SettingsSectionHeader"
