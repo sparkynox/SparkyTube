@@ -12,8 +12,8 @@ android {
         applicationId = "dev.sparkynox.sparkytube"
         minSdk = 24
         targetSdk = 34
-        versionCode = 10
-        versionName = "1.8"
+        versionCode = 11
+        versionName = "1.9"
 
         // ARMv7 (armeabi-v7a) + ARM64 (arm64-v8a) — covers basically every real device.
         // x86/x86_64 skipped on purpose (emulator-only, not needed per Sparky's spec).
