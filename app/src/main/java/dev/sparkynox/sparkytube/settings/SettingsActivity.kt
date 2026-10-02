@@ -308,7 +308,7 @@ class SettingsActivity : AppCompatActivity() {
         refreshExtractorMethodSubtitle(subtitleView)
 
         binding.rowExtractorMethod.root.setOnClickListener {
-            val options = arrayOf("Auto (recommended)", "Local Servers", "NewPipe", "yt-dlp")
+            val options = arrayOf("Auto", "Local Servers", "NewPipe", "yt-dlp (default)")
             val values = arrayOf(
                 SettingsPrefs.ExtractorMethod.AUTO,
                 SettingsPrefs.ExtractorMethod.LOCAL_SERVER,
@@ -334,7 +334,7 @@ class SettingsActivity : AppCompatActivity() {
             SettingsPrefs.ExtractorMethod.AUTO -> "Auto — local server (if enabled) → JavaScript → NewPipe"
             SettingsPrefs.ExtractorMethod.LOCAL_SERVER -> "Local Servers only — set up under Local Servers above"
             SettingsPrefs.ExtractorMethod.NEWPIPE -> "NewPipe only — skips the local server and JS fast path"
-            SettingsPrefs.ExtractorMethod.YT_DLP -> "yt-dlp only — requires the yt-dlp fallback toggle below to be on"
+            SettingsPrefs.ExtractorMethod.YT_DLP -> "yt-dlp only — Python stays loaded in the app, no NewPipe fallback"
         }
     }
 
