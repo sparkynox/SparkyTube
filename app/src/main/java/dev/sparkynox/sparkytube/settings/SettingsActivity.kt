@@ -71,6 +71,14 @@ class SettingsActivity : AppCompatActivity() {
             SettingsPrefs::isPipedFallbackEnabled, SettingsPrefs::setPipedFallbackEnabled
         )
         setupYtDlpFallbackRow()
+        setupRow(
+            binding.rowYtDlpDataSaver, "yt-dlp Data Saver",
+            "On: only 360p, small and fast. Off: every quality yt-dlp finds (144p up to 1080p)",
+            SettingsPrefs::isYtDlpDataSaverEnabled
+        ) { ctx, on ->
+            SettingsPrefs.setYtDlpDataSaverEnabled(ctx, on)
+            dev.sparkynox.sparkytube.extractor.StreamExtractor.clearCache()
+        }
         setupDynamicColorRow()
         setupDataSaverRow()
         setupNativeHomeFeedRow()
