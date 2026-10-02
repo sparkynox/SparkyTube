@@ -32,3 +32,10 @@
 -keepclassmembers class * {
     @com.chaquo.python.PyIgnore *;
 }
+
+## The app bundles its own org.json (org.json:json in build.gradle.kts), so R8
+## treats it as app code and renames it. Chaquopy looks org.json.JSONObject up
+## by name when it reads its build.json at startup, finds nothing that matches
+## the renamed class and dies with an AssertionError -> yt-dlp never starts.
+-keep class org.json.** { *; }
+-dontwarn org.json.**
