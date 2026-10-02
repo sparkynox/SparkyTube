@@ -1293,21 +1293,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         if (intent?.getBooleanExtra(EXTRA_OPEN_YT_SETTINGS, false) == true) {
             webView.loadUrl(YT_SETTINGS_URL)
         } else {
-            // Cold start -- if a video was playing when the app last
-            // fully closed (not just backgrounded, this only gets set/
-            // cleared around actual playback start/stop), reopen it
-            // instead of always dropping back to Home. lastResolvedVideoId
-            // gets set as soon as this resolves via checkCurrentUrlForVideo
-            // picking up the loaded watch page, and resolveAndPlayNative's
-            // own WatchHistoryStore.getPosition() lookup handles the
-            // actual seek-to-saved-position -- this just needs to load
-            // the right watch page to kick that off.
-            val resumeVideoId = dev.sparkynox.sparkytube.history.WatchHistoryStore.getLastPlaying(this)
-            if (resumeVideoId != null) {
-                webView.loadUrl("https://m.youtube.com/watch?v=$resumeVideoId")
-            } else {
-                webView.loadUrl(HOME_URL)
-            }
+            webView.loadUrl(HOME_URL)
         }
         pollHandler.post(urlPollRunnable)
 
@@ -1881,10 +1867,6 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         // under the new video's id -- exactly the "new video resumes from
         // the old one's timestamp" bug.
         ticksSinceLastPositionSave = 0
-
-        if (videoId != null) {
-            dev.sparkynox.sparkytube.history.WatchHistoryStore.saveLastPlaying(this, videoId)
-        }
 
         setPlayerTitle(title)
     }
@@ -2928,12 +2910,6 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 dev.sparkynox.sparkytube.history.WatchHistoryStore.savePosition(this, id, c.currentPosition, c.duration)
             }
         }
-        // stopNativePlayback only fires on an explicit close (back press,
-        // switching to a new video, etc) -- clear the cold-start pointer
-        // here so a deliberately-closed video doesn't reopen itself next
-        // launch. Backgrounding the app (onPause) does NOT call this, so
-        // that case is unaffected.
-        dev.sparkynox.sparkytube.history.WatchHistoryStore.clearLastPlaying(this)
         pendingPlay = null
         prefetchedForVideoId = null
         mediaController?.stop()
