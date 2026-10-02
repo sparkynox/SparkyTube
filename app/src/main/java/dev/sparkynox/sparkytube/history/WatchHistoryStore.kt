@@ -52,19 +52,4 @@ object WatchHistoryStore {
             .remove("dur_$videoId")
             .apply()
     }
-
-    // Separate from the per-video pos_/dur_ entries above -- this is just
-    // "whatever video was on screen when the app last closed", used to
-    // reopen it on a cold start. savePosition() clearing a video's entry
-    // (finished/too-early) doesn't touch this, they're independent.
-    fun saveLastPlaying(context: Context, videoId: String) {
-        prefs(context).edit().putString("last_playing_id", videoId).apply()
-    }
-
-    fun getLastPlaying(context: Context): String? =
-        prefs(context).getString("last_playing_id", null)
-
-    fun clearLastPlaying(context: Context) {
-        prefs(context).edit().remove("last_playing_id").apply()
-    }
 }
