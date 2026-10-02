@@ -165,6 +165,10 @@ object StreamExtractor {
      * fast-path result behaves identically to a NewPipe-resolved one for
      * things like the 5-minute reuse window on back/forward navigation.
      */
+    fun clearCache() {
+        cache.clear()
+    }
+
     fun cacheResolved(videoId: String, resolved: ResolvedStream) {
         if (cache.size >= CACHE_MAX_ENTRIES) {
             cache.remove(cache.keys.first())
