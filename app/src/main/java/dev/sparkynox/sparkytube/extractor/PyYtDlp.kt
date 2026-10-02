@@ -26,7 +26,11 @@ object PyYtDlp {
     var lastErrorMessage: String? = null
         private set
 
+    @Volatile
+    private var appContext: Context? = null
+
     fun init(context: Context) {
+        appContext = context.applicationContext
         if (ytDlpModule != null || initFailedPermanently) return
 
         try {
@@ -60,12 +64,15 @@ object PyYtDlp {
         }
 
         return try {
-            val rawJson = module.callAttr("resolve_json", videoId).toString()
+            val dataSaver = appContext?.let {
+                dev.sparkynox.sparkytube.settings.SettingsPrefs.isYtDlpDataSaverEnabled(it)
+            } ?: true
+            val rawJson = module.callAttr("resolve_json", videoId, dataSaver).toString()
             if (rawJson.isBlank() || rawJson == "None") {
                 lastErrorMessage = "yt-dlp returned no data for this video"
                 return null
             }
-            val parsed = parseFormats(rawJson)
+            val parsed = parseFormats(rawJson, dataSaver)
             if (parsed == null) {
                 lastErrorMessage = "yt-dlp returned no playable formats for this video"
                 return null
@@ -84,7 +91,7 @@ object PyYtDlp {
     // logic (progressive / video-only+bestAudio / audio-only), just reads
     // from a JSON string that came from an in-process call instead of a
     // subprocess's stdout
-    private fun parseFormats(rawJson: String): StreamExtractor.ResolvedStream? {
+    private fun parseFormats(rawJson: String, dataSaver: Boolean): StreamExtractor.ResolvedStream? {
         val root = org.json.JSONObject(rawJson)
         val formats = root.optJSONArray("formats") ?: return null
 
@@ -93,8 +100,18 @@ object PyYtDlp {
             val height: Int,
             val hasVideo: Boolean,
             val hasAudio: Boolean,
-            val abr: Double
+            val abr: Double,
+            val vcodec: String,
+            val isManifest: Boolean
         )
+
+        // weak phones can't hardware-decode AV1, so try h264 first, then vp9
+        fun codecRank(v: String) = when {
+            v.startsWith("avc1") -> 0
+            v.startsWith("vp09") || v.startsWith("vp9") -> 1
+            v.startsWith("av01") -> 3
+            else -> 2
+        }
 
         val all = (0 until formats.length()).mapNotNull { i ->
             val f = formats.optJSONObject(i) ?: return@mapNotNull null
@@ -106,29 +123,55 @@ object PyYtDlp {
                 height = f.optInt("height", 0),
                 hasVideo = vcodec != "none",
                 hasAudio = acodec != "none",
-                abr = f.optDouble("abr", 0.0).let { if (it.isNaN()) 0.0 else it }
+                abr = f.optDouble("abr", 0.0).let { if (it.isNaN()) 0.0 else it },
+                vcodec = vcodec,
+                isManifest = f.optString("protocol", "https").let { it.startsWith("m3u8") || it.contains("dash") }
             )
         }
 
-        val bestAudioUrl = all.filter { it.hasAudio && !it.hasVideo }
+        // manifests (hls/dash) aren't a single playable url, skip them unless nothing else exists
+        val direct = all.filter { !it.isManifest }
+        val usable = if (direct.any { it.hasVideo && it.height > 0 }) direct else all
+
+        val bestAudioUrl = usable.filter { it.hasAudio && !it.hasVideo }
             .maxByOrNull { it.abr }
             ?.url
 
-        val progressiveOptions = all
+        val progressiveOptions = usable
             .filter { it.hasVideo && it.hasAudio && it.height > 0 }
+            .sortedBy { codecRank(it.vcodec) }
             .map { StreamExtractor.QualityOption(label = "${it.height}p", url = it.url, resolutionValue = it.height, audioUrl = null) }
 
         val adaptiveOptions = if (bestAudioUrl != null) {
-            all.filter { it.hasVideo && !it.hasAudio && it.height > 0 }
+            usable.filter { it.hasVideo && !it.hasAudio && it.height > 0 }
+                .sortedBy { codecRank(it.vcodec) }
                 .map { StreamExtractor.QualityOption(label = "${it.height}p", url = it.url, resolutionValue = it.height, audioUrl = bestAudioUrl) }
         } else {
             emptyList()
         }
 
-        val qualities = (progressiveOptions + adaptiveOptions)
+        val allOptions = (progressiveOptions + adaptiveOptions)
+        val fullList = allOptions
             .sortedByDescending { it.audioUrl != null }
             .distinctBy { it.label }
             .sortedByDescending { it.resolutionValue }
+
+        // data saver keeps a single 360p entry (muxed one if there is one),
+        // otherwise the lowest thing available
+        val qualities = if (dataSaver) {
+            val pick = progressiveOptions.filter { it.resolutionValue <= 360 }.maxByOrNull { it.resolutionValue }
+                ?: allOptions.filter { it.resolutionValue <= 360 }.maxByOrNull { it.resolutionValue }
+                ?: allOptions.minByOrNull { it.resolutionValue }
+            listOfNotNull(pick)
+        } else {
+            fullList
+        }
+
+        // shows up in Settings > Logs so we can see what yt-dlp really returned
+        dev.sparkynox.sparkytube.logs.LogRecorder.i(
+            "PyYtDlp",
+            "dataSaver=$dataSaver, found: ${fullList.joinToString { it.label }}, using: ${qualities.joinToString { it.label }}"
+        )
 
         val title = root.optString("title", "")
         val duration = root.optLong("duration", 0L)
