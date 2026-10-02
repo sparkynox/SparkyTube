@@ -37,7 +37,9 @@ class SparkyTubeApp : Application() {
         // the old youtubedl-android version, nothing here needs to run
         // again before a video resolve, there's no per-call subprocess
         // boot cost anymore.
-        if (dev.sparkynox.sparkytube.settings.SettingsPrefs.isYtDlpFallbackEnabled(this)) {
+        val prefsKt = dev.sparkynox.sparkytube.settings.SettingsPrefs
+        val ytDlpIsDefault = prefsKt.getExtractorMethod(this) == prefsKt.ExtractorMethod.YT_DLP
+        if (ytDlpIsDefault || prefsKt.isYtDlpFallbackEnabled(this)) {
             Thread {
                 dev.sparkynox.sparkytube.extractor.PyYtDlp.init(this)
             }.start()

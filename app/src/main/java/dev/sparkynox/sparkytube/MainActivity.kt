@@ -2699,17 +2699,12 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             dev.sparkynox.sparkytube.settings.SettingsPrefs.ExtractorMethod.NEWPIPE ->
                 StreamExtractor.resolvePlayableUrl(videoId)
             dev.sparkynox.sparkytube.settings.SettingsPrefs.ExtractorMethod.YT_DLP -> {
-                // Forces yt-dlp directly, skipping the normal
-                // fallback chain entirely -- useful for testing/verifying
-                // yt-dlp itself works, or as a manual override when
-                // NewPipe/Piped are both failing on a specific video.
-                // Still needs the "yt-dlp fallback" toggle enabled in
-                // Settings (that's what actually unpacks the bundled
-                // binaries on app start -- see SparkyTubeApp.onCreate);
-                // if it's off, this falls through to null same as any
-                // other unavailable method would.
-                dev.sparkynox.sparkytube.extractor.PyYtDlp.init(this)
+                // yt-dlp only, no NewPipe/Piped chain. Default method now.
+                // init() is a no-op once Python is up (SparkyTubeApp warms
+                // it at launch); it's inside the IO block so a cold first
+                // call can't freeze the UI while the interpreter starts.
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    dev.sparkynox.sparkytube.extractor.PyYtDlp.init(this@MainActivity)
                     dev.sparkynox.sparkytube.extractor.PyYtDlp.resolve(videoId)
                 }
             }
