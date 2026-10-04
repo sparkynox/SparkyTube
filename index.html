@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SparkyTube — YouTube for Android, without the ads</title>
+<meta name="description" content="SparkyTube is an Android YouTube client that blocks ads, skips sponsor segments, remembers where you stopped and downloads video or audio in the quality you choose.">
+<meta name="theme-color" content="#ff3b3b">
+<meta property="og:title" content="SparkyTube — YouTube for Android, without the ads">
+<meta property="og:description" content="Blocks ads, skips sponsor segments, resumes where you stopped, downloads video or audio.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%23121214'/%3E%3Ccircle cx='32' cy='32' r='21' fill='none' stroke='%23ff3b3b' stroke-width='2.5' opacity='.55'/%3E%3Cpath d='M26 20v24l20-12z' fill='%23ff3b3b'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --red:#ff3b3b;
+  --red-deep:#c9232b;
+  --ink:#121214;
+  --paper:#eef0f4;
+  --mute:#555a63;
+  --line:rgba(18,18,20,.16);
+  --font:"Archivo","Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:92px}
+body{margin:0;font:400 17px/1.6 var(--font);color:var(--ink);background:var(--paper);-webkit-font-smoothing:antialiased}
+a{color:inherit}
+img,svg{display:block;max-width:100%}
+:focus-visible{outline:3px solid currentColor;outline-offset:3px;border-radius:4px}
+.skip{position:absolute;left:-999px;top:8px;background:var(--ink);color:var(--paper);padding:8px 14px;z-index:99;border-radius:8px}
+.skip:focus{left:8px}
+.wrap{width:min(1120px,100% - 40px);margin-inline:auto}
+
+h1,h2,h3{font-stretch:118%;margin:0;letter-spacing:-.02em}
+h1{font-weight:850;font-size:clamp(2.7rem,7.4vw,5.6rem);line-height:.96}
+h2{font-weight:800;font-size:clamp(1.9rem,4.2vw,3rem);line-height:1.04}
+h3{font-weight:750;font-size:1.15rem;font-stretch:108%;letter-spacing:-.01em;line-height:1.25}
+p{margin:0}
+
+/* ---------- top bar: the page scrolls like a video, sections are chapters ---------- */
+.bar{position:sticky;top:0;z-index:20;background:rgba(238,240,244,.94);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.bar-row{display:flex;align-items:center;gap:20px;min-height:58px}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;font-weight:800;font-stretch:112%;letter-spacing:-.01em}
+.brand svg{width:30px;height:30px}
+.scrub{position:relative;flex:1;height:38px;display:flex;align-items:center;min-width:0}
+.track{position:absolute;left:0;right:0;height:5px;border-radius:3px;background:rgba(18,18,20,.16)}
+.fill{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:3px;background:var(--red)}
+.tick{position:absolute;top:50%;width:14px;height:34px;margin-left:-7px;transform:translateY(-50%);display:flex;justify-content:center;align-items:center;text-decoration:none}
+.tick::before{content:"";width:3px;height:15px;background:var(--ink);border-radius:2px}
+.tick span{position:absolute;left:50%;top:100%;transform:translateX(-50%);font-size:.72rem;font-weight:600;white-space:nowrap;color:var(--mute);display:none}
+.where{font-size:.84rem;font-weight:650;min-width:7.5em;color:var(--mute)}
+.get{background:var(--ink);color:var(--paper);text-decoration:none;font-weight:700;font-size:.9rem;padding:9px 16px;border-radius:999px;white-space:nowrap}
+.get:hover{background:var(--red-deep)}
+@media (min-width:900px){ .tick span{display:block} .bar-row{min-height:64px} .scrub{height:46px} .tick{height:44px} .tick span{top:calc(50% + 14px)} }
+@media (max-width:620px){ .where{display:none} .bar-row{gap:12px} }
+
+/* ---------- hero ---------- */
+.hero{background:var(--red);padding:56px 0 0;overflow:hidden}
+.hero-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:40px;align-items:end}
+.hero-copy{padding-bottom:64px}
+.hero-copy p.lead{font-size:1.2rem;max-width:34em;margin-top:22px;font-weight:450}
+.cta-row{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-top:30px}
+.btn{display:inline-flex;align-items:center;gap:10px;background:var(--ink);color:var(--paper);text-decoration:none;font-weight:750;font-size:1.05rem;padding:15px 24px;border-radius:14px}
+.btn:hover{background:#000}
+.btn svg{width:20px;height:20px}
+.link{font-weight:650;text-underline-offset:4px}
+.meta{margin-top:18px;font-size:.92rem;font-weight:550;opacity:.82}
+.meta b{font-weight:800}
+
+.phone{width:min(330px,82%);margin:0 auto;background:var(--ink);border-radius:38px 38px 0 0;padding:12px 12px 0;box-shadow:0 -2px 0 rgba(255,255,255,.12) inset}
+.screen{background:#0d0d0f;color:#f1f1f1;border-radius:28px 28px 0 0;overflow:hidden;min-height:470px}
+.app-top{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;font-weight:800;font-stretch:112%;font-size:1rem}
+.app-top i{width:18px;height:18px;border:2px solid #f1f1f1;border-radius:50%;margin-left:10px;display:inline-block;opacity:.85}
+.player{position:relative;aspect-ratio:16/9;background:linear-gradient(135deg,#2a2a31,#17171b 55%,#2d1316)}
+.play{position:absolute;inset:0;margin:auto;width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.18)}
+.play::after{content:"";position:absolute;left:18px;top:13px;border-left:16px solid #fff;border-top:10px solid transparent;border-bottom:10px solid transparent}
+.chip{position:absolute;left:10px;bottom:30px;font-size:.7rem;font-weight:650;background:rgba(0,0,0,.6);padding:2px 9px;border-radius:999px}
+.timebar{position:absolute;left:10px;right:10px;bottom:12px;height:4px;background:rgba(255,255,255,.28);border-radius:2px}
+.timebar .tk{position:absolute;top:-3px;width:3px;height:10px;background:#0d0d0f;border-radius:1px}
+.timebar .pf{position:absolute;left:0;top:0;bottom:0;background:var(--red);border-radius:2px;width:0}
+.timebar .hd{position:absolute;top:-4px;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:var(--red)}
+.sk{padding:16px}
+.sk p{height:11px;border-radius:6px;background:#26262b;margin-bottom:10px}
+.sk p:first-child{height:15px;width:88%;background:#34343a}
+.sk .row{display:flex;gap:10px;margin:16px 0 18px}
+.sk .row span{height:30px;border-radius:15px;background:#26262b;flex:1}
+.sk .row span:first-child{background:#eaeaea;flex:1.4}
+.dl{margin:4px 16px 0;padding:12px 14px;border-radius:14px;background:#1a1a1f;font-size:.78rem}
+.dl b{font-weight:650;display:block;margin-bottom:8px}
+.dl .bar2{height:4px;border-radius:2px;background:#33333a;margin-top:6px}
+.dl .bar2 i{display:block;height:100%;border-radius:2px;background:var(--red)}
+
+/* ---------- sections ---------- */
+section{padding:92px 0}
+.intro{max-width:40em;margin-top:18px;color:var(--mute);font-size:1.08rem}
+.cols{display:grid;grid-template-columns:repeat(3,1fr);gap:48px 40px;margin-top:56px}
+.group h3{padding-bottom:12px;border-bottom:2px solid var(--ink);margin-bottom:6px}
+.group dl{margin:0}
+.group dt{font-weight:700;margin-top:18px}
+.group dd{margin:3px 0 0;color:var(--mute);font-size:.97rem;line-height:1.5}
+
+.dark{background:var(--ink);color:#f1f1f3}
+.dark .intro{color:#aeb2ba}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center}
+.facts{margin:34px 0 0;padding:0;list-style:none;display:grid;gap:22px}
+.facts li{padding-left:18px;border-left:3px solid var(--red)}
+.facts b{display:block;font-weight:700;font-size:1.05rem}
+.facts span{color:#aeb2ba;font-size:.96rem}
+.picker{background:#1b1b20;border-radius:20px;padding:22px;max-width:420px;justify-self:end;width:100%}
+.picker h4{margin:0 0 14px;font-size:.95rem;font-weight:700;font-stretch:108%}
+.q{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:12px;background:#24242a;margin-bottom:8px;font-size:.95rem}
+.q small{color:#9da1a9;font-size:.78rem}
+.q.on{background:var(--red);color:var(--ink);font-weight:700}
+.q.on small{color:var(--ink);opacity:.75}
+
+.steps{list-style:none;margin:48px 0 0;padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:32px;counter-reset:s}
+.steps li{counter-increment:s;padding-top:18px;border-top:3px solid var(--ink)}
+.steps li::before{content:counter(s);display:block;font-weight:850;font-stretch:125%;font-size:2.4rem;line-height:1;margin-bottom:10px;color:var(--red-deep)}
+.steps p{color:var(--mute);margin-top:6px;font-size:.98rem}
+.apks{margin-top:44px;display:grid;gap:10px;max-width:640px}
+.apk{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 20px;border:2px solid var(--ink);border-radius:14px;text-decoration:none;background:#fff}
+.apk:hover{background:var(--ink);color:var(--paper)}
+.apk:hover small{color:#c4c8cf}
+.apk strong{display:block;font-weight:750}
+.apk small{color:var(--mute);font-size:.88rem}
+.apk .sz{font-weight:650;font-size:.9rem;white-space:nowrap}
+.note{margin-top:18px;color:var(--mute);font-size:.94rem;max-width:44em}
+
+details{border-bottom:1px solid var(--line);padding:20px 0}
+details:first-of-type{border-top:1px solid var(--line)}
+summary{cursor:pointer;font-weight:700;font-size:1.08rem;list-style:none;display:flex;justify-content:space-between;gap:20px}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";font-weight:500;font-size:1.4rem;line-height:1}
+details[open] summary::after{content:"–"}
+details p{margin-top:10px;color:var(--mute);max-width:46em}
+.faq{max-width:760px;margin-top:40px}
+
+footer{background:var(--ink);color:#c9ccd3;padding:56px 0 64px;font-size:.93rem}
+.f-grid{display:flex;flex-wrap:wrap;justify-content:space-between;gap:28px}
+footer .brand{color:#f1f1f3}
+footer p{max-width:40em;line-height:1.55;margin-top:10px}
+.f-links{display:flex;gap:22px;flex-wrap:wrap}
+.f-links a{text-underline-offset:4px;font-weight:600;color:#f1f1f3}
+.legal{margin-top:34px;padding-top:22px;border-top:1px solid rgba(255,255,255,.14);color:#9da1a9;font-size:.85rem}
+
+@media (max-width:900px){
+  .hero-grid{grid-template-columns:1fr}
+  .hero-copy{padding-bottom:36px}
+  .cols,.steps{grid-template-columns:1fr}
+  .two{grid-template-columns:1fr}
+  .picker{justify-self:start}
+  section{padding:68px 0}
+}
+@media (prefers-reduced-motion:reduce){ html{scroll-behavior:auto} }
+</style>
+</head>
+<body>
+<a class="skip" href="#features">Skip to content</a>
+
+<header class="bar">
+  <div class="wrap bar-row">
+    <a class="brand" href="#top" aria-label="SparkyTube home">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="15" fill="#121214"/><circle cx="32" cy="32" r="21" fill="none" stroke="#ff3b3b" stroke-width="2.5" opacity=".55"/><path d="M26 20v24l20-12z" fill="#ff3b3b"/></svg>
+      SparkyTube
+    </a>
+    <nav class="scrub" aria-label="Page sections">
+      <div class="track"><div class="fill" id="fill"></div></div>
+      <a class="tick" href="#features" style="left:25%" data-for="features"><span>Features</span></a>
+      <a class="tick" href="#under-the-hood" style="left:50%" data-for="under-the-hood"><span>Under the hood</span></a>
+      <a class="tick" href="#install" style="left:75%" data-for="install"><span>Install</span></a>
+      <a class="tick" href="#faq" style="left:90%" data-for="faq"><span>FAQ</span></a>
+    </nav>
+    <span class="where" id="where" aria-live="off">Overview</span>
+    <a class="get" href="#install">Get the app</a>
+  </div>
+</header>
+
+<main id="top">
+<div class="hero" data-chapter="Overview">
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <h1>YouTube for Android, without the ads.</h1>
+      <p class="lead">SparkyTube blocks ads, skips sponsor segments, remembers where you stopped, and downloads video or just the audio in the quality you pick.</p>
+      <div class="cta-row">
+        <a class="btn" id="mainDownload" href="https://github.com/sparkynox/SparkyTube/releases/latest">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M5 20h14"/></svg>
+          Download the APK
+        </a>
+        <a class="link" href="#features">See what it does</a>
+      </div>
+      <p class="meta"><b id="ver">Latest release</b> · Android 7.0 or newer · Free</p>
+    </div>
+
+    <div class="phone" aria-hidden="true">
+      <div class="screen">
+        <div class="app-top"><span>SparkyTube</span><span><i></i><i></i></span></div>
+        <div class="player">
+          <div class="play"></div>
+          <div class="chip" id="chip">Intro</div>
+          <div class="timebar" id="tb">
+            <span class="pf" id="pf"></span>
+            <span class="tk" style="left:20%"></span>
+            <span class="tk" style="left:45%"></span>
+            <span class="tk" style="left:75%"></span>
+            <span class="hd" id="hd"></span>
+          </div>
+        </div>
+        <div class="sk"><p></p><p style="width:62%"></p><div class="row"><span></span><span></span><span></span></div></div>
+        <div class="dl"><b>Downloading</b>Minecraft build guide (720p)<div class="bar2"><i style="width:64%"></i></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<section id="features" data-chapter="Features">
+  <div class="wrap">
+    <h2>Everything you reach for, built in.</h2>
+    <p class="intro">SparkyTube wraps the YouTube mobile site in a faster, cleaner player and adds the things the official app keeps behind a subscription or leaves out.</p>
+
+    <div class="cols">
+      <div class="group">
+        <h3>Watching</h3>
+        <dl>
+          <dt>Ads blocked</dt><dd>Video and page ads are filtered out before they load.</dd>
+          <dt>Sponsor segments skipped</dt><dd>Uses the SponsorBlock community database to skip sponsors, self-promos and like-and-subscribe reminders.</dd>
+          <dt>Chapters</dt><dd>Chapter marks on the seek bar when the description has timestamps. Tap the chapter name to jump.</dd>
+          <dt>Resume where you stopped</dt><dd>Open a video again and it carries on from your last position.</dd>
+        </dl>
+      </div>
+      <div class="group">
+        <h3>Controls</h3>
+        <dl>
+          <dt>Swipe for volume and brightness</dt><dd>Slide up or down on the video, with an on-screen indicator.</dd>
+          <dt>Double-tap to seek</dt><dd>Skip forward or back without reaching for the seek bar.</dd>
+          <dt>Music mode</dt><dd>Turn the picture off and keep listening, even with the screen locked.</dd>
+          <dt>Speed and quality</dt><dd>Change playback speed and video quality from the player.</dd>
+        </dl>
+      </div>
+      <div class="group">
+        <h3>Downloading</h3>
+        <dl>
+          <dt>Video or audio only</dt><dd>Download from the player, or long-press a video in the feed.</dd>
+          <dt>Pick the quality</dt><dd>Higher qualities are downloaded as separate video and audio and joined on your phone.</dd>
+          <dt>Offline library</dt><dd>Watch what you saved inside the app. Files also land in your Downloads folder.</dd>
+          <dt>Progress at a glance</dt><dd>One screen shows every download with progress and speed.</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="under-the-hood" class="dark" data-chapter="Under the hood">
+  <div class="wrap two">
+    <div>
+      <h2>Streams are resolved on your phone.</h2>
+      <p class="intro">No middle server to go down. SparkyTube runs yt-dlp inside the app and keeps it loaded, so the second video you open is much quicker than the first.</p>
+      <ul class="facts">
+        <li><b>yt-dlp Data Saver</b><span>On by default: plays at 360p to save mobile data. Switch it off in Settings to get every quality yt-dlp finds.</span></li>
+        <li><b>Crash screen with logs</b><span>If something breaks, you get a log you can share instead of a silent close.</span></li>
+        <li><b>Material You</b><span>Optional dynamic colors from your wallpaper on Android 12 and newer.</span></li>
+      </ul>
+    </div>
+    <div class="picker" aria-hidden="true">
+      <h4>Video quality</h4>
+      <div class="q">1080p <small>video + audio joined</small></div>
+      <div class="q">720p <small>video + audio joined</small></div>
+      <div class="q on">360p <small>Data Saver</small></div>
+      <div class="q">144p <small>smallest</small></div>
+    </div>
+  </div>
+</section>
+
+<section id="install" data-chapter="Install">
+  <div class="wrap">
+    <h2>Install it in a minute.</h2>
+    <p class="intro">SparkyTube isn't on the Play Store, so you install the APK file yourself.</p>
+    <ol class="steps">
+      <li><h3>Download</h3><p>Pick the file for your phone below. If you aren't sure, take arm64-v8a.</p></li>
+      <li><h3>Allow the install</h3><p>Android asks once whether your browser or file manager may install apps. Say yes.</p></li>
+      <li><h3>Open and tap Install</h3><p>Android may warn about an unknown source, that's normal for apps outside the Play Store.</p></li>
+    </ol>
+
+    <div class="apks" id="apks">
+      <a class="apk" data-abi="arm64" href="https://github.com/sparkynox/SparkyTube/releases/latest"><span><strong>arm64-v8a</strong><small>Most phones from about 2017 on</small></span><span class="sz"></span></a>
+      <a class="apk" data-abi="armeabi" href="https://github.com/sparkynox/SparkyTube/releases/latest"><span><strong>armeabi-v7a</strong><small>Older 32-bit phones</small></span><span class="sz"></span></a>
+      <a class="apk" data-abi="universal" href="https://github.com/sparkynox/SparkyTube/releases/latest"><span><strong>Universal</strong><small>Works on everything, larger file</small></span><span class="sz"></span></a>
+    </div>
+    <p class="note">All files come from the <a href="https://github.com/sparkynox/SparkyTube/releases">GitHub releases page</a>. Updates are the same steps with the newer file, your settings stay.</p>
+  </div>
+</section>
+
+<section id="faq" data-chapter="FAQ" style="padding-top:0">
+  <div class="wrap">
+    <h2>Questions</h2>
+    <div class="faq">
+      <details><summary>Is this the official YouTube app?</summary><p>No. SparkyTube is an independent project and isn't affiliated with or endorsed by YouTube or Google.</p></details>
+      <details><summary>Do I need to sign in?</summary><p>No. You can watch without an account. Sign in inside the app if you want your own subscriptions and recommendations.</p></details>
+      <details><summary>Does it cost anything?</summary><p>No, it's free.</p></details>
+      <details><summary>Is there an iPhone version?</summary><p>No. SparkyTube is built for Android only.</p></details>
+      <details><summary>Where do my downloads go?</summary><p>Into your phone's Downloads folder, and they also show up in the app's Offline Library.</p></details>
+      <details><summary>A video won't play. What now?</summary><p>Open Settings, then Logs, and share the log with the developer on Telegram. It shows exactly which step failed.</p></details>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="f-grid">
+      <div>
+        <a class="brand" href="#top">
+          <svg viewBox="0 0 64 64" aria-hidden="true" style="width:30px;height:30px"><rect width="64" height="64" rx="15" fill="#1d1d21"/><circle cx="32" cy="32" r="21" fill="none" stroke="#ff3b3b" stroke-width="2.5" opacity=".55"/><path d="M26 20v24l20-12z" fill="#ff3b3b"/></svg>
+          SparkyTube
+        </a>
+        <p>Made by SparkyNox. Built on NewPipe Extractor, yt-dlp, Media3 ExoPlayer and the SponsorBlock database.</p>
+      </div>
+      <div class="f-links">
+        <a href="https://github.com/sparkynox/SparkyTube">GitHub</a>
+        <a href="https://github.com/sparkynox/SparkyTube/releases">Releases</a>
+        <a href="https://t.me/SparkyNox">Telegram</a>
+      </div>
+    </div>
+    <p class="legal">SparkyTube is not affiliated with YouTube or Google. YouTube is a trademark of Google LLC.</p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var REPO = "sparkynox/SparkyTube";
+
+  // ---- top bar behaves like a seek bar: fill = scroll progress, ticks = sections
+  var fill = document.getElementById("fill");
+  var where = document.getElementById("where");
+  var ticks = [].slice.call(document.querySelectorAll(".tick"));
+  var chapters = [].slice.call(document.querySelectorAll("[data-chapter]"));
+
+  function maxScroll() {
+    return Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+  }
+  function placeTicks() {
+    var max = maxScroll();
+    ticks.forEach(function (t) {
+      var sec = document.getElementById(t.getAttribute("data-for"));
+      if (sec) t.style.left = Math.min(97, (sec.offsetTop / max) * 100) + "%";
+    });
+  }
+  function onScroll() {
+    var y = window.scrollY;
+    fill.style.width = Math.min(100, (y / maxScroll()) * 100) + "%";
+    var probe = y + window.innerHeight * 0.35;
+    var current = chapters[0];
+    chapters.forEach(function (c) { if (c.offsetTop <= probe) current = c; });
+    where.textContent = current.getAttribute("data-chapter");
+  }
+  window.addEventListener("scroll", onScroll, { passive: true });
+  window.addEventListener("resize", function () { placeTicks(); onScroll(); });
+  window.addEventListener("load", function () { placeTicks(); onScroll(); });
+  placeTicks(); onScroll();
+
+  // ---- hero phone: playhead loops, chapter chip follows it
+  var pf = document.getElementById("pf");
+  var hd = document.getElementById("hd");
+  var chip = document.getElementById("chip");
+  var marks = [[0, "Intro"], [0.2, "Setup"], [0.45, "Build"], [0.75, "Outro"]];
+  function setPlayhead(p) {
+    pf.style.width = p * 100 + "%";
+    hd.style.left = p * 100 + "%";
+    var name = marks[0][1];
+    marks.forEach(function (m) { if (p >= m[0]) name = m[1]; });
+    if (chip.textContent !== name) chip.textContent = name;
+  }
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduce) {
+    setPlayhead(0.5);
+  } else {
+    var LOOP = 16000;
+    (function frame(now) {
+      setPlayhead((now % LOOP) / LOOP);
+      requestAnimationFrame(frame);
+    })(performance.now());
+  }
+
+  // ---- pull the latest release so version and file links never go stale
+  function mb(bytes) { return (bytes / 1048576).toFixed(0) + " MB"; }
+  fetch("https://api.github.com/repos/" + REPO + "/releases/latest")
+    .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+    .then(function (rel) {
+      if (rel.tag_name) document.getElementById("ver").textContent = "Version " + rel.tag_name.replace(/^v/i, "");
+      var assets = (rel.assets || []).filter(function (a) { return /\.apk$/i.test(a.name); });
+      function find(re) { return assets.filter(function (a) { return re.test(a.name); })[0]; }
+      var found = { arm64: find(/arm64/i), armeabi: find(/armeabi|v7a/i), universal: find(/universal/i) };
+      [].slice.call(document.querySelectorAll(".apk")).forEach(function (el) {
+        var a = found[el.getAttribute("data-abi")];
+        if (a) {
+          el.href = a.browser_download_url;
+          el.querySelector(".sz").textContent = mb(a.size);
+        }
+      });
+      if (found.arm64) document.getElementById("mainDownload").href = found.arm64.browser_download_url;
+    })
+    .catch(function () { /* offline or repo not public: the plain release links stay */ });
+})();
+</script>
+</body>
+</html>
