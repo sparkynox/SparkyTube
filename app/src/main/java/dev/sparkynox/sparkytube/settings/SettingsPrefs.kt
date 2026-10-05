@@ -39,6 +39,7 @@ object SettingsPrefs {
     private const val KEY_PIPED_FALLBACK_ENABLED = "piped_fallback_enabled"
     private const val KEY_YTDLP_FALLBACK_ENABLED = "ytdlp_fallback_enabled"
     private const val KEY_YTDLP_DATA_SAVER = "ytdlp_data_saver"
+    private const val KEY_MAX_DOWNLOADS = "max_concurrent_downloads"
     private const val KEY_DYNAMIC_COLOR_ENABLED = "dynamic_color_enabled"
     private const val KEY_SPONSORBLOCK_ENABLED = "sponsorblock_enabled"
     private const val KEY_SPONSORBLOCK_CATEGORIES = "sponsorblock_categories"
@@ -321,6 +322,13 @@ object SettingsPrefs {
 
     fun setYtDlpFallbackEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_YTDLP_FALLBACK_ENABLED, enabled).apply()
+    }
+
+    fun getMaxConcurrentDownloads(context: Context): Int =
+        prefs(context).getInt(KEY_MAX_DOWNLOADS, 2).coerceIn(1, 4)
+
+    fun setMaxConcurrentDownloads(context: Context, n: Int) {
+        prefs(context).edit().putInt(KEY_MAX_DOWNLOADS, n.coerceIn(1, 4)).apply()
     }
 
     // yt-dlp Data Saver: on (default) = only 360p, off = every quality yt-dlp finds

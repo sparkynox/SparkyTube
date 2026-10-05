@@ -58,6 +58,7 @@ class SettingsActivity : AppCompatActivity() {
         )
         setupLogsRow()
         setupDownloadsManagerRow()
+        setupMaxDownloadsRow()
         setupOfflineLibraryRow()
         setupYtSettingsRow()
         setupRelatedFetcherRow()
@@ -208,6 +209,31 @@ class SettingsActivity : AppCompatActivity() {
      * by long-pressing the download button in the player, but that's not
      * discoverable on its own, so this is the primary entry point.
      */
+    private fun setupMaxDownloadsRow() {
+        binding.rowMaxDownloads.rowTitle.text = "Simultaneous downloads"
+        binding.rowMaxDownloads.rowSwitch.visibility = android.view.View.GONE
+        val sub: TextView = binding.rowMaxDownloads.rowSubtitle
+        sub.visibility = TextView.VISIBLE
+        fun refresh() {
+            sub.text = "${SettingsPrefs.getMaxConcurrentDownloads(this)} at a time, the rest wait in the queue"
+        }
+        refresh()
+
+        binding.rowMaxDownloads.root.setOnClickListener {
+            val options = arrayOf("1", "2", "3", "4")
+            AlertDialog.Builder(this)
+                .setTitle("Simultaneous downloads")
+                .setSingleChoiceItems(options, SettingsPrefs.getMaxConcurrentDownloads(this) - 1) { dialog, which ->
+                    SettingsPrefs.setMaxConcurrentDownloads(this, which + 1)
+                    dev.sparkynox.sparkytube.download.DownloadQueue.pump()
+                    refresh()
+                    dialog.dismiss()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
+    }
+
     private fun setupDownloadsManagerRow() {
         binding.rowDownloadsManager.rowTitle.text = "Downloads"
         val subtitleView: TextView = binding.rowDownloadsManager.rowSubtitle
@@ -342,7 +368,7 @@ class SettingsActivity : AppCompatActivity() {
             SettingsPrefs.ExtractorMethod.AUTO -> "Auto — local server (if enabled) → JavaScript → NewPipe"
             SettingsPrefs.ExtractorMethod.LOCAL_SERVER -> "Local Servers only — set up under Local Servers above"
             SettingsPrefs.ExtractorMethod.NEWPIPE -> "NewPipe only — skips the local server and JS fast path"
-            SettingsPrefs.ExtractorMethod.YT_DLP -> "yt-dlp only — Python stays loaded in the app, no NewPipe fallback"
+            SettingsPrefs.ExtractorMethod.YT_DLP -> "yt-dlp first, NewPipe takes over if yt-dlp fails"
         }
     }
 
