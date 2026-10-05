@@ -89,6 +89,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     // Audio tracks available for the currently-playing video (multi-dub
     // videos only) — used by the audio-track picker dialog.
     private var currentAudioTracks: List<StreamExtractor.AudioTrackOption> = emptyList()
+    private var currentDownloadAudios: List<StreamExtractor.DownloadAudioOption> = emptyList()
     private var currentAudioTrackLabel: String = ""
 
     // Tracks which video ID we've already fired a pre-cache request for, so
@@ -880,12 +881,17 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             return
         }
 
-        val labels = currentQualities.map { it.label }.toTypedArray()
+        val audios = currentDownloadAudios
+        val labels = (currentQualities.map { it.label } + if (audios.isNotEmpty()) listOf("Audio only…") else emptyList()).toTypedArray()
         val title = mediaController?.mediaMetadata?.title?.toString() ?: "video"
 
         AlertDialog.Builder(this)
             .setTitle("Download quality")
             .setItems(labels) { _, which ->
+                if (which >= currentQualities.size) {
+                    showAudioDownloadPicker(title, lastResolvedVideoId, audios)
+                    return@setItems
+                }
                 val chosen = currentQualities[which]
                 dev.sparkynox.sparkytube.download.VideoDownloader.downloadVideo(
                     this, chosen.url, chosen.audioUrl, title, chosen.label, lastResolvedVideoId
@@ -1639,6 +1645,8 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 .setItems(arrayOf("Video", "Audio only")) { _, which ->
                     if (which == 0) {
                         showFeedQualityPicker(videoId, item.title, videoOptions)
+                    } else if (resolved.downloadAudios.isNotEmpty()) {
+                        showAudioDownloadPicker(item.title, videoId, resolved.downloadAudios)
                     } else {
                         showFeedAudioPicker(videoId, item.title, audioOptions)
                     }
@@ -1646,6 +1654,21 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 .setNegativeButton("Cancel", null)
                 .show()
         }
+    }
+
+    private fun showAudioDownloadPicker(title: String, videoId: String?, audios: List<StreamExtractor.DownloadAudioOption>) {
+        val labels = audios.map { it.label }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Audio quality")
+            .setItems(labels) { _, which ->
+                val a = audios[which]
+                val ext = if (a.ext == "webm") "webm" else "m4a"
+                dev.sparkynox.sparkytube.download.VideoDownloader.downloadVideo(
+                    this, a.url, null, title, "${a.kbps}kbps", videoId, ext
+                )
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun showFeedQualityPicker(videoId: String, title: String, qualities: List<StreamExtractor.QualityOption>) {
@@ -2703,10 +2726,13 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 // init() is a no-op once Python is up (SparkyTubeApp warms
                 // it at launch); it's inside the IO block so a cold first
                 // call can't freeze the UI while the interpreter starts.
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val viaYtDlp = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                     dev.sparkynox.sparkytube.extractor.PyYtDlp.init(this@MainActivity)
                     dev.sparkynox.sparkytube.extractor.PyYtDlp.resolve(videoId)
                 }
+                // yt-dlp came back empty (error, age gate, whatever) -> use the
+                // normal NewPipe chain instead of failing the video
+                viaYtDlp ?: StreamExtractor.resolvePlayableUrl(videoId)
             }
             dev.sparkynox.sparkytube.settings.SettingsPrefs.ExtractorMethod.AUTO ->
                 tryLocalServer() ?: tryFastResolve(videoId) ?: StreamExtractor.resolvePlayableUrl(videoId)
@@ -2792,11 +2818,13 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 binding.qualityBtn.visibility = View.GONE
                 binding.audioTrackBtn.visibility = View.GONE
                 currentQualities = emptyList()
+                currentDownloadAudios = emptyList()
                 currentAudioTracks = emptyList()
                 return@launch
             }
 
             currentQualities = resolved.availableQualities
+            currentDownloadAudios = resolved.downloadAudios
             val isDataSaverOn = dev.sparkynox.sparkytube.settings.SettingsPrefs.isDataSaverEnabled(this@MainActivity)
             // Data Saver: start at the lowest available resolution instead
             // of the ~360p default doResolve()/toQualityOption already
@@ -2916,6 +2944,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         isNativePlaybackActive = false
         lastResolvedVideoId = null
         currentQualities = emptyList()
+        currentDownloadAudios = emptyList()
         currentAudioTracks = emptyList()
         currentChapters = emptyList()
         binding.exoPlayerView.findViewById<android.widget.TextView>(R.id.exo_chapter_label)?.visibility = View.GONE
