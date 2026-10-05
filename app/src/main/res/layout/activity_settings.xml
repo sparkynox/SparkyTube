@@ -105,6 +105,7 @@
             <include layout="@layout/settings_switch_row" android:id="@+id/rowExperimental" />
             <include layout="@layout/settings_switch_row" android:id="@+id/rowLogs" />
             <include layout="@layout/settings_switch_row" android:id="@+id/rowDownloadsManager" />
+            <include layout="@layout/settings_switch_row" android:id="@+id/rowMaxDownloads" />
             <include layout="@layout/settings_switch_row" android:id="@+id/rowOfflineLibrary" />
 
             <TextView
