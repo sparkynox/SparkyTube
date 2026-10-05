@@ -102,7 +102,8 @@ object PyYtDlp {
             val hasAudio: Boolean,
             val abr: Double,
             val vcodec: String,
-            val isManifest: Boolean
+            val isManifest: Boolean,
+            val ext: String
         )
 
         // weak phones can't hardware-decode AV1, so try h264 first, then vp9
@@ -125,7 +126,8 @@ object PyYtDlp {
                 hasAudio = acodec != "none",
                 abr = f.optDouble("abr", 0.0).let { if (it.isNaN()) 0.0 else it },
                 vcodec = vcodec,
-                isManifest = f.optString("protocol", "https").let { it.startsWith("m3u8") || it.contains("dash") }
+                isManifest = f.optString("protocol", "https").let { it.startsWith("m3u8") || it.contains("dash") },
+                ext = f.optString("ext", "")
             )
         }
 
@@ -136,6 +138,13 @@ object PyYtDlp {
         val bestAudioUrl = usable.filter { it.hasAudio && !it.hasVideo }
             .maxByOrNull { it.abr }
             ?.url
+
+        val downloadAudios = usable
+            .filter { it.hasAudio && !it.hasVideo && it.abr > 0 }
+            .sortedByDescending { it.abr }
+            .distinctBy { "${it.abr.toInt()}_${it.ext}" }
+            .take(6)
+            .map { StreamExtractor.DownloadAudioOption("${it.abr.toInt()} kbps (${it.ext})", it.url, it.ext, it.abr.toInt()) }
 
         val progressiveOptions = usable
             .filter { it.hasVideo && it.hasAudio && it.height > 0 }
@@ -186,7 +195,8 @@ object PyYtDlp {
                 durationSeconds = duration,
                 availableQualities = emptyList(),
                 isLive = root.optBoolean("is_live", false) || (fallbackUrl.contains(".m3u8") && duration <= 0),
-                description = description
+                description = description,
+                downloadAudios = downloadAudios
             )
         }
 
@@ -203,7 +213,8 @@ object PyYtDlp {
             defaultAudioUrl = defaultQuality.audioUrl,
             defaultQualityLabel = defaultQuality.label,
             availableAudioTracks = emptyList(),
-            description = description
+            description = description,
+            downloadAudios = downloadAudios
         )
     }
 }

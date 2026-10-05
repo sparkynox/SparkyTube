@@ -594,7 +594,9 @@ object StreamExtractor {
         // Raw description text -- only used to pull chapter timestamps out
         // of it (see ChapterParser). Null on resolvers that don't expose
         // it, in which case chapters just don't show for that video.
-        val description: String? = null
+        val description: String? = null,
+        // audio-only streams with their bitrate, only used by the download dialogs
+        val downloadAudios: List<DownloadAudioOption> = emptyList()
     )
 
     data class QualityOption(
@@ -606,6 +608,13 @@ object StreamExtractor {
         // way to get 480p and above) are video-only and need this audio
         // track muxed in separately by ExoPlayer at playback time.
         val audioUrl: String? = null
+    )
+
+    data class DownloadAudioOption(
+        val label: String,   // e.g. "129 kbps (m4a)"
+        val url: String,
+        val ext: String,
+        val kbps: Int
     )
 
     data class AudioTrackOption(
