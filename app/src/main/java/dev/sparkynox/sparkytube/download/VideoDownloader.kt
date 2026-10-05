@@ -15,21 +15,27 @@ import android.widget.Toast
 object VideoDownloader {
 
     /**
-     * Download function that handles selection from quality dialog.
-     * Regardless of selected quality label, downloads the direct playable stream safely.
+     * Entry point for every download. Goes through DownloadQueue so only
+     * N run at once (Settings > Simultaneous downloads), the rest wait.
+     * audioOnlyExt is set for audio-only downloads (m4a / webm).
      */
-    fun downloadVideo(context: Context, videoUrl: String, audioUrl: String?, title: String, qualityLabel: String = "360p", videoId: String? = null) {
+    fun downloadVideo(
+        context: Context,
+        videoUrl: String,
+        audioUrl: String?,
+        title: String,
+        qualityLabel: String = "360p",
+        videoId: String? = null,
+        audioOnlyExt: String? = null
+    ) {
         val safeName = sanitizeFileName(title).ifBlank { "sparkytube_video" }
-        if (audioUrl != null) {
-            // Adaptive quality (video-only stream + separate audio-only
-            // stream) -- DownloadManager alone can't combine two files
-            // into one playable video, so this path downloads both then
-            // muxes them with FFmpeg. This is the fix for the
-            // "downloads aren't working because of SABR" limitation
-            // downloadVideoById's caller used to refuse outright.
-            startAdaptiveDownloadAndMux(context, videoUrl, audioUrl, safeName, qualityLabel, videoId)
-        } else {
-            startDirectDownload(context, videoUrl, safeName, qualityLabel, videoId)
+        DownloadQueue.submit(context, safeName, qualityLabel, videoId) { release ->
+            if (audioUrl != null) {
+                // video-only + audio-only streams, downloaded then muxed with FFmpeg
+                startAdaptiveDownloadAndMux(context, videoUrl, audioUrl, safeName, qualityLabel, videoId, release)
+            } else {
+                startDirectDownload(context, videoUrl, safeName, qualityLabel, videoId, release, audioOnlyExt)
+            }
         }
     }
 
@@ -53,7 +59,8 @@ object VideoDownloader {
         audioUrl: String,
         safeName: String,
         qualityLabel: String,
-        videoId: String?
+        videoId: String?,
+        release: () -> Unit
     ) {
         val appContext = context.applicationContext
         val task = MuxTaskTracker.start(safeName, qualityLabel, videoId)
@@ -158,6 +165,8 @@ object VideoDownloader {
                         Toast.makeText(appContext, "Download failed: ${e.message}", Toast.LENGTH_LONG).show()
                     }
                 }
+            } finally {
+                release()
             }
         }
         worker.start()
@@ -463,10 +472,10 @@ object VideoDownloader {
         }
     }
 
-    private fun startDirectDownload(context: Context, videoUrl: String, safeName: String, qualityLabel: String, videoId: String?) {
+    private fun startDirectDownload(context: Context, videoUrl: String, safeName: String, qualityLabel: String, videoId: String?, release: () -> Unit, extOverride: String? = null) {
         try {
             val isWebm = videoUrl.contains("webm", ignoreCase = true)
-            val extension = if (isWebm) "webm" else "mp4"
+            val extension = extOverride ?: if (isWebm) "webm" else "mp4"
             
             // File name tagged with the user's selected resolution label
             val fileName = "${safeName}_$qualityLabel.$extension"
@@ -483,6 +492,7 @@ object VideoDownloader {
 
             val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
             val downloadId = downloadManager.enqueue(request)
+            DownloadQueue.watchDirect(context, downloadId, release)
 
             // Thumbnail lookup -- DownloadManager itself has no concept of
             // "attach a thumbnail to this download," so this side-table
@@ -506,6 +516,7 @@ object VideoDownloader {
                 Toast.makeText(context, "Download started ($qualityLabel)! Check notifications.", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
+            release()
             e.printStackTrace()
             Handler(Looper.getMainLooper()).post {
                 Toast.makeText(context, "Download failed: ${e.message}", Toast.LENGTH_LONG).show()

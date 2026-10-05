@@ -52,9 +52,15 @@ class DownloadsActivity : AppCompatActivity() {
         downloadManager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
 
         binding.downloadsBackBtn.setOnClickListener { finish() }
+        binding.downloadsCancelQueuedBtn.setOnClickListener {
+            DownloadQueue.cancelAllPending()
+            refreshDownloads()
+        }
 
         adapter = DownloadsAdapter { row ->
-            if (row.isMuxTask) {
+            if (row.isQueued) {
+                DownloadQueue.cancelPending(row.id)
+            } else if (row.isMuxTask) {
                 MuxTaskTracker.remove(row.id)
             } else {
                 downloadManager.remove(row.id)
@@ -79,9 +85,17 @@ class DownloadsActivity : AppCompatActivity() {
         val items = mutableListOf<DownloadRowUi>()
         items.addAll(readDownloadManagerRows())
         items.addAll(readMuxTaskRows())
+        items.addAll(readQueuedRows())
 
-        // Most recent first across both sources.
-        items.sortByDescending { it.sortKey }
+        // active first, then queued, then finished; newest first inside each group
+        items.sortWith(compareBy<DownloadRowUi> { it.state }.thenByDescending { it.sortKey })
+
+        val active = items.count { it.state == 0 }
+        val queued = items.count { it.state == 1 }
+        val finished = items.count { it.state == 2 }
+        binding.downloadsSummary.text = "Downloading $active  •  Queued $queued  •  Finished $finished"
+        binding.downloadsCancelQueuedBtn.visibility = if (queued > 0) View.VISIBLE else View.GONE
+
         adapter.submitList(items)
         binding.downloadsEmptyText.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
     }
@@ -183,7 +197,8 @@ class DownloadsActivity : AppCompatActivity() {
                         indeterminate = indeterminate,
                         showProgress = showProgress,
                         sortKey = id,
-                        videoId = DownloadThumbnails.get(id)
+                        videoId = DownloadThumbnails.get(id),
+                        state = if (status == DownloadManager.STATUS_RUNNING || status == DownloadManager.STATUS_PENDING || status == DownloadManager.STATUS_PAUSED) 0 else 2
                     )
                 )
             }
@@ -236,7 +251,28 @@ class DownloadsActivity : AppCompatActivity() {
                 // so a freshly-started mux task always sorts to the top,
                 // same as a freshly-enqueued DownloadManager entry would.
                 sortKey = 1_000_000_000L + task.id,
-                videoId = task.videoId
+                videoId = task.videoId,
+                state = if (task.stage == MuxTaskTracker.Stage.DONE || task.stage == MuxTaskTracker.Stage.FAILED) 2 else 0
+            )
+        }
+    }
+
+    private fun readQueuedRows(): List<DownloadRowUi> {
+        return DownloadQueue.pending().mapIndexed { index, q ->
+            DownloadRowUi(
+                id = q.id,
+                isMuxTask = false,
+                title = "${q.title} (${q.qualityLabel})",
+                statusText = "Queued  •  #${index + 1} in line",
+                statusColor = 0xFFCFA23B.toInt(),
+                progress = 0,
+                indeterminate = false,
+                showProgress = false,
+                // first in line shows first inside the queued group
+                sortKey = 1_500_000_000L - q.id,
+                videoId = q.videoId,
+                isQueued = true,
+                state = 1
             )
         }
     }
@@ -287,7 +323,10 @@ data class DownloadRowUi(
     val indeterminate: Boolean,
     val showProgress: Boolean,
     val sortKey: Long,
-    val videoId: String? = null
+    val videoId: String? = null,
+    val isQueued: Boolean = false,
+    // 0 = active, 1 = queued, 2 = finished
+    val state: Int = 0
 )
 
 class DownloadsAdapter(
