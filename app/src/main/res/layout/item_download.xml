@@ -46,7 +46,7 @@
             android:layout_marginTop="8dp"
             android:max="100"
             android:progressTint="@color/accent"
-            android:progressBackgroundTint="#33FFFFFF" />
+            android:progressBackgroundTint="@color/divider" />
 
         <TextView
             android:id="@+id/itemDownloadStatus"
