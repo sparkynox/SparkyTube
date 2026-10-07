@@ -66,6 +66,11 @@
             android:theme="@style/Theme.SparkyTube.NoActionBar" />
 
         <activity
+            android:name=".settings.AppearanceActivity"
+            android:exported="false"
+            android:theme="@style/Theme.SparkyTube.NoActionBar" />
+
+        <activity
             android:name=".download.DownloadsActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout"
