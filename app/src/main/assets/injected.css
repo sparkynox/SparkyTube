@@ -45,7 +45,7 @@ ytm-app,
   padding-bottom: 0 !important;
   margin-top: 0 !important;
   margin-bottom: 0 !important;
-  background-color: #0A0A0A !important;
+  background-color: var(--st-bg, #0A0A0A) !important;
 }
 
 /* ---------- Ad containers & slots (visual backstop; network-level
@@ -110,7 +110,7 @@ body.sparkytube-native-active video {
    list reads as part of the app rather than a plain web sidebar list. */
 ytm-item-section-renderer[data-content-type="watch-next"] ytm-compact-video-renderer,
 ytm-video-with-context-renderer.watch-next {
-  background-color: #141414 !important;
+  background-color: var(--st-surface, #141414) !important;
   border-radius: 12px !important;
   margin: 5px 10px !important;
   padding: 6px !important;
@@ -145,7 +145,7 @@ body {
 ytm-rich-item-renderer,
 ytm-video-with-context-renderer,
 ytm-compact-video-renderer {
-  background-color: #141414 !important;
+  background-color: var(--st-surface, #141414) !important;
   border-radius: 14px !important;
   overflow: hidden !important;
   margin: 6px 10px !important;
@@ -165,7 +165,7 @@ ytm-thumbnail-cover-view-model img {
 ytm-rich-item-renderer h3,
 ytm-video-with-context-renderer h3,
 .yt-core-attributed-string {
-  color: #F5F5F5 !important;
+  color: var(--st-text, #F5F5F5) !important;
   font-weight: 500 !important;
   line-height: 1.35 !important;
 }
@@ -174,7 +174,7 @@ ytm-video-with-context-renderer h3,
    consistent with the native app's text_secondary color */
 .ytm-video-with-context-renderer-metadata-line,
 .ytm-video-with-context-renderer-channel-name {
-  color: #9A9A9A !important;
+  color: var(--st-text2, #9A9A9A) !important;
 }
 
 /* Remove YouTube's own card dividers/borders -- our spacing/shadow
@@ -191,7 +191,7 @@ ytm-item-section-renderer > * {
 
 /* Comments section -- card-style like a native comment list */
 ytm-comment-thread-renderer {
-  background-color: #141414 !important;
+  background-color: var(--st-surface, #141414) !important;
   border-radius: 12px !important;
   margin: 4px 10px !important;
   padding: 8px !important;

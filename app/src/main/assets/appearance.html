@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Appearance</title>
+<style>
+:root{
+  --font:system-ui,"Roboto","Helvetica Neue",Arial,sans-serif;
+}
+body[data-theme="dark"]{
+  --bg:#0A0A0A;--surface:#141414;--raised:#1C1C1C;--text:#F5F5F5;--text2:#9A9A9A;--line:#262626;--accent:#FF3B3B;--on:#F5F5F5;
+}
+body[data-theme="light"]{
+  --bg:#F2F4F7;--surface:#FFFFFF;--raised:#E8EBF0;--text:#121214;--text2:#565B65;--line:#D6DAE1;--accent:#D92626;--on:#FFFFFF;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);font:400 16px/1.5 var(--font)}
+main{padding:20px 16px 40px;max-width:560px;margin:0 auto}
+h1{font-size:1.6rem;line-height:1.15;margin:4px 0 6px;font-weight:700;letter-spacing:-.01em}
+.sub{margin:0 0 22px;color:var(--text2)}
+
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.opt{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:10px;padding:10px 10px 14px;border-radius:18px;background:var(--surface);border:2px solid var(--line);transition:border-color .16s,transform .16s;position:relative;touch-action:manipulation}
+.opt:active{transform:scale(.97)}
+.opt:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.opt[aria-checked="true"]{border-color:var(--accent)}
+.opt .name{font-weight:650;font-size:.98rem;padding:0 4px}
+.opt .tick{position:absolute;right:10px;top:10px;width:22px;height:22px;border-radius:50%;background:var(--accent);color:var(--on);display:none;align-items:center;justify-content:center;font-size:.8rem;font-weight:800;z-index:3}
+.opt[aria-checked="true"] .tick{display:flex}
+
+/* tiny preview of the app */
+.mini{--b:#0A0A0A;--s:#141414;--t:#F5F5F5;--t2:#9A9A9A;--a:#FF3B3B;position:relative;aspect-ratio:3/4.2;border-radius:12px;background:var(--b);overflow:hidden;padding:7px;display:flex;flex-direction:column;gap:5px}
+.mini.light{--b:#F2F4F7;--s:#FFFFFF;--t:#121214;--t2:#565B65;--a:#D92626}
+.mini .top{display:flex;align-items:center;gap:4px;height:9px}
+.mini .top i{width:5px;height:5px;border-radius:50%;background:var(--a)}
+.mini .top b{display:block;height:4px;width:38%;border-radius:2px;background:var(--t)}
+.mini .vid{height:32%;border-radius:6px;background:#000;position:relative}
+.mini .vid::after{content:"";position:absolute;left:50%;top:50%;transform:translate(-35%,-50%);border-left:7px solid #fff;border-top:4px solid transparent;border-bottom:4px solid transparent;opacity:.85}
+.mini .vid u{position:absolute;left:5px;right:5px;bottom:4px;height:2px;border-radius:1px;background:rgba(255,255,255,.3)}
+.mini .vid u::after{content:"";display:block;width:42%;height:100%;border-radius:1px;background:var(--a)}
+.mini .card{border-radius:6px;background:var(--s);padding:5px;display:flex;flex-direction:column;gap:3px}
+.mini .card b{height:4px;border-radius:2px;background:var(--t);width:80%}
+.mini .card s{height:3px;border-radius:2px;background:var(--t2);width:50%;text-decoration:none}
+.mini .nav{margin-top:auto;height:10px;border-radius:5px;background:var(--s);display:flex;justify-content:space-around;align-items:center}
+.mini .nav i{width:5px;height:5px;border-radius:50%;background:var(--t2)}
+.mini .nav i:first-child{background:var(--a)}
+/* system = diagonal split, light on one side and dark on the other */
+.split{position:relative;aspect-ratio:3/4.2;border-radius:12px;overflow:hidden}
+.split .mini{position:absolute;inset:0;aspect-ratio:auto}
+.split .mini.dark{clip-path:polygon(100% 0,100% 100%,0 100%)}
+
+.desc{margin:18px 2px 0;min-height:3em;color:var(--text2)}
+.desc b{color:var(--text);font-weight:650}
+.hint{margin-top:22px;padding:14px 16px;border-radius:16px;background:var(--surface);border:1px solid var(--line);color:var(--text2);font-size:.92rem}
+@media (prefers-reduced-motion:reduce){.opt{transition:none}}
+</style>
+</head>
+<body data-theme="dark">
+<main>
+  <h1>Theme</h1>
+  <p class="sub">Pick how SparkyTube looks.</p>
+
+  <div class="grid" role="radiogroup" aria-label="Theme">
+    <button class="opt" role="radio" aria-checked="false" data-mode="dark">
+      <span class="tick" aria-hidden="true">✓</span>
+      <div class="mini dark" aria-hidden="true"><div class="top"><i></i><b></b></div><div class="vid"><u></u></div><div class="card"><b></b><s></s></div><div class="card"><b></b><s></s></div><div class="nav"><i></i><i></i><i></i><i></i></div></div>
+      <span class="name">Dark</span>
+    </button>
+    <button class="opt" role="radio" aria-checked="false" data-mode="light">
+      <span class="tick" aria-hidden="true">✓</span>
+      <div class="mini light" aria-hidden="true"><div class="top"><i></i><b></b></div><div class="vid"><u></u></div><div class="card"><b></b><s></s></div><div class="card"><b></b><s></s></div><div class="nav"><i></i><i></i><i></i><i></i></div></div>
+      <span class="name">Light</span>
+    </button>
+    <button class="opt" role="radio" aria-checked="false" data-mode="system">
+      <span class="tick" aria-hidden="true">✓</span>
+      <div class="split" aria-hidden="true">
+        <div class="mini light"><div class="top"><i></i><b></b></div><div class="vid"><u></u></div><div class="card"><b></b><s></s></div><div class="card"><b></b><s></s></div><div class="nav"><i></i><i></i><i></i><i></i></div></div>
+        <div class="mini dark"><div class="top"><i></i><b></b></div><div class="vid"><u></u></div><div class="card"><b></b><s></s></div><div class="card"><b></b><s></s></div><div class="nav"><i></i><i></i><i></i><i></i></div></div>
+      </div>
+      <span class="name">System</span>
+    </button>
+  </div>
+
+  <p class="desc" id="desc" aria-live="polite"></p>
+  <div class="hint">YouTube pages follow this too. If a page still looks off, open YouTube settings from the app and set Appearance there once.</div>
+</main>
+
+<script>
+(function () {
+  // inside the app SparkyTheme is the Android bridge. In a normal browser (for
+  // previewing the page) a tiny stand-in keeps the choice in localStorage.
+  var bridge = window.SparkyTheme || {
+    getMode: function () { return localStorage.getItem("st-mode") || "dark"; },
+    isNight: function () {
+      var m = this.getMode();
+      return m === "dark" || (m === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+    },
+    setMode: function (m) { localStorage.setItem("st-mode", m); }
+  };
+
+  var texts = {
+    dark: "<b>Dark.</b> The original SparkyTube look.",
+    light: "<b>Light.</b> Bright surfaces and a slightly deeper red so small text stays readable.",
+    system: "<b>System.</b> Switches by itself when your phone changes between light and dark."
+  };
+  var opts = [].slice.call(document.querySelectorAll(".opt"));
+  var desc = document.getElementById("desc");
+
+  function paint(mode) {
+    opts.forEach(function (o) { o.setAttribute("aria-checked", o.getAttribute("data-mode") === mode ? "true" : "false"); });
+    desc.innerHTML = texts[mode];
+  }
+  function pageTheme(mode) {
+    var night = mode === "dark" ? true : mode === "light" ? false : bridge.isNight();
+    document.body.setAttribute("data-theme", night ? "dark" : "light");
+  }
+
+  var current = bridge.getMode();
+  document.body.setAttribute("data-theme", bridge.isNight() ? "dark" : "light");
+  paint(current);
+
+  opts.forEach(function (o) {
+    o.addEventListener("click", function () {
+      var mode = o.getAttribute("data-mode");
+      if (mode === current) return;
+      current = mode;
+      paint(mode);
+      pageTheme(mode);
+      // the app flips its night mode and recreates this screen, the page
+      // reloads into the new theme
+      bridge.setMode(mode);
+    });
+  });
+})();
+</script>
+</body>
+</html>
