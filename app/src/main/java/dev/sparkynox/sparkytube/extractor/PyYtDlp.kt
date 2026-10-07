@@ -40,7 +40,11 @@ object PyYtDlp {
             // sparky_ytdlp.py lives in src/main/python, Chaquopy bundles it
             // automatically. Importing it runs the module body once, which
             // is where yt-dlp gets imported and the YoutubeDL instance built.
+            val t0 = android.os.SystemClock.elapsedRealtime()
             ytDlpModule = Python.getInstance().getModule("sparky_ytdlp")
+            dev.sparkynox.sparkytube.logs.LogRecorder.i(
+                "PyYtDlp", "python + yt-dlp ready in ${android.os.SystemClock.elapsedRealtime() - t0} ms"
+            )
             lastErrorMessage = null
         } catch (t: Throwable) {
             android.util.Log.e("PyYtDlp", "init failed", t)
@@ -67,7 +71,11 @@ object PyYtDlp {
             val dataSaver = appContext?.let {
                 dev.sparkynox.sparkytube.settings.SettingsPrefs.isYtDlpDataSaverEnabled(it)
             } ?: true
+            val t0 = android.os.SystemClock.elapsedRealtime()
             val rawJson = module.callAttr("resolve_json", videoId, dataSaver).toString()
+            val pyMs = android.os.SystemClock.elapsedRealtime() - t0
+            val path = Regex("\"_sparky_path\": \"(\\w+)\"").find(rawJson)?.groupValues?.get(1) ?: "?"
+            dev.sparkynox.sparkytube.logs.LogRecorder.i("PyYtDlp", "python call took $pyMs ms (path=$path)")
             if (rawJson.isBlank() || rawJson == "None") {
                 lastErrorMessage = "yt-dlp returned no data for this video"
                 return null

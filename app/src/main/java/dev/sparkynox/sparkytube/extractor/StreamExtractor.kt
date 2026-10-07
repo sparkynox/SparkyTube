@@ -165,6 +165,16 @@ object StreamExtractor {
      * fast-path result behaves identically to a NewPipe-resolved one for
      * things like the 5-minute reuse window on back/forward navigation.
      */
+    fun cached(videoId: String): ResolvedStream? {
+        val entry = cache[videoId] ?: return null
+        return if (System.currentTimeMillis() - entry.first < CACHE_TTL_MS) {
+            entry.second
+        } else {
+            cache.remove(videoId)
+            null
+        }
+    }
+
     fun clearCache() {
         cache.clear()
     }
