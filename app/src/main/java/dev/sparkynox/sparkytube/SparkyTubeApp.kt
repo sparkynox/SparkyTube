@@ -16,6 +16,9 @@ class SparkyTubeApp : Application() {
         dev.sparkynox.sparkytube.logs.LogRecorder.init(this)
         Thread.setDefaultUncaughtExceptionHandler(dev.sparkynox.sparkytube.logs.CrashHandler(this))
 
+        // before any activity exists, so the very first screen already has the right colors
+        dev.sparkynox.sparkytube.settings.SettingsPrefs.applyThemeMode(this)
+
         // Nothing else heavy here on purpose — AdBlockEngine loads its JSON
         // lazily the first time MainActivity spins up the WebView.
 

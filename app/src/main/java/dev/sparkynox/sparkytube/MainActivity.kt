@@ -1296,6 +1296,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             }
         })
 
+        dev.sparkynox.sparkytube.settings.YouTubeTheme.apply(this)
         if (intent?.getBooleanExtra(EXTRA_OPEN_YT_SETTINGS, false) == true) {
             webView.loadUrl(YT_SETTINGS_URL)
         } else {
@@ -1963,7 +1964,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             text = message
             setPadding(padding, padding, padding, padding)
             textSize = 14f
-            setTextColor(android.graphics.Color.WHITE)
+            setTextColor(getColor(R.color.text_primary))
         }
         val scrollView = android.widget.ScrollView(this).apply {
             addView(textView)
@@ -2241,6 +2242,13 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }
     }
 
+    // current app palette as css variables, injected.css reads them (--st-*)
+    private fun themeVars(): String {
+        fun hex(id: Int) = String.format("#%06X", 0xFFFFFF and getColor(id))
+        return ":root{--st-bg:${hex(R.color.bg_root)};--st-surface:${hex(R.color.bg_surface)};" +
+            "--st-text:${hex(R.color.text_primary)};--st-text2:${hex(R.color.text_secondary)};}\n"
+    }
+
     private fun injectAlwaysOnLayer(view: WebView) {
         val cssInjectJs = """
             (function() {
@@ -2250,7 +2258,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                     s.id = 'sparkytube-native-style';
                     document.documentElement.appendChild(s);
                 }
-                s.textContent = ${org.json.JSONObject.quote(cssPayload)};
+                s.textContent = ${org.json.JSONObject.quote(themeVars() + cssPayload)};
             })();
         """.trimIndent()
 
@@ -2726,13 +2734,31 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 // init() is a no-op once Python is up (SparkyTubeApp warms
                 // it at launch); it's inside the IO block so a cold first
                 // call can't freeze the UI while the interpreter starts.
-                val viaYtDlp = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    dev.sparkynox.sparkytube.extractor.PyYtDlp.init(this@MainActivity)
-                    dev.sparkynox.sparkytube.extractor.PyYtDlp.resolve(videoId)
+                val hit = StreamExtractor.cached(videoId)
+                if (hit != null) {
+                    hit
+                } else {
+                    val t0 = android.os.SystemClock.elapsedRealtime()
+                    val viaYtDlp = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        dev.sparkynox.sparkytube.extractor.PyYtDlp.init(this@MainActivity)
+                        dev.sparkynox.sparkytube.extractor.PyYtDlp.resolve(videoId)
+                    }
+                    val ytMs = android.os.SystemClock.elapsedRealtime() - t0
+                    if (viaYtDlp != null) {
+                        StreamExtractor.cacheResolved(videoId, viaYtDlp)
+                        dev.sparkynox.sparkytube.logs.LogRecorder.i("Resolve", "yt-dlp ok in $ytMs ms ($videoId)")
+                        viaYtDlp
+                    } else {
+                        // yt-dlp came back empty (error, age gate, whatever) -> use the
+                        // normal NewPipe chain instead of failing the video
+                        val viaPipe = StreamExtractor.resolvePlayableUrl(videoId)
+                        val total = android.os.SystemClock.elapsedRealtime() - t0
+                        dev.sparkynox.sparkytube.logs.LogRecorder.i(
+                            "Resolve", "yt-dlp failed after $ytMs ms, NewPipe fallback total $total ms, got=${viaPipe != null} ($videoId)"
+                        )
+                        viaPipe
+                    }
                 }
-                // yt-dlp came back empty (error, age gate, whatever) -> use the
-                // normal NewPipe chain instead of failing the video
-                viaYtDlp ?: StreamExtractor.resolvePlayableUrl(videoId)
             }
             dev.sparkynox.sparkytube.settings.SettingsPrefs.ExtractorMethod.AUTO ->
                 tryLocalServer() ?: tryFastResolve(videoId) ?: StreamExtractor.resolvePlayableUrl(videoId)
@@ -3020,6 +3046,18 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         android.widget.Toast.makeText(this, "Skipped ${segment.category.label}", android.widget.Toast.LENGTH_SHORT).show()
     }
 
+    // warm the cache for the next video with yt-dlp itself, the old prefetch
+    // ran the (slow) NewPipe chain in the background and resolveStream never used it
+    private fun prefetchViaYtDlp(videoId: String) {
+        if (StreamExtractor.cached(videoId) != null) return
+        lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            dev.sparkynox.sparkytube.extractor.PyYtDlp.init(this@MainActivity)
+            dev.sparkynox.sparkytube.extractor.PyYtDlp.resolve(videoId)?.let {
+                StreamExtractor.cacheResolved(videoId, it)
+            }
+        }
+    }
+
     private fun maybePrefetchNextVideo() {
         if (!isNativePlaybackActive) return
         val controller = mediaController ?: return
@@ -3037,7 +3075,13 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             val predictedId = rawResult?.trim('"')?.takeIf { it.isNotBlank() && it != "null" }
             if (predictedId != null && predictedId != prefetchedForVideoId) {
                 prefetchedForVideoId = predictedId
-                StreamExtractor.prefetch(predictedId, lifecycleScope)
+                if (dev.sparkynox.sparkytube.settings.SettingsPrefs.getExtractorMethod(this) ==
+                    dev.sparkynox.sparkytube.settings.SettingsPrefs.ExtractorMethod.YT_DLP
+                ) {
+                    prefetchViaYtDlp(predictedId)
+                } else {
+                    StreamExtractor.prefetch(predictedId, lifecycleScope)
+                }
             }
         }
     }
