@@ -80,6 +80,7 @@ class SettingsActivity : AppCompatActivity() {
             SettingsPrefs.setYtDlpDataSaverEnabled(ctx, on)
             dev.sparkynox.sparkytube.extractor.StreamExtractor.clearCache()
         }
+        setupThemeRow()
         setupDynamicColorRow()
         setupDataSaverRow()
         setupNativeHomeFeedRow()
@@ -274,6 +275,7 @@ class SettingsActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        binding.rowTheme.rowSubtitle.text = themeLabel()
         // The local-server enabled state can change on LocalServerActivity,
         // so refresh this summary line every time Settings comes back into
         // view rather than only once in onCreate.
@@ -419,6 +421,22 @@ class SettingsActivity : AppCompatActivity() {
      * subtitle sets expectations rather than the toggle silently doing
      * nothing until restart.
      */
+    private fun themeLabel() = when (SettingsPrefs.getThemeMode(this)) {
+        SettingsPrefs.ThemeMode.DARK -> "Dark"
+        SettingsPrefs.ThemeMode.LIGHT -> "Light"
+        SettingsPrefs.ThemeMode.SYSTEM -> "Follow system"
+    }
+
+    private fun setupThemeRow() {
+        binding.rowTheme.rowTitle.text = "Theme"
+        binding.rowTheme.rowSwitch.visibility = android.view.View.GONE
+        binding.rowTheme.rowSubtitle.visibility = TextView.VISIBLE
+        binding.rowTheme.rowSubtitle.text = themeLabel()
+        binding.rowTheme.root.setOnClickListener {
+            startActivity(android.content.Intent(this, AppearanceActivity::class.java))
+        }
+    }
+
     private fun setupDynamicColorRow() {
         binding.rowDynamicColor.rowTitle.text = "Dynamic color (Material You)"
         val subtitleView: TextView = binding.rowDynamicColor.rowSubtitle

@@ -39,6 +39,8 @@ object SettingsPrefs {
     private const val KEY_PIPED_FALLBACK_ENABLED = "piped_fallback_enabled"
     private const val KEY_YTDLP_FALLBACK_ENABLED = "ytdlp_fallback_enabled"
     private const val KEY_YTDLP_DATA_SAVER = "ytdlp_data_saver"
+    private const val KEY_THEME_MODE = "theme_mode"
+    private const val KEY_THEME_CHOSEN = "theme_mode_chosen"
     private const val KEY_MAX_DOWNLOADS = "max_concurrent_downloads"
     private const val KEY_DYNAMIC_COLOR_ENABLED = "dynamic_color_enabled"
     private const val KEY_SPONSORBLOCK_ENABLED = "sponsorblock_enabled"
@@ -329,6 +331,33 @@ object SettingsPrefs {
 
     fun setMaxConcurrentDownloads(context: Context, n: Int) {
         prefs(context).edit().putInt(KEY_MAX_DOWNLOADS, n.coerceIn(1, 4)).apply()
+    }
+
+    // Theme: Dark stays the default so nobody's app suddenly turns light after an update
+    enum class ThemeMode { DARK, LIGHT, SYSTEM }
+
+    fun getThemeMode(context: Context): ThemeMode = try {
+        ThemeMode.valueOf(prefs(context).getString(KEY_THEME_MODE, ThemeMode.DARK.name) ?: ThemeMode.DARK.name)
+    } catch (e: IllegalArgumentException) {
+        ThemeMode.DARK
+    }
+
+    fun setThemeMode(context: Context, mode: ThemeMode) {
+        prefs(context).edit().putString(KEY_THEME_MODE, mode.name).putBoolean(KEY_THEME_CHOSEN, true).apply()
+    }
+
+    // true once the user picked something on the Appearance screen, until then
+    // we leave YouTube's own theme cookie alone
+    fun hasChosenTheme(context: Context) = prefs(context).getBoolean(KEY_THEME_CHOSEN, false)
+
+    fun applyThemeMode(context: Context) {
+        androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(
+            when (getThemeMode(context)) {
+                ThemeMode.DARK -> androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES
+                ThemeMode.LIGHT -> androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO
+                ThemeMode.SYSTEM -> androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+            }
+        )
     }
 
     // yt-dlp Data Saver: on (default) = only 360p, off = every quality yt-dlp finds
