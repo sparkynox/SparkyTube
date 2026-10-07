@@ -10,7 +10,7 @@
     <style name="Theme.SparkyTube" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="android:windowBackground">@color/bg_root</item>
         <item name="colorPrimary">@color/accent</item>
-        <item name="colorOnPrimary">@color/text_primary</item>
+        <item name="colorOnPrimary">@color/on_accent</item>
         <item name="colorSecondary">@color/accent</item>
         <item name="colorSurface">@color/bg_surface</item>
         <item name="colorOnSurface">@color/text_primary</item>
@@ -21,7 +21,8 @@
         <item name="colorAccent">@color/accent</item>
         <item name="android:statusBarColor">@color/bg_root</item>
         <item name="android:navigationBarColor">@color/bg_root</item>
-        <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="m">@bool/light_system_bars</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">@bool/light_system_bars</item>
         <item name="android:forceDarkAllowed" tools:targetApi="q">false</item>
 
         <!-- Rounded-corner shape scale used by M3 components app-wide

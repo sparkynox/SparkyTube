@@ -1,22 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Core surfaces -->
-    <color name="bg_root">#0A0A0A</color>
-    <color name="bg_surface">#141414</color>
-    <color name="bg_surface_raised">#1C1C1C</color>
-    <color name="divider">#262626</color>
+    <!-- Light palette. The dark one lives in values-night/colors.xml, the app
+         picks between them from Settings > Appearance (Theme). -->
+    <color name="bg_root">#F2F4F7</color>
+    <color name="bg_surface">#FFFFFF</color>
+    <color name="bg_surface_raised">#E8EBF0</color>
+    <color name="divider">#D6DAE1</color>
 
-    <!-- Accent -->
-    <color name="accent">#FF3B3B</color>
-    <color name="accent_dim">#7A1F1F</color>
+    <!-- a bit deeper than the dark-mode red so small text on white stays readable -->
+    <color name="accent">#D92626</color>
+    <color name="accent_dim">#F3C4C4</color>
+    <color name="on_accent">#FFFFFF</color>
 
-    <!-- Text -->
-    <color name="text_primary">#F5F5F5</color>
-    <color name="text_secondary">#9A9A9A</color>
-    <color name="text_disabled">#5A5A5A</color>
+    <color name="text_primary">#121214</color>
+    <color name="text_secondary">#565B65</color>
+    <color name="text_disabled">#9AA0A9</color>
 
-    <color name="icon_active">#FFFFFF</color>
-    <color name="icon_inactive">#707070</color>
+    <color name="icon_active">#121214</color>
+    <color name="icon_inactive">#7B8089</color>
 
     <color name="transparent">#00000000</color>
 </resources>
