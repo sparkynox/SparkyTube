@@ -66,6 +66,11 @@
             android:theme="@style/Theme.SparkyTube.NoActionBar" />
 
         <activity
+            android:name=".settings.HtmlSettingsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.SparkyTube.NoActionBar" />
+
+        <activity
             android:name=".settings.AppearanceActivity"
             android:exported="false"
             android:theme="@style/Theme.SparkyTube.NoActionBar" />
