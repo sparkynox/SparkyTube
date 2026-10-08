@@ -15,6 +15,16 @@ class SettingsActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // the user picked the stylish HTML screen: every way into Settings lands there.
+        // EXTRA_FORCE_STOCK is the escape hatch so the classic screen can still be opened.
+        if (SettingsPrefs.getSettingsUi(this) == SettingsPrefs.SettingsUi.HTML &&
+            !intent.getBooleanExtra(EXTRA_FORCE_STOCK, false)
+        ) {
+            startActivity(android.content.Intent(this, HtmlSettingsActivity::class.java))
+            finish()
+            return
+        }
         binding = ActivitySettingsBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -80,6 +90,7 @@ class SettingsActivity : AppCompatActivity() {
             SettingsPrefs.setYtDlpDataSaverEnabled(ctx, on)
             dev.sparkynox.sparkytube.extractor.StreamExtractor.clearCache()
         }
+        setupSettingsStyleRow()
         setupThemeRow()
         setupDynamicColorRow()
         setupDataSaverRow()
@@ -275,6 +286,7 @@ class SettingsActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (!::binding.isInitialized) return
         binding.rowTheme.rowSubtitle.text = themeLabel()
         // The local-server enabled state can change on LocalServerActivity,
         // so refresh this summary line every time Settings comes back into
@@ -425,6 +437,28 @@ class SettingsActivity : AppCompatActivity() {
         SettingsPrefs.ThemeMode.DARK -> "Dark"
         SettingsPrefs.ThemeMode.LIGHT -> "Light"
         SettingsPrefs.ThemeMode.SYSTEM -> "Follow system"
+    }
+
+    private fun setupSettingsStyleRow() {
+        binding.rowSettingsStyle.rowTitle.text = "Settings style"
+        binding.rowSettingsStyle.rowSwitch.visibility = android.view.View.GONE
+        binding.rowSettingsStyle.rowSubtitle.visibility = TextView.VISIBLE
+        binding.rowSettingsStyle.rowSubtitle.text = "Classic (this screen) or the Stylish animated one"
+        binding.rowSettingsStyle.root.setOnClickListener {
+            val options = arrayOf("Classic (this screen)", "Stylish (HTML, animated)")
+            AlertDialog.Builder(this)
+                .setTitle("Settings style")
+                .setSingleChoiceItems(options, 0) { dialog, which ->
+                    dialog.dismiss()
+                    if (which == 1) {
+                        SettingsPrefs.setSettingsUi(this, SettingsPrefs.SettingsUi.HTML)
+                        startActivity(android.content.Intent(this, HtmlSettingsActivity::class.java))
+                        finish()
+                    }
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
     }
 
     private fun setupThemeRow() {
@@ -595,5 +629,9 @@ class SettingsActivity : AppCompatActivity() {
         switch.setOnCheckedChangeListener { _, isChecked ->
             setter(this, isChecked)
         }
+    }
+
+    companion object {
+        const val EXTRA_FORCE_STOCK = "force_stock_settings"
     }
 }

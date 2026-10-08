@@ -40,6 +40,7 @@ object SettingsPrefs {
     private const val KEY_YTDLP_FALLBACK_ENABLED = "ytdlp_fallback_enabled"
     private const val KEY_YTDLP_DATA_SAVER = "ytdlp_data_saver"
     private const val KEY_THEME_MODE = "theme_mode"
+    private const val KEY_SETTINGS_UI = "settings_ui"
     private const val KEY_THEME_CHOSEN = "theme_mode_chosen"
     private const val KEY_MAX_DOWNLOADS = "max_concurrent_downloads"
     private const val KEY_DYNAMIC_COLOR_ENABLED = "dynamic_color_enabled"
@@ -331,6 +332,20 @@ object SettingsPrefs {
 
     fun setMaxConcurrentDownloads(context: Context, n: Int) {
         prefs(context).edit().putInt(KEY_MAX_DOWNLOADS, n.coerceIn(1, 4)).apply()
+    }
+
+    // which Settings screen opens: the stock Kotlin one (default) or the
+    // animated HTML one (HtmlSettingsActivity)
+    enum class SettingsUi { STOCK, HTML }
+
+    fun getSettingsUi(context: Context): SettingsUi = try {
+        SettingsUi.valueOf(prefs(context).getString(KEY_SETTINGS_UI, SettingsUi.STOCK.name) ?: SettingsUi.STOCK.name)
+    } catch (e: IllegalArgumentException) {
+        SettingsUi.STOCK
+    }
+
+    fun setSettingsUi(context: Context, ui: SettingsUi) {
+        prefs(context).edit().putString(KEY_SETTINGS_UI, ui.name).apply()
     }
 
     // Theme: Dark stays the default so nobody's app suddenly turns light after an update
