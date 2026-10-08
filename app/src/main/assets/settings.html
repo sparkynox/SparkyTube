@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Settings</title>
+<style>
+:root{--font:system-ui,"Roboto","Helvetica Neue",Arial,sans-serif;--ease:cubic-bezier(.2,.8,.2,1);--spring:cubic-bezier(.3,1.5,.5,1)}
+body[data-theme="dark"]{
+  --bg:#0A0A0A;--surface:#141414;--raised:#1C1C1C;--text:#F5F5F5;--text2:#9A9A9A;--line:#262626;
+  --accent:#FF3B3B;--accent2:#FF7A45;--on:#FFFFFF;--glow:rgba(255,59,59,.20);--shadow:0 6px 24px rgba(0,0,0,.45);--track:#33333A;
+}
+body[data-theme="light"]{
+  --bg:#F2F4F7;--surface:#FFFFFF;--raised:#E8EBF0;--text:#121214;--text2:#565B65;--line:#D6DAE1;
+  --accent:#D92626;--accent2:#F0613A;--on:#FFFFFF;--glow:rgba(217,38,38,.16);--shadow:0 6px 24px rgba(18,18,20,.10);--track:#CDD1D9;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);font:400 16px/1.45 var(--font)}
+svg{display:block}
+.ico{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- header ---------- */
+header{position:sticky;top:0;z-index:10;padding:14px 16px 10px;background:linear-gradient(180deg,var(--bg) 70%,transparent);backdrop-filter:blur(8px)}
+header::before{content:"";position:absolute;inset:0 0 -30px 0;background:radial-gradient(90% 120% at 8% 0%,var(--glow),transparent 62%);pointer-events:none;z-index:-1}
+.top{display:flex;align-items:center;gap:6px}
+.back{all:unset;cursor:pointer;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:background .15s,transform .15s}
+.back:active{transform:scale(.9);background:var(--raised)}
+h1{margin:0;font-size:1.75rem;font-weight:800;letter-spacing:-.02em;transition:font-size .25s var(--ease)}
+body.scrolled h1{font-size:1.3rem}
+.seg{margin-left:auto;display:flex;background:var(--raised);border-radius:999px;padding:3px;position:relative}
+.seg button{all:unset;cursor:pointer;position:relative;z-index:1;padding:6px 12px;font-size:.78rem;font-weight:700;border-radius:999px;color:var(--text2);transition:color .2s}
+.seg button.on{color:var(--on)}
+.seg i{position:absolute;top:3px;bottom:3px;right:3px;width:calc(50% - 3px);border-radius:999px;background:linear-gradient(135deg,var(--accent),var(--accent2));transition:transform .3s var(--spring)}
+.search{margin-top:12px;display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:0 12px;height:44px;transition:border-color .2s,box-shadow .2s}
+.search:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--glow)}
+.search .ico{width:18px;height:18px;color:var(--text2)}
+.search input{all:unset;flex:1;font-size:.95rem;color:var(--text)}
+.search input::placeholder{color:var(--text2)}
+
+/* ---------- list ---------- */
+main{padding:6px 16px 90px;max-width:640px;margin:0 auto}
+section{margin-top:22px}
+section h2{margin:0 4px 10px;font-size:.74rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);display:flex;align-items:center;gap:10px}
+section h2::after{content:"";height:1px;flex:1;background:var(--line)}
+.card{position:relative;display:flex;align-items:center;gap:14px;padding:13px 14px;margin-bottom:10px;background:var(--surface);border:1px solid var(--line);border-radius:18px;cursor:pointer;transition:transform .18s var(--ease),border-color .2s,box-shadow .2s;user-select:none}
+.card:active{transform:scale(.982)}
+.card.in{animation:rise .46s var(--ease) both;animation-delay:calc(min(var(--i),16) * 32ms)}
+@keyframes rise{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
+.card.off{opacity:.42;pointer-events:none}
+.tile{flex:none;width:42px;height:42px;border-radius:13px;display:flex;align-items:center;justify-content:center;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 4px 12px var(--glow)}
+.txt{flex:1;min-width:0}
+.t{font-weight:700;font-size:1rem;line-height:1.25}
+.s{margin-top:2px;color:var(--text2);font-size:.86rem;line-height:1.35}
+.val{flex:none;max-width:42%;font-size:.8rem;font-weight:700;padding:5px 10px;border-radius:999px;background:var(--raised);color:var(--text);text-align:center;line-height:1.2}
+.chev{flex:none;color:var(--text2);width:20px;height:20px}
+
+/* switch */
+.sw{flex:none;width:50px;height:30px;border-radius:999px;background:var(--track);position:relative;transition:background .25s}
+.sw::after{content:"";position:absolute;left:3px;top:3px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.35);transition:transform .32s var(--spring)}
+.sw.on{background:linear-gradient(135deg,var(--accent),var(--accent2))}
+.sw.on::after{transform:translateX(20px)}
+
+/* css editor */
+.editor{display:none;margin:-4px 0 12px;padding:14px;background:var(--surface);border:1px solid var(--line);border-radius:18px}
+.editor.open{display:block;animation:rise .35s var(--ease) both}
+.editor textarea{width:100%;min-height:150px;resize:vertical;border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:12px;padding:12px;font:13px/1.45 ui-monospace,Menlo,Consolas,monospace}
+.editor textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--glow)}
+.editor p{margin:8px 0 12px;color:var(--text2);font-size:.82rem}
+.btn{all:unset;cursor:pointer;display:inline-block;padding:11px 20px;border-radius:12px;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));transition:transform .15s}
+.btn:active{transform:scale(.95)}
+
+/* bottom sheet */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .25s;z-index:30}
+.scrim.show{opacity:1;pointer-events:auto}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:31;max-width:640px;margin:0 auto;background:var(--surface);border-radius:26px 26px 0 0;padding:10px 16px 24px;transform:translateY(105%);transition:transform .38s var(--ease);box-shadow:var(--shadow);max-height:80vh;overflow:auto}
+.sheet.show{transform:none}
+.grab{width:42px;height:5px;border-radius:3px;background:var(--line);margin:4px auto 14px}
+.sheet h3{margin:0 4px 10px;font-size:1.1rem;font-weight:800}
+.opt{display:flex;align-items:center;gap:12px;padding:14px;border-radius:14px;cursor:pointer;font-weight:600;transition:background .15s}
+.opt:active{background:var(--raised)}
+.opt .dot{flex:none;width:22px;height:22px;border-radius:50%;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;color:transparent;transition:all .2s var(--spring)}
+.opt.sel{background:var(--raised)}
+.opt.sel .dot{border-color:transparent;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;transform:scale(1.08)}
+.opt .dot svg{width:13px;height:13px;stroke-width:3.4}
+
+.toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,30px);opacity:0;background:var(--text);color:var(--bg);padding:10px 18px;border-radius:999px;font-weight:700;font-size:.88rem;transition:all .3s var(--ease);z-index:40;pointer-events:none}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.empty{display:none;text-align:center;color:var(--text2);margin-top:48px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body data-theme="dark">
+<header>
+  <div class="top">
+    <button class="back" id="back" aria-label="Back"></button>
+    <h1>Settings</h1>
+    <div class="seg" role="group" aria-label="Settings style">
+      <i></i>
+      <button id="classic">Classic</button>
+      <button class="on" id="stylish">Stylish</button>
+    </div>
+  </div>
+  <label class="search"><span id="searchIcon"></span><input id="q" type="search" placeholder="Search settings" autocomplete="off"></label>
+</header>
+
+<main id="list"></main>
+<p class="empty" id="empty">Nothing matches that.</p>
+
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true"><div class="grab"></div><h3 id="sheetTitle"></h3><div id="sheetOpts"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  var P = {
+    film: '<rect x="2" y="2" width="20" height="20" rx="2.2"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/>',
+    shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+    download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+    play: '<polygon points="5 3 19 12 5 21 5 3"/>',
+    list: '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
+    skip: '<polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/>',
+    server: '<rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>',
+    code: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
+    sliders: '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
+    globe: '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
+    zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+    pulse: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
+    layout: '<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/>',
+    eyeoff: '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>',
+    refresh: '<polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>',
+    spark: '<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/>',
+    file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
+    folder: '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
+    layers: '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',
+    moon: '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
+    drop: '<path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>',
+    ext: '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>',
+    chev: '<polyline points="9 18 15 12 9 6"/>',
+    search: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+    back: '<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>',
+    check: '<polyline points="20 6 9 17 4 12"/>'
+  };
+  function svg(name, cls) {
+    return '<svg class="ico ' + (cls || "") + '" viewBox="0 0 24 24" aria-hidden="true">' + (P[name] || P.spark) + "</svg>";
+  }
+
+  // Android bridge. In a normal browser (to preview the design) a small
+  // stand-in with sample rows is used instead.
+  var bridge = window.SparkySettings || (function () {
+    var st = { a: true, b: false, c: "fast" };
+    return {
+      schema: function () {
+        return JSON.stringify([
+          { title: "Features", rows: [
+            { id: "a", type: "toggle", title: "Ad blocking", icon: "shield", sub: "Blocks ad/tracker domains and hides ad slots", value: st.a, enabled: true },
+            { id: "b", type: "toggle", title: "SponsorBlock", icon: "skip", sub: "Auto-skip sponsor segments", value: st.b, enabled: true } ]},
+          { title: "Extraction", rows: [
+            { id: "c", type: "choice", title: "Extractor Method", icon: "code", sub: "yt-dlp first, NewPipe takes over if it fails", value: st.c, enabled: true,
+              options: [{ v: "fast", l: "yt-dlp (default)" }, { v: "np", l: "NewPipe" }] },
+            { id: "d", type: "link", title: "Logs", icon: "file", sub: "Session log + crash reports", enabled: true } ]}
+        ]);
+      },
+      set: function (id, v) { if (id === "c") st.c = v; else st[id] = v === "true"; window.__refresh(); },
+      run: function () {}, isNight: function () { return matchMedia("(prefers-color-scheme: dark)").matches; },
+      close: function () {}, useClassic: function () {}, getCss: function () { return ""; }, setCss: function () {}
+    };
+  })();
+
+  document.body.setAttribute("data-theme", bridge.isNight() ? "dark" : "light");
+  document.getElementById("back").innerHTML = svg("back");
+  document.getElementById("searchIcon").innerHTML = svg("search");
+  document.getElementById("back").onclick = function () { bridge.close(); };
+  document.getElementById("classic").onclick = function () { bridge.useClassic(); };
+
+  var list = document.getElementById("list");
+  var data = [];
+  var firstRender = true;
+  var query = "";
+  var cssOpen = false;
+
+  function toast(msg) {
+    var t = document.getElementById("toast");
+    t.textContent = msg; t.classList.add("show");
+    clearTimeout(toast.h); toast.h = setTimeout(function () { t.classList.remove("show"); }, 1600);
+  }
+
+  // ---- bottom sheet for choices
+  var scrim = document.getElementById("scrim"), sheet = document.getElementById("sheet");
+  function closeSheet() { scrim.classList.remove("show"); sheet.classList.remove("show"); }
+  scrim.onclick = closeSheet;
+  function openSheet(row) {
+    document.getElementById("sheetTitle").textContent = row.title;
+    var box = document.getElementById("sheetOpts"); box.innerHTML = "";
+    row.options.forEach(function (o) {
+      var d = document.createElement("div");
+      d.className = "opt" + (o.v === row.value ? " sel" : "");
+      d.innerHTML = '<span class="dot">' + svg("check") + "</span><span></span>";
+      d.lastChild.textContent = o.l;
+      d.onclick = function () { closeSheet(); if (o.v !== row.value) bridge.set(row.id, o.v); };
+      box.appendChild(d);
+    });
+    scrim.classList.add("show"); sheet.classList.add("show");
+  }
+
+  function valueLabel(row) {
+    var m = (row.options || []).filter(function (o) { return o.v === row.value; })[0];
+    return m ? m.l : String(row.value);
+  }
+
+  function makeRow(row, idx, animate) {
+    var c = document.createElement("div");
+    c.className = "card" + (animate ? " in" : "") + (row.enabled === false ? " off" : "");
+    c.style.setProperty("--i", idx);
+    c.setAttribute("data-search", (row.title + " " + (row.sub || "")).toLowerCase());
+    var right = "";
+    if (row.type === "toggle") right = '<span class="sw' + (row.value ? " on" : "") + '"></span>';
+    else if (row.type === "choice") right = '<span class="val"></span>';
+    else right = svg("chev", "chev");
+    c.innerHTML = '<span class="tile">' + svg(row.icon) + '</span><span class="txt"><div class="t"></div><div class="s"></div></span>' + right;
+    c.querySelector(".t").textContent = row.title;
+    c.querySelector(".s").textContent = row.sub || "";
+    if (!row.sub) c.querySelector(".s").style.display = "none";
+    if (row.type === "choice") c.querySelector(".val").textContent = valueLabel(row);
+
+    c.onclick = function () {
+      if (row.type === "toggle") {
+        var sw = c.querySelector(".sw");
+        sw.classList.toggle("on");               // instant feedback, truth comes back via refresh
+        bridge.set(row.id, String(!row.value));
+      } else if (row.type === "choice") {
+        openSheet(row);
+      } else if (row.type === "css") {
+        cssOpen = !cssOpen;
+        var ed = document.getElementById("cssEditor");
+        if (ed) ed.classList.toggle("open", cssOpen);
+      } else {
+        bridge.run(row.id);
+      }
+    };
+    return c;
+  }
+
+  function render(animate) {
+    var keepY = window.scrollY;
+    list.innerHTML = "";
+    var idx = 0;
+    data.forEach(function (sec) {
+      var s = document.createElement("section");
+      var h = document.createElement("h2"); h.textContent = sec.title; s.appendChild(h);
+      sec.rows.forEach(function (row) {
+        s.appendChild(makeRow(row, idx++, animate));
+        if (row.type === "css") {
+          var ed = document.createElement("div");
+          ed.className = "editor" + (cssOpen ? " open" : ""); ed.id = "cssEditor";
+          ed.innerHTML = '<textarea spellcheck="false" placeholder="/* your css */"></textarea><p>Applied on top of SparkyTube\'s own CSS. Bad CSS can only break the page\'s look, not the app.</p><button class="btn">Save CSS</button>';
+          ed.querySelector("textarea").value = row.value || "";
+          ed.querySelector(".btn").onclick = function () { bridge.setCss(ed.querySelector("textarea").value); toast("CSS saved"); };
+          s.appendChild(ed);
+        }
+      });
+      list.appendChild(s);
+    });
+    applyFilter();
+    window.scrollTo(0, keepY);
+  }
+
+  function applyFilter() {
+    var q = query.trim().toLowerCase(), any = false;
+    [].slice.call(list.querySelectorAll("section")).forEach(function (s) {
+      var shown = 0;
+      [].slice.call(s.querySelectorAll(".card")).forEach(function (c) {
+        var ok = !q || c.getAttribute("data-search").indexOf(q) !== -1;
+        c.style.display = ok ? "" : "none"; if (ok) shown++;
+      });
+      var ed = s.querySelector(".editor"); if (ed && q) ed.classList.remove("open");
+      s.style.display = shown ? "" : "none"; if (shown) any = true;
+    });
+    document.getElementById("empty").style.display = any ? "none" : "block";
+  }
+  document.getElementById("q").addEventListener("input", function (e) { query = e.target.value; applyFilter(); });
+
+  function load(animate) {
+    try { data = JSON.parse(bridge.schema()); } catch (e) { data = []; }
+    render(animate);
+  }
+  window.__refresh = function () { load(false); };
+
+  window.addEventListener("scroll", function () { document.body.classList.toggle("scrolled", window.scrollY > 10); }, { passive: true });
+
+  load(true);
+})();
+</script>
+</body>
+</html>
