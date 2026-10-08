@@ -112,6 +112,7 @@
                 style="@style/SettingsSectionHeader"
                 android:text="Appearance" />
 
+            <include layout="@layout/settings_switch_row" android:id="@+id/rowSettingsStyle" />
             <include layout="@layout/settings_switch_row" android:id="@+id/rowTheme" />
             <include layout="@layout/settings_switch_row" android:id="@+id/rowDynamicColor" />
             <include layout="@layout/settings_switch_row" android:id="@+id/rowCustomCss" />
