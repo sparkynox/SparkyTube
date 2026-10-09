@@ -175,8 +175,16 @@ object PyYtDlp {
 
         // data saver keeps a single 360p entry (muxed one if there is one),
         // otherwise the lowest thing available
+        val duration = root.optLong("duration", 0L)
+
         val qualities = if (dataSaver) {
-            val pick = progressiveOptions.filter { it.resolutionValue <= 360 }.maxByOrNull { it.resolutionValue }
+            // the muxed 360p is a plain mp4 with the whole sample table in the moov atom,
+            // on 30min+ videos that's several MB exoplayer has to pull before the first frame.
+            // adaptive streams only carry a tiny index so long videos start way faster on those
+            val longVideo = duration >= 900
+            val adaptiveLow = adaptiveOptions.filter { it.resolutionValue <= 360 }.maxByOrNull { it.resolutionValue }
+            val pick = (if (longVideo) adaptiveLow else null)
+                ?: progressiveOptions.filter { it.resolutionValue <= 360 }.maxByOrNull { it.resolutionValue }
                 ?: allOptions.filter { it.resolutionValue <= 360 }.maxByOrNull { it.resolutionValue }
                 ?: allOptions.minByOrNull { it.resolutionValue }
             listOfNotNull(pick)
@@ -191,7 +199,6 @@ object PyYtDlp {
         )
 
         val title = root.optString("title", "")
-        val duration = root.optLong("duration", 0L)
         val description = root.optString("description").takeIf { it.isNotBlank() }
 
         if (qualities.isEmpty()) {
