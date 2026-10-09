@@ -94,11 +94,6 @@ section h2::after{content:"";height:1px;flex:1;background:var(--line)}
   <div class="top">
     <button class="back" id="back" aria-label="Back"></button>
     <h1>Settings</h1>
-    <div class="seg" role="group" aria-label="Settings style">
-      <i></i>
-      <button id="classic">Classic</button>
-      <button class="on" id="stylish">Stylish</button>
-    </div>
   </div>
   <label class="search"><span id="searchIcon"></span><input id="q" type="search" placeholder="Search settings" autocomplete="off"></label>
 </header>
@@ -162,7 +157,7 @@ section h2::after{content:"";height:1px;flex:1;background:var(--line)}
       },
       set: function (id, v) { if (id === "c") st.c = v; else st[id] = v === "true"; window.__refresh(); },
       run: function () {}, isNight: function () { return matchMedia("(prefers-color-scheme: dark)").matches; },
-      close: function () {}, useClassic: function () {}, getCss: function () { return ""; }, setCss: function () {}
+      close: function () {}, getCss: function () { return ""; }, setCss: function () {}
     };
   })();
 
@@ -170,7 +165,6 @@ section h2::after{content:"";height:1px;flex:1;background:var(--line)}
   document.getElementById("back").innerHTML = svg("back");
   document.getElementById("searchIcon").innerHTML = svg("search");
   document.getElementById("back").onclick = function () { bridge.close(); };
-  document.getElementById("classic").onclick = function () { bridge.useClassic(); };
 
   var list = document.getElementById("list");
   var data = [];
