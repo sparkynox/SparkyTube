@@ -248,6 +248,14 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 mediaController = controller
                 binding.exoPlayerView.player = controller
                 controller.addListener(object : Player.Listener {
+                    override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                        // notification / lockscreen pause comes in as USER_REQUEST,
+                        // audio focus loss etc. don't, so those can still be force-resumed
+                        if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST) {
+                            userInitiatedPause = !playWhenReady
+                        }
+                    }
+
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
                         // Screen-off during playback bug: Android's normal
                         // sleep timer doesn't know a video is playing
@@ -276,6 +284,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                             // until the user explicitly pauses.
                             val controller = mediaController
                             if (!userInitiatedPause && controller != null &&
+                                controller.playWhenReady &&
                                 controller.playbackState != Player.STATE_ENDED &&
                                 controller.playbackState != Player.STATE_IDLE
                             ) {
@@ -3198,7 +3207,9 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             // force it to keep playing rather than trusting whatever
             // Android's focus system decided.
             val controller = mediaController
-            if (controller != null && controller.playbackState != Player.STATE_ENDED) {
+            if (controller != null && !userInitiatedPause &&
+                controller.playbackState != Player.STATE_ENDED
+            ) {
                 controller.play()
             }
         }
