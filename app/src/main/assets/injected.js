@@ -516,18 +516,22 @@
   // the one advanceToNextVideo() (triggered by ExoPlayer's real state)
   // would pick — leaving the two players out of sync. All navigation is
   // meant to go through the native side's explicit trigger only.
+  // kills youtube's own "up next" countdown so the web player never navigates by itself
+  function cancelWebAutonav() {
+    var cancel = document.querySelector('.ytp-autonav-endscreen-upnext-cancel-button, .ytp-autonav-endscreen-cancel-button');
+    if (cancel) cancel.click();
+  }
+
   function disableNativeAutoplay() {
     var video = document.querySelector('video');
     if (!video || video.__sparkyAutoplayGuarded) return;
     video.__sparkyAutoplayGuarded = true;
     video.addEventListener('ended', function () {
-      // Restart the same video from the top rather than letting YouTube's
-      // engine auto-advance — native ExoPlayer's real end-of-playback
-      // event is what actually drives advanceToNextVideo(). The user
-      // never sees/hears this since it's muted and hidden behind
-      // ExoPlayer's visible overlay.
+      // web copy just stops when it finishes, no loop and no autoplay.
+      // only exoplayer ending moves to the next video (native side)
       video.currentTime = 0;
-      video.play().catch(function () {});
+      video.pause();
+      cancelWebAutonav();
     });
     // Instant reaction to any attempt to un-mute -- the 500ms poll cycle
     // alone left a brief audible window right as an ad started (YouTube's

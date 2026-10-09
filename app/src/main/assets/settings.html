@@ -93,7 +93,7 @@ section h2::after{content:"";height:1px;flex:1;background:var(--line)}
 <header>
   <div class="top">
     <button class="back" id="back" aria-label="Back"></button>
-    <h1>Settings</h1>
+    <h1 id="title">Settings</h1>
   </div>
   <label class="search"><span id="searchIcon"></span><input id="q" type="search" placeholder="Search settings" autocomplete="off"></label>
 </header>
@@ -146,10 +146,10 @@ section h2::after{content:"";height:1px;flex:1;background:var(--line)}
     return {
       schema: function () {
         return JSON.stringify([
-          { title: "Features", rows: [
+          { key: "features", icon: "shield", sub: "Ad blocking and more", title: "Features", rows: [
             { id: "a", type: "toggle", title: "Ad blocking", icon: "shield", sub: "Blocks ad/tracker domains and hides ad slots", value: st.a, enabled: true },
             { id: "b", type: "toggle", title: "SponsorBlock", icon: "skip", sub: "Auto-skip sponsor segments", value: st.b, enabled: true } ]},
-          { title: "Extraction", rows: [
+          { key: "extraction", icon: "code", sub: "Extractors and fallbacks", title: "Extraction", rows: [
             { id: "c", type: "choice", title: "Extractor Method", icon: "code", sub: "yt-dlp first, NewPipe takes over if it fails", value: st.c, enabled: true,
               options: [{ v: "fast", l: "yt-dlp (default)" }, { v: "np", l: "NewPipe" }] },
             { id: "d", type: "link", title: "Logs", icon: "file", sub: "Session log + crash reports", enabled: true } ]}
@@ -157,20 +157,22 @@ section h2::after{content:"";height:1px;flex:1;background:var(--line)}
       },
       set: function (id, v) { if (id === "c") st.c = v; else st[id] = v === "true"; window.__refresh(); },
       run: function () {}, isNight: function () { return matchMedia("(prefers-color-scheme: dark)").matches; },
-      close: function () {}, getCss: function () { return ""; }, setCss: function () {}
+      close: function () {}, initialSection: function () { return ""; }, getCss: function () { return ""; }, setCss: function () {}
     };
   })();
 
   document.body.setAttribute("data-theme", bridge.isNight() ? "dark" : "light");
   document.getElementById("back").innerHTML = svg("back");
   document.getElementById("searchIcon").innerHTML = svg("search");
-  document.getElementById("back").onclick = function () { bridge.close(); };
+  document.getElementById("back").onclick = function () { if (!goBack()) bridge.close(); };
 
   var list = document.getElementById("list");
   var data = [];
   var firstRender = true;
   var query = "";
   var cssOpen = false;
+  var view = null;            // null = settings home, otherwise the key of the open category
+  var titleEl = document.getElementById("title");
 
   function toast(msg) {
     var t = document.getElementById("toast");
@@ -234,27 +236,82 @@ section h2::after{content:"";height:1px;flex:1;background:var(--line)}
     return c;
   }
 
+  function makeCat(sec, idx, animate) {
+    var c = document.createElement("div");
+    c.className = "card" + (animate ? " in" : "");
+    c.style.setProperty("--i", idx);
+    c.innerHTML = '<span class="tile">' + svg(sec.icon) + '</span><span class="txt"><div class="t"></div><div class="s"></div></span>' + svg("chev", "chev");
+    c.querySelector(".t").textContent = sec.title;
+    c.querySelector(".s").textContent = sec.sub || "";
+    c.onclick = function () { openView(sec.key); };
+    return c;
+  }
+
+  function findSec(key) {
+    return data.filter(function (x) { return x.key === key; })[0] || null;
+  }
+
+  function openView(key) {
+    view = key; cssOpen = false;
+    window.scrollTo(0, 0);
+    render(true);
+  }
+
+  // true when it stepped back to the home list, false when already on it
+  function goBack() {
+    var q = document.getElementById("q");
+    if (query) { q.value = ""; query = ""; render(false); return true; }
+    if (view !== null) { view = null; window.scrollTo(0, 0); render(true); return true; }
+    return false;
+  }
+  window.__goBack = goBack;
+
+  function drawRows(s, sec, idx, animate) {
+    sec.rows.forEach(function (row) {
+      s.appendChild(makeRow(row, idx++, animate));
+      if (row.type === "css") {
+        var ed = document.createElement("div");
+        ed.className = "editor" + (cssOpen ? " open" : ""); ed.id = "cssEditor";
+        ed.innerHTML = '<textarea spellcheck="false" placeholder="/* your css */"></textarea><p>Applied on top of SparkyTube\'s own CSS. Bad CSS can only break the page\'s look, not the app.</p><button class="btn">Save CSS</button>';
+        ed.querySelector("textarea").value = row.value || "";
+        ed.querySelector(".btn").onclick = function () { bridge.setCss(ed.querySelector("textarea").value); toast("CSS saved"); };
+        s.appendChild(ed);
+      }
+    });
+    return idx;
+  }
+
   function render(animate) {
     var keepY = window.scrollY;
     list.innerHTML = "";
     var idx = 0;
-    data.forEach(function (sec) {
-      var s = document.createElement("section");
-      var h = document.createElement("h2"); h.textContent = sec.title; s.appendChild(h);
-      sec.rows.forEach(function (row) {
-        s.appendChild(makeRow(row, idx++, animate));
-        if (row.type === "css") {
-          var ed = document.createElement("div");
-          ed.className = "editor" + (cssOpen ? " open" : ""); ed.id = "cssEditor";
-          ed.innerHTML = '<textarea spellcheck="false" placeholder="/* your css */"></textarea><p>Applied on top of SparkyTube\'s own CSS. Bad CSS can only break the page\'s look, not the app.</p><button class="btn">Save CSS</button>';
-          ed.querySelector("textarea").value = row.value || "";
-          ed.querySelector(".btn").onclick = function () { bridge.setCss(ed.querySelector("textarea").value); toast("CSS saved"); };
-          s.appendChild(ed);
-        }
+    var searching = query.trim() !== "";
+    var open = view !== null ? findSec(view) : null;
+    if (view !== null && !open) view = null;
+
+    if (searching) {
+      // flat results across every category, same as before
+      titleEl.textContent = "Settings";
+      data.forEach(function (sec) {
+        var s = document.createElement("section");
+        var h = document.createElement("h2"); h.textContent = sec.title; s.appendChild(h);
+        idx = drawRows(s, sec, idx, animate);
+        list.appendChild(s);
       });
-      list.appendChild(s);
-    });
-    applyFilter();
+      applyFilter();
+    } else if (open) {
+      titleEl.textContent = open.title;
+      var s2 = document.createElement("section"); s2.style.marginTop = "10px";
+      drawRows(s2, open, 0, animate);
+      list.appendChild(s2);
+      document.getElementById("empty").style.display = "none";
+    } else {
+      titleEl.textContent = "Settings";
+      var box = document.createElement("section"); box.style.marginTop = "10px";
+      data.forEach(function (sec, i) { box.appendChild(makeCat(sec, i, animate)); });
+      list.appendChild(box);
+      document.getElementById("empty").style.display = "none";
+    }
     window.scrollTo(0, keepY);
   }
 
@@ -271,10 +328,14 @@ section h2::after{content:"";height:1px;flex:1;background:var(--line)}
     });
     document.getElementById("empty").style.display = any ? "none" : "block";
   }
-  document.getElementById("q").addEventListener("input", function (e) { query = e.target.value; applyFilter(); });
+  document.getElementById("q").addEventListener("input", function (e) { query = e.target.value; render(false); });
 
   function load(animate) {
     try { data = JSON.parse(bridge.schema()); } catch (e) { data = []; }
+    if (animate) {
+      var first = ""; try { first = bridge.initialSection() || ""; } catch (e) {}
+      if (first && findSec(first)) view = first;
+    }
     render(animate);
   }
   window.__refresh = function () { load(false); };
