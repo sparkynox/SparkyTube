@@ -107,6 +107,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             maybePrefetchNextVideo()
             maybeSkipSponsorSegment()
             maybeSaveWatchPosition()
+            updateDownloadCard()
             pollHandler.postDelayed(this, 600)
         }
     }
@@ -910,6 +911,41 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             .show()
     }
 
+    private var lastDownloadCardCheck = 0L
+
+    // little card under the player showing the download that's running now
+    private fun updateDownloadCard() {
+        val card = binding.downloadStatusCard
+        val playerOpen = binding.exoPlayerView.visibility == View.VISIBLE &&
+            !isPlayerFullscreen && !isMiniPlayerActive
+        if (!playerOpen) {
+            if (card.visibility != View.GONE) card.visibility = View.GONE
+            return
+        }
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastDownloadCardCheck < 1200) return
+        lastDownloadCardCheck = now
+
+        val info = dev.sparkynox.sparkytube.download.ActiveDownloads.current(this)
+        if (info == null) {
+            card.visibility = View.GONE
+            return
+        }
+        binding.downloadCardTitle.text = info.title
+        binding.downloadCardInfo.text = info.detail
+        binding.downloadCardCount.text = when {
+            info.queuedCount > 0 -> "${info.activeCount} active • ${info.queuedCount} queued"
+            info.activeCount > 1 -> "${info.activeCount} active"
+            else -> ""
+        }
+        binding.downloadCardBar.isIndeterminate = info.percent < 0
+        if (info.percent >= 0) binding.downloadCardBar.progress = info.percent
+        card.setOnClickListener {
+            startActivity(Intent(this, dev.sparkynox.sparkytube.download.DownloadsActivity::class.java))
+        }
+        card.visibility = View.VISIBLE
+    }
+
     private fun toggleFullscreenPlayer() {
         isPlayerFullscreen = !isPlayerFullscreen
         val params = binding.exoPlayerView.layoutParams
@@ -1565,29 +1601,94 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         binding.overflowMenuBtn.setOnClickListener { showOverflowMenu(it) }
     }
 
+    private class Shortcut(val label: String, val icon: Int, val run: () -> Unit)
+
+    // quick-access grid instead of a plain popup, jumps straight into settings pages
+    // so nobody has to dig through Settings. toggles (ad block etc) stay out on purpose
     private fun showOverflowMenu(anchor: View) {
-        val popup = android.widget.PopupMenu(this, anchor)
-        popup.menu.add(0, 1, 0, "About SparkyTube")
-        popup.menu.add(0, 2, 1, "Support the Developer")
-        // Anime streaming has a master switch in Settings now — if it's
-        // off, don't even show the toggle here (and if the user was
-        // somehow still sitting on the Crunchyroll page from before it
-        // was turned off, bounce them back to YouTube).
+        val dp = resources.displayMetrics.density
+        val sheet = com.google.android.material.bottomsheet.BottomSheetDialog(this)
+        var closeSheet: () -> Unit = { sheet.dismiss() }
+
+        fun settingsAt(section: String) = {
+            startActivity(Intent(this, dev.sparkynox.sparkytube.settings.HtmlSettingsActivity::class.java)
+                .putExtra(dev.sparkynox.sparkytube.settings.HtmlSettingsActivity.EXTRA_OPEN_SECTION, section))
+        }
+
+        val items = mutableListOf<Shortcut>()
+        items += Shortcut("Settings", android.R.drawable.ic_menu_manage) {
+            startActivity(Intent(this, dev.sparkynox.sparkytube.settings.SettingsActivity::class.java))
+        }
+        items += Shortcut("Downloads", R.drawable.ic_download) {
+            startActivity(Intent(this, dev.sparkynox.sparkytube.download.DownloadsActivity::class.java))
+        }
+        items += Shortcut("Offline", R.drawable.ic_library) {
+            startActivity(Intent(this, dev.sparkynox.sparkytube.download.OfflineLibraryActivity::class.java))
+        }
+        items += Shortcut("Appearance", android.R.drawable.ic_menu_gallery, settingsAt("appearance"))
+        items += Shortcut("Player", R.drawable.ic_play, settingsAt("player"))
+        items += Shortcut("Extraction", android.R.drawable.ic_menu_edit, settingsAt("extraction"))
+        items += Shortcut("YT Settings", android.R.drawable.ic_menu_share) {
+            browseMode = BrowseMode.YOUTUBE
+            stopNativePlayback()
+            webView.loadUrl(YT_SETTINGS_URL)
+        }
+        items += Shortcut("Logs", android.R.drawable.ic_menu_info_details) {
+            startActivity(Intent(this, dev.sparkynox.sparkytube.logs.LogsActivity::class.java))
+        }
         if (dev.sparkynox.sparkytube.settings.SettingsPrefs.isAnimeStreamingEnabled(this)) {
-            val siteToggleLabel = if (browseMode == BrowseMode.CRUNCHYROLL) "Back to YouTube" else "Anime Streaming"
-            popup.menu.add(0, 3, 2, siteToggleLabel)
+            items += Shortcut(
+                if (browseMode == BrowseMode.CRUNCHYROLL) "YouTube" else "Anime",
+                R.drawable.ic_shorts
+            ) { toggleBrowseMode() }
         } else if (browseMode == BrowseMode.CRUNCHYROLL) {
             toggleBrowseMode()
         }
-        popup.setOnMenuItemClickListener { item ->
-            when (item.itemId) {
-                1 -> showAboutDialog()
-                2 -> showSupportDialog()
-                3 -> toggleBrowseMode()
-            }
-            true
+        items += Shortcut("About", R.drawable.ic_about) { showAboutDialog() }
+        items += Shortcut("Support", android.R.drawable.btn_star_big_off) { showSupportDialog() }
+
+        val grid = android.widget.GridLayout(this).apply {
+            columnCount = 4
+            setPadding((12 * dp).toInt(), (18 * dp).toInt(), (12 * dp).toInt(), (24 * dp).toInt())
         }
-        popup.show()
+        val textColor = androidx.core.content.ContextCompat.getColor(this, R.color.text_primary)
+        val accent = androidx.core.content.ContextCompat.getColor(this, R.color.accent)
+        val cellW = (resources.displayMetrics.widthPixels - (24 * dp).toInt()) / 4
+
+        items.forEach { sc ->
+            val cell = android.widget.LinearLayout(this).apply {
+                orientation = android.widget.LinearLayout.VERTICAL
+                gravity = android.view.Gravity.CENTER_HORIZONTAL
+                setPadding(0, (10 * dp).toInt(), 0, (10 * dp).toInt())
+                isClickable = true
+                val tv = android.util.TypedValue()
+                theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, tv, true)
+                setBackgroundResource(tv.resourceId)
+                setOnClickListener {
+                    closeSheet()
+                    sc.run()
+                }
+            }
+            val icon = android.widget.ImageView(this).apply {
+                setImageResource(sc.icon)
+                setColorFilter(accent)
+                layoutParams = android.widget.LinearLayout.LayoutParams((26 * dp).toInt(), (26 * dp).toInt())
+            }
+            val label = android.widget.TextView(this).apply {
+                text = sc.label
+                setTextColor(textColor)
+                textSize = 12f
+                maxLines = 1
+                gravity = android.view.Gravity.CENTER
+                setPadding(0, (8 * dp).toInt(), 0, 0)
+            }
+            cell.addView(icon)
+            cell.addView(label)
+            grid.addView(cell, android.widget.GridLayout.LayoutParams().apply { width = cellW })
+        }
+
+        sheet.setContentView(grid)
+        sheet.show()
     }
 
     /**
@@ -2879,28 +2980,12 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 ?: currentAudioTracks.firstOrNull()?.label ?: ""
             binding.audioTrackBtn.visibility = if (currentAudioTracks.size > 1) View.VISIBLE else View.GONE
 
-            // Play YouTube's own HTML5 <video> just long enough to
-            // register the view with YouTube's servers (watch-history,
-            // view count, recommendations all come from this), then stop
-            // it. Previously this kept playing indefinitely in the
-            // background for as long as the native ExoPlayer video ran —
-            // muted and invisible, but still actively buffering/streaming
-            // through YouTube's own player the whole time, which doubled
-            // the network usage for every video (ExoPlayer's real stream
-            // AND YouTube's background stream, simultaneously). 3 seconds
-            // is enough for YouTube to count the view; stopping after
-            // that removes the ongoing bandwidth cost for the rest of the
-            // video's duration.
+            // web <video> stays muted and keeps playing so youtube counts a real
+            // watch for history, it only stops by itself when it ends (see injected.js)
             webView.evaluateJavascript(
                 "(function(){var v=document.querySelector('video'); if(v){v.muted=true; if(v.paused){v.play().catch(function(){});}} document.body.classList.add('sparkytube-native-active');})();",
                 null
             )
-            pollHandler.postDelayed({
-                webView.evaluateJavascript(
-                    "(function(){var v=document.querySelector('video'); if(v){v.pause();}})();",
-                    null
-                )
-            }, 3000L)
 
             val savedPosition = dev.sparkynox.sparkytube.history.WatchHistoryStore.getPosition(this@MainActivity, videoId) ?: 0L
             playOnController(
