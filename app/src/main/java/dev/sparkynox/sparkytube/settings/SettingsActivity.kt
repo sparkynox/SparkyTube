@@ -16,15 +16,10 @@ class SettingsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // the user picked the stylish HTML screen: every way into Settings lands there.
-        // EXTRA_FORCE_STOCK is the escape hatch so the classic screen can still be opened.
-        if (SettingsPrefs.getSettingsUi(this) == SettingsPrefs.SettingsUi.HTML &&
-            !intent.getBooleanExtra(EXTRA_FORCE_STOCK, false)
-        ) {
-            startActivity(android.content.Intent(this, HtmlSettingsActivity::class.java))
-            finish()
-            return
-        }
+        // html settings is the only settings screen now
+        startActivity(android.content.Intent(this, HtmlSettingsActivity::class.java))
+        finish()
+        return
         binding = ActivitySettingsBinding.inflate(layoutInflater)
         setContentView(binding.root)
 

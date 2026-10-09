@@ -339,9 +339,9 @@ object SettingsPrefs {
     enum class SettingsUi { STOCK, HTML }
 
     fun getSettingsUi(context: Context): SettingsUi = try {
-        SettingsUi.valueOf(prefs(context).getString(KEY_SETTINGS_UI, SettingsUi.STOCK.name) ?: SettingsUi.STOCK.name)
+        SettingsUi.valueOf(prefs(context).getString(KEY_SETTINGS_UI, SettingsUi.HTML.name) ?: SettingsUi.HTML.name)
     } catch (e: IllegalArgumentException) {
-        SettingsUi.STOCK
+        SettingsUi.HTML
     }
 
     fun setSettingsUi(context: Context, ui: SettingsUi) {

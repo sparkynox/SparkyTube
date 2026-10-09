@@ -301,14 +301,5 @@ class HtmlSettingsActivity : AppCompatActivity() {
         fun close() {
             runOnUiThread { finish() }
         }
-
-        @JavascriptInterface
-        fun useClassic() {
-            runOnUiThread {
-                SettingsPrefs.setSettingsUi(this@HtmlSettingsActivity, SettingsPrefs.SettingsUi.STOCK)
-                startActivity(Intent(this@HtmlSettingsActivity, SettingsActivity::class.java))
-                finish()
-            }
-        }
     }
 }
