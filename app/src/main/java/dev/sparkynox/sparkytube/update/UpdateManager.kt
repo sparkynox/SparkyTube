@@ -9,6 +9,8 @@ import dev.sparkynox.sparkytube.settings.SettingsPrefs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -129,11 +131,16 @@ object UpdateManager {
         phase = Phase.CHECKING
         error = ""
         val ctx = c.applicationContext
-        val (l, m) = kotlinx.coroutines.coroutineScope {
-            val a = kotlinx.coroutines.async { fetchLatest() }
-            val b = kotlinx.coroutines.async { fetchMessages(0) }
-            a.await() to b.await()
+        var gotLatest: Latest? = null
+        var gotMessages: List<Message>? = null
+        coroutineScope {
+            val a = async { fetchLatest() }
+            val b = async { fetchMessages(0) }
+            gotLatest = a.await()
+            gotMessages = b.await()
         }
+        val l = gotLatest
+        val m = gotMessages
         lastCheckOk = l != null || m != null
         if (l != null) latest = l
         if (m != null) messages = m
