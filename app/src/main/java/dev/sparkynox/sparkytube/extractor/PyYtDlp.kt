@@ -60,7 +60,27 @@ object PyYtDlp {
      * parseFormats() below (ported straight from the old YtDlpResolver)
      * doesn't need to change at all.
      */
+    // prefetch and the real play can ask for the same video at the same moment, the
+    // second caller just waits for the first one instead of running python twice
+    private val inFlightResolves = java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.CompletableFuture<StreamExtractor.ResolvedStream?>>()
+
     fun resolve(videoId: String): StreamExtractor.ResolvedStream? {
+        val mine = java.util.concurrent.CompletableFuture<StreamExtractor.ResolvedStream?>()
+        val running = inFlightResolves.putIfAbsent(videoId, mine)
+        if (running != null) {
+            return try { running.get(45, java.util.concurrent.TimeUnit.SECONDS) } catch (e: Exception) { null }
+        }
+        return try {
+            resolveNow(videoId).also { mine.complete(it) }
+        } catch (t: Throwable) {
+            mine.complete(null)
+            throw t
+        } finally {
+            inFlightResolves.remove(videoId)
+        }
+    }
+
+    private fun resolveNow(videoId: String): StreamExtractor.ResolvedStream? {
         val module = ytDlpModule
         if (module == null) {
             lastErrorMessage = "yt-dlp isn't initialized -- check the \"yt-dlp fallback\" toggle in Settings is on, and restart the app if you just enabled it"
@@ -72,12 +92,15 @@ object PyYtDlp {
             // defaulted to 360p-only even with Data Saver off
             val dataSaver = appContext?.let {
                 dev.sparkynox.sparkytube.settings.SettingsPrefs.isDataSaverEnabled(it)
-            } ?: true
+            } ?: false
             val t0 = android.os.SystemClock.elapsedRealtime()
             val rawJson = module.callAttr("resolve_json", videoId, dataSaver).toString()
             val pyMs = android.os.SystemClock.elapsedRealtime() - t0
             val path = Regex("\"_sparky_path\": \"(\\w+)\"").find(rawJson)?.groupValues?.get(1) ?: "?"
             dev.sparkynox.sparkytube.logs.LogRecorder.i("PyYtDlp", "python call took $pyMs ms (path=$path)")
+            Regex("\"_sparky_diag\": \"([^\"]*)\"").find(rawJson)?.groupValues?.get(1)?.let {
+                dev.sparkynox.sparkytube.logs.LogRecorder.i("PyYtDlp", "diag: $it")
+            }
             if (rawJson.isBlank() || rawJson == "None") {
                 lastErrorMessage = "yt-dlp returned no data for this video"
                 return null
