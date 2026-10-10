@@ -1308,7 +1308,6 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
         checkForUpdatesOnce()
         showFirstLaunchDialogIfNeeded()
-        showContactReminderDialog()
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -1466,32 +1465,6 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     }
 
     /**
-     * Shown on every app open (unlike showFirstLaunchDialogIfNeeded, which
-     * is one-time) — a short reminder of where to actually reach the dev,
-     * since GitHub Issues is the right channel for bugs/feature requests
-     * but people keep DMing instead. Skipped entirely when the user has
-     * turned on "Block all popups" in Settings.
-     */
-    private fun showContactReminderDialog() {
-        if (dev.sparkynox.sparkytube.settings.SettingsPrefs.arePopupsBlocked(this)) return
-
-        AlertDialog.Builder(this)
-            .setTitle("Before you message me")
-            .setMessage(
-                "Coding and fixing bugs takes time. If you have a problem, " +
-                "please open a GitHub issue instead of messaging on Instagram or Telegram.\n\n" +
-                "Telegram: @SparkyNox (mostly inactive)\n" +
-                "Instagram: @sparkynox07"
-            )
-            .setPositiveButton("Open GitHub Issues") { _, _ ->
-                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_ISSUES_URL)))
-            }
-            .setNegativeButton("OK", null)
-            .setCancelable(true)
-            .show()
-    }
-
-    /**
      * Many OEMs (Xiaomi/MIUI, OnePlus/OxygenOS, Oppo/ColorOS, etc.) apply
      * aggressive battery optimization that kills background services even
      * when a foreground notification is showing — this is almost certainly
@@ -1632,6 +1605,9 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             browseMode = BrowseMode.YOUTUBE
             stopNativePlayback()
             webView.loadUrl(YT_SETTINGS_URL)
+        }
+        items += Shortcut("Update", android.R.drawable.stat_sys_download_done) {
+            startActivity(Intent(this, dev.sparkynox.sparkytube.update.UpdateActivity::class.java))
         }
         items += Shortcut("Logs", android.R.drawable.ic_menu_info_details) {
             startActivity(Intent(this, dev.sparkynox.sparkytube.logs.LogsActivity::class.java))
@@ -2033,64 +2009,24 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }
     }
 
-    /**
-     * Sideloaded APK = no Play Store auto-update. Checks GitHub Releases once
-     * per cold start; if a newer version is out, shows BOTH a system
-     * notification AND an in-app dialog.
-     */
+    // checks our update server on app open. no dialog, just a small bar at the bottom
+    // that opens the update screen (the notification comes from UpdateManager)
     private fun checkForUpdatesOnce() {
         if (!dev.sparkynox.sparkytube.settings.SettingsPrefs.isUpdaterEnabled(this)) return
 
         lifecycleScope.launch {
-            val currentVersion = UpdateChecker.getInstalledVersionName(this@MainActivity)
-            val update = UpdateChecker.checkForUpdate(currentVersion) ?: return@launch
-
+            dev.sparkynox.sparkytube.update.UpdateManager.backgroundCheck(this@MainActivity)
+            val m = dev.sparkynox.sparkytube.update.UpdateManager
+            if (!m.hasUpdate(this@MainActivity) || isFinishing || isDestroyed) return@launch
             if (dev.sparkynox.sparkytube.settings.SettingsPrefs.arePopupsBlocked(this@MainActivity)) return@launch
-
-            UpdateNotifier.notifyUpdateAvailable(this@MainActivity, update)
-            showUpdateDialog(update)
+            val l = m.latest ?: return@launch
+            com.google.android.material.snackbar.Snackbar
+                .make(binding.root, "SparkyTube ${l.versionName} is available", com.google.android.material.snackbar.Snackbar.LENGTH_LONG)
+                .setAction("Update") {
+                    startActivity(Intent(this@MainActivity, dev.sparkynox.sparkytube.update.UpdateActivity::class.java))
+                }
+                .show()
         }
-    }
-
-    private fun showUpdateDialog(update: UpdateChecker.UpdateInfo) {
-        if (isFinishing || isDestroyed) return
-
-        val formattedDate = formatReleaseDate(update.releaseDateIso)
-        val changelog = update.releaseNotes.ifBlank { "No changelog provided for this release." }
-
-        val message = buildString {
-            append("Version: ${update.versionTag}\n")
-            append("Release Date: $formattedDate\n\n")
-            append("Changelog:\n")
-            append(changelog)
-        }
-
-        // AlertDialog.setMessage() clips at a fixed height and does NOT
-        // scroll on its own for long content — that's why a long changelog
-        // got cut off. A ScrollView wrapping the TextView, passed via
-        // setView(), actually scrolls.
-        val padding = (20 * resources.displayMetrics.density).toInt()
-        val textView = android.widget.TextView(this).apply {
-            text = message
-            setPadding(padding, padding, padding, padding)
-            textSize = 14f
-            setTextColor(getColor(R.color.text_primary))
-        }
-        val scrollView = android.widget.ScrollView(this).apply {
-            addView(textView)
-        }
-
-        AlertDialog.Builder(this)
-            .setTitle("A new update is available")
-            .setView(scrollView)
-            .setPositiveButton("Download") { _, _ ->
-                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(update.downloadUrl)))
-            }
-            .setNegativeButton("GitHub Issues") { _, _ ->
-                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_ISSUES_URL)))
-            }
-            .setCancelable(true)
-            .show()
     }
 
     private fun formatReleaseDate(isoDate: String): String {

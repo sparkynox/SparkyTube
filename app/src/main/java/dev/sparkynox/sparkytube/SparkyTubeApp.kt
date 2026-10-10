@@ -19,6 +19,9 @@ class SparkyTubeApp : Application() {
         // before any activity exists, so the very first screen already has the right colors
         dev.sparkynox.sparkytube.settings.SettingsPrefs.applyThemeMode(this)
 
+        // background check for new versions + developer messages (every ~6h, only on network)
+        dev.sparkynox.sparkytube.update.UpdateManager.schedule(this)
+
         // Nothing else heavy here on purpose — AdBlockEngine loads its JSON
         // lazily the first time MainActivity spins up the WebView.
 
