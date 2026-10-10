@@ -72,7 +72,7 @@ object PyYtDlp {
             // defaulted to 360p-only even with Data Saver off
             val dataSaver = appContext?.let {
                 dev.sparkynox.sparkytube.settings.SettingsPrefs.isDataSaverEnabled(it)
-            } ?: false
+            } ?: true
             val t0 = android.os.SystemClock.elapsedRealtime()
             val rawJson = module.callAttr("resolve_json", videoId, dataSaver).toString()
             val pyMs = android.os.SystemClock.elapsedRealtime() - t0
