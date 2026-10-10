@@ -12,8 +12,8 @@ android {
         applicationId = "dev.sparkynox.sparkytube"
         minSdk = 24
         targetSdk = 34
-        versionCode = 13
-        versionName = "2.0"
+        versionCode = 14
+        versionName = "2.1"
 
         // ARMv7 (armeabi-v7a) + ARM64 (arm64-v8a) — covers basically every real device.
         // x86/x86_64 skipped on purpose (emulator-only, not needed per Sparky's spec).
@@ -140,6 +140,8 @@ dependencies {
     // user explicitly taps it. See support/SupportAdManager.kt.
     implementation("com.inmobi.monetization:inmobi-ads-kotlin:11.3.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // background update/message checks
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
 
     // FFmpeg for on-device muxing/downloads — arthenica's original
     // FFmpegKit retired in Jan 2025 (binaries pulled, repo archived),
