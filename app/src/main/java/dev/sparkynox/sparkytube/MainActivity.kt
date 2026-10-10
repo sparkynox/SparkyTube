@@ -38,6 +38,7 @@ import dev.sparkynox.sparkytube.extractor.StreamExtractor
 import dev.sparkynox.sparkytube.player.PlaybackService
 import dev.sparkynox.sparkytube.update.UpdateChecker
 import dev.sparkynox.sparkytube.update.UpdateNotifier
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import java.io.ByteArrayInputStream
 
@@ -2785,9 +2786,28 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                     hit
                 } else {
                     val t0 = android.os.SystemClock.elapsedRealtime()
+                    val wantFull = !dev.sparkynox.sparkytube.settings.SettingsPrefs.isDataSaverEnabled(this)
                     val viaYtDlp = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                        dev.sparkynox.sparkytube.extractor.PyYtDlp.init(this@MainActivity)
-                        dev.sparkynox.sparkytube.extractor.PyYtDlp.resolve(videoId)
+                        if (!wantFull) {
+                            dev.sparkynox.sparkytube.extractor.PyYtDlp.init(this@MainActivity)
+                            dev.sparkynox.sparkytube.extractor.PyYtDlp.resolve(videoId)
+                        } else {
+                            // yt-dlp's android clients only hand out the muxed 360p these days, so with
+                            // Data Saver off NewPipe runs next to it and wins if it has higher qualities
+                            // own scope on purpose: python can't be cancelled, so if NewPipe wins we
+                            // don't want to sit and wait for yt-dlp to finish in the background
+                            val dlp = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).async {
+                                dev.sparkynox.sparkytube.extractor.PyYtDlp.init(this@MainActivity)
+                                dev.sparkynox.sparkytube.extractor.PyYtDlp.resolve(videoId)
+                            }
+                            val p = kotlinx.coroutines.withTimeoutOrNull(7000) { StreamExtractor.resolvePlayableUrl(videoId) }
+                            if (p != null && p.availableQualities.any { it.resolutionValue > 360 }) {
+                                dev.sparkynox.sparkytube.logs.LogRecorder.i("Resolve", "NewPipe gave ${p.availableQualities.size} qualities, using it ($videoId)")
+                                p
+                            } else {
+                                dlp.await() ?: p
+                            }
+                        }
                     }
                     val ytMs = android.os.SystemClock.elapsedRealtime() - t0
                     if (viaYtDlp != null) {
