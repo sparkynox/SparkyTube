@@ -87,7 +87,7 @@ object UpdateChecker {
     }
 
     /** Simple semantic-ish version compare, good enough for "1.2.0" style tags. */
-    private fun isNewer(remote: String, local: String): Boolean {
+    fun isNewer(remote: String, local: String): Boolean {
         val r = remote.split(".").mapNotNull { it.toIntOrNull() }
         val l = local.split(".").mapNotNull { it.toIntOrNull() }
         val len = maxOf(r.size, l.size)
