@@ -918,7 +918,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     private fun updateDownloadCard() {
         val card = binding.downloadStatusCard
         val playerOpen = binding.exoPlayerView.visibility == View.VISIBLE &&
-            !isPlayerFullscreen && !isMiniPlayerActive
+            !isPlayerFullscreen && !isMiniPlayerActive && !isInPictureInPictureMode
         if (!playerOpen) {
             if (card.visibility != View.GONE) card.visibility = View.GONE
             return
@@ -3214,6 +3214,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         // in the tiny PIP window and just clutters it -- Android's own
         // PIP chrome supplies its own minimal play/pause control.
         binding.exoPlayerView.useController = !isInPictureInPictureMode
+        setPipLayout(isInPictureInPictureMode)
         if (isInPictureInPictureMode) {
             binding.topBar.visibility = View.GONE
             binding.bottomNav.visibility = View.GONE
@@ -3221,6 +3222,40 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             binding.topBar.visibility = View.VISIBLE
             binding.bottomNav.visibility = View.VISIBLE
         }
+    }
+
+    // the player normally sits in a fixed 220dp box at the top (or zoomed for fullscreen),
+    // inside the tiny pip window that showed only a slice of it. in pip it has to fill
+    // the whole window, uncropped, then go back to whatever it was on exit
+    private fun setPipLayout(inPip: Boolean) {
+        val view = binding.exoPlayerView
+        if (isMiniPlayerActive) return
+        val lp = view.layoutParams
+        val insets = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+        val bars = androidx.core.view.WindowInsetsCompat.Type.systemBars()
+
+        if (inPip) {
+            lp.height = android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+            view.resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+            androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+            insets.hide(bars)
+            // a pinch zoom/pan from before would push the picture out of the small window
+            videoScale = 1f
+            videoTranslationX = 0f
+            videoTranslationY = 0f
+            applyVideoTransform()
+            binding.downloadStatusCard.visibility = View.GONE
+        } else if (isPlayerFullscreen) {
+            lp.height = android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+            view.resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+            insets.hide(bars)
+        } else {
+            lp.height = (220 * resources.displayMetrics.density).toInt()
+            view.resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+            androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, true)
+            insets.show(bars)
+        }
+        view.layoutParams = lp
     }
 
     override fun onPause() {
