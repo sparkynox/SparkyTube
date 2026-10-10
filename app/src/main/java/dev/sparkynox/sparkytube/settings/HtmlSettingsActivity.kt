@@ -11,6 +11,8 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import androidx.webkit.WebViewAssetLoader
 import dev.sparkynox.sparkytube.MainActivity
 import dev.sparkynox.sparkytube.R
@@ -77,6 +79,12 @@ class HtmlSettingsActivity : AppCompatActivity() {
             }
             loadUrl("https://appassets.androidplatform.net/assets/settings.html")
         }
+
+        // so the "System update" row can say up to date / available right away
+        lifecycleScope.launch {
+            dev.sparkynox.sparkytube.update.UpdateManager.checkNow(this@HtmlSettingsActivity)
+            refreshPage()
+        }
     }
 
     override fun onResume() {
@@ -101,6 +109,9 @@ class HtmlSettingsActivity : AppCompatActivity() {
 
     private fun link(id: String, title: String, icon: String, sub: () -> String, run: () -> Unit) =
         Item(id, "link", title, icon, sub = sub, run = run)
+
+    private fun info(id: String, title: String, icon: String, sub: () -> String) =
+        Item(id, "info", title, icon, sub = sub)
 
     private fun open(cls: Class<*>) = startActivity(Intent(this, cls))
 
@@ -141,7 +152,7 @@ class HtmlSettingsActivity : AppCompatActivity() {
                         sub = { "${it}p — applies to new videos as they load" }),
                 toggle("datasaver", "Data Saver Mode", "pulse",
                         "Blocks YouTube telemetry, disables images, starts videos at the lowest quality",
-                        { p.isDataSaverEnabled(this) }, { p.setDataSaverEnabled(this, it) })
+                        { p.isDataSaverEnabled(this) }, { p.setDataSaverEnabled(this, it); StreamExtractor.clearCache() })
             )),
             Section("extraction", "Extraction", "code", "Extractors, local servers and fallbacks", listOf(
                 choice("extractor", "Extractor Method", "code",
@@ -181,12 +192,6 @@ class HtmlSettingsActivity : AppCompatActivity() {
                             } else {
                                 p.setYtDlpFallbackEnabled(this, on)
                             }
-                        }),
-                toggle("ytdlpsaver", "yt-dlp Data Saver", "pulse",
-                        "On: only 360p, small and fast. Off: every quality yt-dlp finds (144p up to 1080p)",
-                        { p.isYtDlpDataSaverEnabled(this) }, {
-                            p.setYtDlpDataSaverEnabled(this, it)
-                            StreamExtractor.clearCache()
                         })
             )),
             Section("downloads", "Downloads", "download", "Queue, progress and offline library", listOf(
@@ -247,11 +252,32 @@ class HtmlSettingsActivity : AppCompatActivity() {
                             }
                         })
             )),
-            Section("app", "App", "file", "Popups, updates and logs", listOf(
+            Section("update", "Update", "refresh", "Updates, notifications and messages", listOf(
+                link("sysupdate", "System update", "refresh", {
+                        val m = dev.sparkynox.sparkytube.update.UpdateManager
+                        val l = m.latest
+                        when {
+                            l != null && m.hasUpdate(this) -> "Version ${l.versionName} is available, tap to update"
+                            l != null -> "Up to date"
+                            else -> "Tap to check"
+                        }
+                    }) { open(dev.sparkynox.sparkytube.update.UpdateActivity::class.java) },
+                info("version", "Version", "file", {
+                        "${dev.sparkynox.sparkytube.update.UpdateManager.installedName(this)} " +
+                            "(${dev.sparkynox.sparkytube.update.UpdateManager.installedCode(this)})"
+                    }),
+                toggle("updater", "Automatic update check", "refresh", "Checks for a new version in the background and when the app opens",
+                        { p.isUpdaterEnabled(this) }, { p.setUpdaterEnabled(this, it) }),
+                toggle("updatenotif", "Update notifications", "bell", "Show a notification when a new version or a message arrives",
+                        { p.isUpdateNotificationsEnabled(this) }, { p.setUpdateNotificationsEnabled(this, it) }),
+                link("messages", "Messages", "file", { "News and notes from the developer" }) {
+                        startActivity(Intent(this, dev.sparkynox.sparkytube.update.UpdateActivity::class.java)
+                            .putExtra(dev.sparkynox.sparkytube.update.UpdateActivity.EXTRA_TAB, "messages"))
+                    }
+            )),
+            Section("app", "App", "file", "Popups and logs", listOf(
                 toggle("popups", "Block all popups", "eyeoff", "Hides the contact-reminder, update, and welcome dialogs",
                         { p.arePopupsBlocked(this) }, { p.setPopupsBlocked(this, it) }),
-                toggle("updater", "Check for updates", "refresh", "Looks for a new SparkyTube version on app open",
-                        { p.isUpdaterEnabled(this) }, { p.setUpdaterEnabled(this, it) }),
                 link("logs", "Logs", "file", {
                         if (dev.sparkynox.sparkytube.logs.LogRecorder.getLastCrash(this) != null) "⚠ Last session crashed — tap to view"
                         else "Session log + crash reports"
