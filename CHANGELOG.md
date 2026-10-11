@@ -17,12 +17,13 @@
 ## Improvements
 
 - **New look for Settings, Update and Plugins**: flat grouped lists, one accent colour, no more glowing gradient cards
-- **Faster resolve, real quality list**: with Data Saver off, NewPipe now runs next to yt-dlp and its list is used when it has more than 360p (yt-dlp's android clients only return the muxed 360p now). Both yt-dlp clients reuse warm instances and run at the same time, and the same video is never resolved twice at once (prefetch + play used to run python twice and each took longer)
+- **Faster resolve, real quality list**: with Data Saver off, NewPipe now runs next to yt-dlp and its list (up to 4K) is used whenever it has more than 360p, it gets up to 12 seconds before falling back to yt-dlp (yt-dlp's android clients only return the muxed 360p now). A 360p-only result is no longer cached, so the next play tries for the full list again. The same video is never resolved twice at once
 - The "Before you message me" popup that appeared on every app open is gone
 - The update popup on app open is replaced by a small bar at the bottom with an Update button, plus a notification
 
 ## Bug Fixes
 
+- **Watch history records the whole video**: the hidden web player is no longer collapsed to 0px (YouTube paused it a few seconds in), it is kept playing muted and follows the native player's pause/play
 - **PiP showed half the video**: the player now fills the whole PiP window and goes back to its normal size when you leave PiP
 - **Data Saver off still gave 360p only**: yt-dlp had its own hidden Data Saver switch that was on by default. It now follows the main Data Saver Mode, and the extra switch is removed from Settings
 
