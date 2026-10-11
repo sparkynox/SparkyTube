@@ -4,102 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 <title>Settings</title>
-<style>
-:root{--font:system-ui,"Roboto","Helvetica Neue",Arial,sans-serif;--ease:cubic-bezier(.2,.8,.2,1);--spring:cubic-bezier(.3,1.5,.5,1)}
-body[data-theme="dark"]{
-  --bg:#0A0A0A;--surface:#141414;--raised:#1C1C1C;--text:#F5F5F5;--text2:#9A9A9A;--line:#262626;
-  --accent:#FF3B3B;--accent2:#FF7A45;--on:#FFFFFF;--glow:rgba(255,59,59,.20);--shadow:0 6px 24px rgba(0,0,0,.45);--track:#33333A;
-}
-body[data-theme="light"]{
-  --bg:#F2F4F7;--surface:#FFFFFF;--raised:#E8EBF0;--text:#121214;--text2:#565B65;--line:#D6DAE1;
-  --accent:#D92626;--accent2:#F0613A;--on:#FFFFFF;--glow:rgba(217,38,38,.16);--shadow:0 6px 24px rgba(18,18,20,.10);--track:#CDD1D9;
-}
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;background:var(--bg);color:var(--text);font:400 16px/1.45 var(--font)}
-svg{display:block}
-.ico{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-
-/* ---------- header ---------- */
-header{position:sticky;top:0;z-index:10;padding:14px 16px 10px;background:linear-gradient(180deg,var(--bg) 70%,transparent);backdrop-filter:blur(8px)}
-header::before{content:"";position:absolute;inset:0 0 -30px 0;background:radial-gradient(90% 120% at 8% 0%,var(--glow),transparent 62%);pointer-events:none;z-index:-1}
-.top{display:flex;align-items:center;gap:6px}
-.back{all:unset;cursor:pointer;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:background .15s,transform .15s}
-.back:active{transform:scale(.9);background:var(--raised)}
-h1{margin:0;font-size:1.75rem;font-weight:800;letter-spacing:-.02em;transition:font-size .25s var(--ease)}
-body.scrolled h1{font-size:1.3rem}
-.seg{margin-left:auto;display:flex;background:var(--raised);border-radius:999px;padding:3px;position:relative}
-.seg button{all:unset;cursor:pointer;position:relative;z-index:1;padding:6px 12px;font-size:.78rem;font-weight:700;border-radius:999px;color:var(--text2);transition:color .2s}
-.seg button.on{color:var(--on)}
-.seg i{position:absolute;top:3px;bottom:3px;right:3px;width:calc(50% - 3px);border-radius:999px;background:linear-gradient(135deg,var(--accent),var(--accent2));transition:transform .3s var(--spring)}
-.search{margin-top:12px;display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:0 12px;height:44px;transition:border-color .2s,box-shadow .2s}
-.search:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--glow)}
-.search .ico{width:18px;height:18px;color:var(--text2)}
-.search input{all:unset;flex:1;font-size:.95rem;color:var(--text)}
-.search input::placeholder{color:var(--text2)}
-
-/* ---------- list ---------- */
-main{padding:6px 16px 90px;max-width:640px;margin:0 auto}
-section{margin-top:22px}
-section h2{margin:0 4px 10px;font-size:.74rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);display:flex;align-items:center;gap:10px}
-section h2::after{content:"";height:1px;flex:1;background:var(--line)}
-.card{position:relative;display:flex;align-items:center;gap:14px;padding:13px 14px;margin-bottom:10px;background:var(--surface);border:1px solid var(--line);border-radius:18px;cursor:pointer;transition:transform .18s var(--ease),border-color .2s,box-shadow .2s;user-select:none}
-.card:active{transform:scale(.982)}
-.card.in{animation:rise .46s var(--ease) both;animation-delay:calc(min(var(--i),16) * 32ms)}
-@keyframes rise{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
-.card.off{opacity:.42;pointer-events:none}
-.tile{flex:none;width:42px;height:42px;border-radius:13px;display:flex;align-items:center;justify-content:center;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 4px 12px var(--glow)}
-.txt{flex:1;min-width:0}
-.t{font-weight:700;font-size:1rem;line-height:1.25}
-.s{margin-top:2px;color:var(--text2);font-size:.86rem;line-height:1.35}
-.val{flex:none;max-width:42%;font-size:.8rem;font-weight:700;padding:5px 10px;border-radius:999px;background:var(--raised);color:var(--text);text-align:center;line-height:1.2}
-.chev{flex:none;color:var(--text2);width:20px;height:20px}
-
-/* switch */
-.sw{flex:none;width:50px;height:30px;border-radius:999px;background:var(--track);position:relative;transition:background .25s}
-.sw::after{content:"";position:absolute;left:3px;top:3px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.35);transition:transform .32s var(--spring)}
-.sw.on{background:linear-gradient(135deg,var(--accent),var(--accent2))}
-.sw.on::after{transform:translateX(20px)}
-
-/* css editor */
-.editor{display:none;margin:-4px 0 12px;padding:14px;background:var(--surface);border:1px solid var(--line);border-radius:18px}
-.editor.open{display:block;animation:rise .35s var(--ease) both}
-.editor textarea{width:100%;min-height:150px;resize:vertical;border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:12px;padding:12px;font:13px/1.45 ui-monospace,Menlo,Consolas,monospace}
-.editor textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--glow)}
-.editor p{margin:8px 0 12px;color:var(--text2);font-size:.82rem}
-.btn{all:unset;cursor:pointer;display:inline-block;padding:11px 20px;border-radius:12px;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));transition:transform .15s}
-.btn:active{transform:scale(.95)}
-
-/* bottom sheet */
-.scrim{position:fixed;inset:0;background:rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .25s;z-index:30}
-.scrim.show{opacity:1;pointer-events:auto}
-.sheet{position:fixed;left:0;right:0;bottom:0;z-index:31;max-width:640px;margin:0 auto;background:var(--surface);border-radius:26px 26px 0 0;padding:10px 16px 24px;transform:translateY(105%);transition:transform .38s var(--ease);box-shadow:var(--shadow);max-height:80vh;overflow:auto}
-.sheet.show{transform:none}
-.grab{width:42px;height:5px;border-radius:3px;background:var(--line);margin:4px auto 14px}
-.sheet h3{margin:0 4px 10px;font-size:1.1rem;font-weight:800}
-.opt{display:flex;align-items:center;gap:12px;padding:14px;border-radius:14px;cursor:pointer;font-weight:600;transition:background .15s}
-.opt:active{background:var(--raised)}
-.opt .dot{flex:none;width:22px;height:22px;border-radius:50%;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;color:transparent;transition:all .2s var(--spring)}
-.opt.sel{background:var(--raised)}
-.opt.sel .dot{border-color:transparent;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;transform:scale(1.08)}
-.opt .dot svg{width:13px;height:13px;stroke-width:3.4}
-
-.toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,30px);opacity:0;background:var(--text);color:var(--bg);padding:10px 18px;border-radius:999px;font-weight:700;font-size:.88rem;transition:all .3s var(--ease);z-index:40;pointer-events:none}
-.toast.show{opacity:1;transform:translate(-50%,0)}
-.empty{display:none;text-align:center;color:var(--text2);margin-top:48px}
-@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-</style>
+<link rel="stylesheet" href="sparky_ui.css">
 </head>
 <body data-theme="dark">
-<header>
-  <div class="top">
+<div class="appbar" id="bar">
+  <div class="line">
     <button class="back" id="back" aria-label="Back"></button>
     <h1 id="title">Settings</h1>
   </div>
   <label class="search"><span id="searchIcon"></span><input id="q" type="search" placeholder="Search settings" autocomplete="off"></label>
-</header>
+</div>
 
 <main id="list"></main>
-<p class="empty" id="empty">Nothing matches that.</p>
+<p class="empty" id="empty" style="display:none">Nothing matches that.</p>
 
 <div class="scrim" id="scrim"></div>
 <div class="sheet" id="sheet" role="dialog" aria-modal="true"><div class="grab"></div><h3 id="sheetTitle"></h3><div id="sheetOpts"></div></div>
@@ -191,7 +108,7 @@ section h2::after{content:"";height:1px;flex:1;background:var(--line)}
     row.options.forEach(function (o) {
       var d = document.createElement("div");
       d.className = "opt" + (o.v === row.value ? " sel" : "");
-      d.innerHTML = '<span class="dot">' + svg("check") + "</span><span></span>";
+      d.innerHTML = '<span class="radio"></span><span></span>';
       d.lastChild.textContent = o.l;
       d.onclick = function () { closeSheet(); if (o.v !== row.value) bridge.set(row.id, o.v); };
       box.appendChild(d);
@@ -204,17 +121,16 @@ section h2::after{content:"";height:1px;flex:1;background:var(--line)}
     return m ? m.l : String(row.value);
   }
 
-  function makeRow(row, idx, animate) {
+  function makeRow(row) {
     var c = document.createElement("div");
-    c.className = "card" + (animate ? " in" : "") + (row.enabled === false ? " off" : "");
-    c.style.setProperty("--i", idx);
+    c.className = "row" + (row.enabled === false ? " off" : "") + (row.type === "info" ? " static" : "");
     c.setAttribute("data-search", (row.title + " " + (row.sub || "")).toLowerCase());
     var right = "";
-    if (row.type === "toggle") right = '<span class="sw' + (row.value ? " on" : "") + '"></span>';
-    else if (row.type === "choice") right = '<span class="val"></span>';
-    else if (row.type === "info") { right = ""; c.style.cursor = "default"; }
+    if (row.type === "toggle") right = '<span class="switch' + (row.value ? " on" : "") + '"></span>';
+    else if (row.type === "choice") right = '<span class="val"></span>' + svg("chev", "chev");
+    else if (row.type === "info") right = "";
     else right = svg("chev", "chev");
-    c.innerHTML = '<span class="tile">' + svg(row.icon) + '</span><span class="txt"><div class="t"></div><div class="s"></div></span>' + right;
+    c.innerHTML = svg(row.icon) + '<div class="txt"><div class="t"></div><div class="s"></div></div>' + right;
     c.querySelector(".t").textContent = row.title;
     c.querySelector(".s").textContent = row.sub || "";
     if (!row.sub) c.querySelector(".s").style.display = "none";
@@ -222,8 +138,7 @@ section h2::after{content:"";height:1px;flex:1;background:var(--line)}
 
     c.onclick = function () {
       if (row.type === "toggle") {
-        var sw = c.querySelector(".sw");
-        sw.classList.toggle("on");               // instant feedback, truth comes back via refresh
+        c.querySelector(".switch").classList.toggle("on");   // instant feedback, truth comes back via refresh
         bridge.set(row.id, String(!row.value));
       } else if (row.type === "choice") {
         openSheet(row);
@@ -231,18 +146,17 @@ section h2::after{content:"";height:1px;flex:1;background:var(--line)}
         cssOpen = !cssOpen;
         var ed = document.getElementById("cssEditor");
         if (ed) ed.classList.toggle("open", cssOpen);
-      } else {
+      } else if (row.type !== "info") {
         bridge.run(row.id);
       }
     };
     return c;
   }
 
-  function makeCat(sec, idx, animate) {
+  function makeCat(sec) {
     var c = document.createElement("div");
-    c.className = "card" + (animate ? " in" : "");
-    c.style.setProperty("--i", idx);
-    c.innerHTML = '<span class="tile">' + svg(sec.icon) + '</span><span class="txt"><div class="t"></div><div class="s"></div></span>' + svg("chev", "chev");
+    c.className = "row";
+    c.innerHTML = svg(sec.icon) + '<div class="txt"><div class="t"></div><div class="s"></div></div>' + svg("chev", "chev");
     c.querySelector(".t").textContent = sec.title;
     c.querySelector(".s").textContent = sec.sub || "";
     c.onclick = function () { openView(sec.key); };
@@ -256,63 +170,64 @@ section h2::after{content:"";height:1px;flex:1;background:var(--line)}
   function openView(key) {
     view = key; cssOpen = false;
     window.scrollTo(0, 0);
-    render(true);
+    render();
   }
 
   // true when it stepped back to the home list, false when already on it
   function goBack() {
     var q = document.getElementById("q");
-    if (query) { q.value = ""; query = ""; render(false); return true; }
-    if (view !== null) { view = null; window.scrollTo(0, 0); render(true); return true; }
+    if (query) { q.value = ""; query = ""; render(); return true; }
+    if (view !== null) { view = null; window.scrollTo(0, 0); render(); return true; }
     return false;
   }
   window.__goBack = goBack;
 
-  function drawRows(s, sec, idx, animate) {
+  function drawRows(g, sec) {
     sec.rows.forEach(function (row) {
-      s.appendChild(makeRow(row, idx++, animate));
+      g.appendChild(makeRow(row));
       if (row.type === "css") {
         var ed = document.createElement("div");
         ed.className = "editor" + (cssOpen ? " open" : ""); ed.id = "cssEditor";
-        ed.innerHTML = '<textarea spellcheck="false" placeholder="/* your css */"></textarea><p>Applied on top of SparkyTube\'s own CSS. Bad CSS can only break the page\'s look, not the app.</p><button class="btn">Save CSS</button>';
+        ed.innerHTML = '<textarea class="field" spellcheck="false" placeholder="/* your css */"></textarea><p>Applied on top of SparkyTube\'s own CSS. Bad CSS can only break the page\'s look, not the app.</p><button class="btn">Save CSS</button>';
         ed.querySelector("textarea").value = row.value || "";
         ed.querySelector(".btn").onclick = function () { bridge.setCss(ed.querySelector("textarea").value); toast("CSS saved"); };
-        s.appendChild(ed);
+        g.appendChild(ed);
       }
     });
-    return idx;
   }
 
-  function render(animate) {
+  function render() {
     var keepY = window.scrollY;
     list.innerHTML = "";
-    var idx = 0;
     var searching = query.trim() !== "";
     var open = view !== null ? findSec(view) : null;
     if (view !== null && !open) view = null;
+    var empty = document.getElementById("empty");
 
     if (searching) {
-      // flat results across every category, same as before
+      // flat results across every category
       titleEl.textContent = "Settings";
       data.forEach(function (sec) {
-        var s = document.createElement("section");
-        var h = document.createElement("h2"); h.textContent = sec.title; s.appendChild(h);
-        idx = drawRows(s, sec, idx, animate);
-        list.appendChild(s);
+        var wrap = document.createElement("section");
+        var h = document.createElement("div"); h.className = "label"; h.textContent = sec.title; wrap.appendChild(h);
+        var g = document.createElement("div"); g.className = "group";
+        drawRows(g, sec);
+        wrap.appendChild(g);
+        list.appendChild(wrap);
       });
       applyFilter();
     } else if (open) {
       titleEl.textContent = open.title;
-      var s2 = document.createElement("section"); s2.style.marginTop = "10px";
-      drawRows(s2, open, 0, animate);
-      list.appendChild(s2);
-      document.getElementById("empty").style.display = "none";
+      var g2 = document.createElement("div"); g2.className = "group";
+      drawRows(g2, open);
+      list.appendChild(g2);
+      empty.style.display = "none";
     } else {
       titleEl.textContent = "Settings";
-      var box = document.createElement("section"); box.style.marginTop = "10px";
-      data.forEach(function (sec, i) { box.appendChild(makeCat(sec, i, animate)); });
-      list.appendChild(box);
-      document.getElementById("empty").style.display = "none";
+      var g3 = document.createElement("div"); g3.className = "group";
+      data.forEach(function (sec) { g3.appendChild(makeCat(sec)); });
+      list.appendChild(g3);
+      empty.style.display = "none";
     }
     window.scrollTo(0, keepY);
   }
@@ -321,16 +236,16 @@ section h2::after{content:"";height:1px;flex:1;background:var(--line)}
     var q = query.trim().toLowerCase(), any = false;
     [].slice.call(list.querySelectorAll("section")).forEach(function (s) {
       var shown = 0;
-      [].slice.call(s.querySelectorAll(".card")).forEach(function (c) {
+      [].slice.call(s.querySelectorAll(".row")).forEach(function (c) {
         var ok = !q || c.getAttribute("data-search").indexOf(q) !== -1;
         c.style.display = ok ? "" : "none"; if (ok) shown++;
       });
-      var ed = s.querySelector(".editor"); if (ed && q) ed.classList.remove("open");
+      var ed = s.querySelector(".editor"); if (ed) { if (q) ed.style.display = "none"; else ed.style.display = ""; }
       s.style.display = shown ? "" : "none"; if (shown) any = true;
     });
     document.getElementById("empty").style.display = any ? "none" : "block";
   }
-  document.getElementById("q").addEventListener("input", function (e) { query = e.target.value; render(false); });
+  document.getElementById("q").addEventListener("input", function (e) { query = e.target.value; render(); });
 
   function load(animate) {
     try { data = JSON.parse(bridge.schema()); } catch (e) { data = []; }
@@ -338,11 +253,11 @@ section h2::after{content:"";height:1px;flex:1;background:var(--line)}
       var first = ""; try { first = bridge.initialSection() || ""; } catch (e) {}
       if (first && findSec(first)) view = first;
     }
-    render(animate);
+    render();
   }
   window.__refresh = function () { load(false); };
 
-  window.addEventListener("scroll", function () { document.body.classList.toggle("scrolled", window.scrollY > 10); }, { passive: true });
+  window.addEventListener("scroll", function () { document.getElementById("bar").classList.toggle("scrolled", window.scrollY > 4); }, { passive: true });
 
   load(true);
 })();
