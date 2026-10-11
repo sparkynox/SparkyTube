@@ -72,7 +72,11 @@
     'body.sparkytube-native-active ytd-player,' +
     'body.sparkytube-native-active ytm-inline-player-renderer,' +
     'body.sparkytube-native-active video' +
-    '{opacity:0 !important; pointer-events:none !important; height:0 !important; min-height:0 !important; max-height:0 !important; overflow:hidden !important;}';
+    // hidden but not collapsed to nothing: a 0px player gets paused by youtube's own
+    // visibility checks after a few seconds, and then history only counts those seconds.
+    // fixed + tiny + transparent takes it out of the page flow (no gap) and keeps it "visible"
+    '{opacity:0 !important; pointer-events:none !important; position:fixed !important; top:0 !important; left:0 !important;' +
+    ' width:2px !important; height:2px !important; min-height:0 !important; max-height:2px !important; overflow:hidden !important; z-index:-1 !important;}';
 
   function injectCssOnce() {
     if (document.getElementById('sparkytube-style')) return;
@@ -131,6 +135,27 @@
     if (!video) return;
     if (!video.muted) video.muted = true;
     if (video.volume !== 0) video.volume = 0;
+  }
+
+  // The hidden web player is only there so youtube records a real watch in history, and
+  // that needs it to actually keep playing. youtube (or the webview) sometimes pauses it a
+  // few seconds in, so every poll tick it gets pushed back to playing, except when it
+  // finished on its own or the native player is paused (then history shouldn't move either).
+  var webHold = false;
+  window.__sparkyWebHold = function (hold) {
+    webHold = !!hold;
+    var v = document.querySelector('video');
+    if (v && webHold && !v.paused) v.pause();
+  };
+
+  function keepWebVideoPlaying(video) {
+    if (!video || webHold || video.ended || video.__sparkyEnded) return;
+    if (!document.body || !document.body.classList.contains('sparkytube-native-active')) return;
+    if (video.paused && video.readyState > 0) {
+      video.muted = true;
+      var p = video.play();
+      if (p && p.catch) p.catch(function () { /* blocked for now, next tick tries again */ });
+    }
   }
 
   function tryAdBackstop() {
@@ -529,10 +554,13 @@
     video.addEventListener('ended', function () {
       // web copy just stops when it finishes, no loop and no autoplay.
       // only exoplayer ending moves to the next video (native side)
+      video.__sparkyEnded = true;
       video.currentTime = 0;
       video.pause();
       cancelWebAutonav();
     });
+    // the same <video> is reused for the next video, so the "finished" flag has to reset
+    video.addEventListener('loadstart', function () { video.__sparkyEnded = false; });
     // Instant reaction to any attempt to un-mute -- the 500ms poll cycle
     // alone left a brief audible window right as an ad started (YouTube's
     // player sometimes resets muted=false internally when a new ad break
@@ -637,6 +665,7 @@
       enforceAlwaysMuted(video);
       restoreVideoIfAdGone(video);
       disableNativeAutoplay();
+      keepWebVideoPlaying(video);
     }
 
     if (window.SparkyBridge && video.src) {
