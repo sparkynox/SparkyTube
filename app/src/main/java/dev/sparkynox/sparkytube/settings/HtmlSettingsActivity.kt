@@ -278,7 +278,7 @@ class HtmlSettingsActivity : AppCompatActivity() {
             Section("app", "App", "file", "Plugins, popups and logs", listOf(
                 toggle("popups", "Block all popups", "eyeoff", "Hides the contact-reminder, update, and welcome dialogs",
                         { p.arePopupsBlocked(this) }, { p.setPopupsBlocked(this, it) }),
-                link("plugins", "Plugins", "layers", { "Install and manage JS plugins" }) {
+                link("plugins", "Plugins", "layers", { "Beta: install and manage JS plugins" }) {
                         open(dev.sparkynox.sparkytube.plugins.PluginsActivity::class.java)
                     },
                 link("logs", "Logs", "file", {
