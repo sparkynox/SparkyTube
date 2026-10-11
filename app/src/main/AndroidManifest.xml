@@ -72,6 +72,11 @@
             android:theme="@style/Theme.SparkyTube.NoActionBar" />
 
         <activity
+            android:name=".plugins.PluginsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.SparkyTube.NoActionBar" />
+
+        <activity
             android:name=".update.UpdateActivity"
             android:exported="false"
             android:theme="@style/Theme.SparkyTube.NoActionBar" />
