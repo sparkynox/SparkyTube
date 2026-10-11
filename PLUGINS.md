@@ -1,4 +1,6 @@
-# SparkyTube plugins
+# SparkyTube plugins (Beta)
+
+Plugins are in beta. The API below can still change between versions.
 
 A plugin is plain JavaScript that runs inside the YouTube page. Install it from
 **Settings > Plugins** (or the ⋮ menu): paste the code, give a https link, or pick a file.
@@ -75,3 +77,11 @@ or other plugins.
 - Plugins only run on youtube.com pages.
 - Each plugin has its own private token, a page script can't call the app on its behalf.
 - Values saved with `sparky.storage` are removed with the plugin.
+
+## Later
+
+Plugins are JS/CSS only for now. Planned for a later version:
+
+- Kotlin/dex style plugins, for things JS can't reach (native screens, the player, settings pages)
+- Image changing support (swap the app's images/icons from a plugin)
+- A plugin store, so plugins can be browsed and installed from the app
