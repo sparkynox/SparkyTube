@@ -275,9 +275,12 @@ class HtmlSettingsActivity : AppCompatActivity() {
                             .putExtra(dev.sparkynox.sparkytube.update.UpdateActivity.EXTRA_TAB, "messages"))
                     }
             )),
-            Section("app", "App", "file", "Popups and logs", listOf(
+            Section("app", "App", "file", "Plugins, popups and logs", listOf(
                 toggle("popups", "Block all popups", "eyeoff", "Hides the contact-reminder, update, and welcome dialogs",
                         { p.arePopupsBlocked(this) }, { p.setPopupsBlocked(this, it) }),
+                link("plugins", "Plugins", "layers", { "Install and manage JS plugins" }) {
+                        open(dev.sparkynox.sparkytube.plugins.PluginsActivity::class.java)
+                    },
                 link("logs", "Logs", "file", {
                         if (dev.sparkynox.sparkytube.logs.LogRecorder.getLastCrash(this) != null) "⚠ Last session crashed — tap to view"
                         else "Session log + crash reports"
