@@ -257,6 +257,13 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                         if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST) {
                             userInitiatedPause = !playWhenReady
                         }
+                        // the hidden web player follows the native one, so history time only
+                        // moves while the video is really playing
+                        webView.post {
+                            webView.evaluateJavascript(
+                                "window.__sparkyWebHold&&window.__sparkyWebHold(${!playWhenReady})", null
+                            )
+                        }
                     }
 
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -2852,7 +2859,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                                 dev.sparkynox.sparkytube.extractor.PyYtDlp.init(this@MainActivity)
                                 dev.sparkynox.sparkytube.extractor.PyYtDlp.resolve(videoId)
                             }
-                            val p = kotlinx.coroutines.withTimeoutOrNull(7000) { StreamExtractor.resolvePlayableUrl(videoId) }
+                            val p = kotlinx.coroutines.withTimeoutOrNull(12000) { StreamExtractor.resolvePlayableUrl(videoId) }
                             if (p != null && p.availableQualities.any { it.resolutionValue > 360 }) {
                                 dev.sparkynox.sparkytube.logs.LogRecorder.i("Resolve", "NewPipe gave ${p.availableQualities.size} qualities, using it ($videoId)")
                                 p
@@ -2863,7 +2870,11 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                     }
                     val ytMs = android.os.SystemClock.elapsedRealtime() - t0
                     if (viaYtDlp != null) {
-                        StreamExtractor.cacheResolved(videoId, viaYtDlp)
+                        // a 360p-only result must not stick in the cache when full quality was
+                        // wanted, the next play should try for the real list again
+                        if (!wantFull || viaYtDlp.availableQualities.any { it.resolutionValue > 360 }) {
+                            StreamExtractor.cacheResolved(videoId, viaYtDlp)
+                        }
                         dev.sparkynox.sparkytube.logs.LogRecorder.i("Resolve", "yt-dlp ok in $ytMs ms ($videoId)")
                         viaYtDlp
                     } else {
