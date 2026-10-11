@@ -109,6 +109,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             maybeSkipSponsorSegment()
             maybeSaveWatchPosition()
             updateDownloadCard()
+            updatePluginSnapshot()
             pollHandler.postDelayed(this, 600)
         }
     }
@@ -259,6 +260,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                     }
 
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
+                        emitPluginEvent(if (isPlaying) "play" else "pause", "{}")
                         // Screen-off during playback bug: Android's normal
                         // sleep timer doesn't know a video is playing
                         // (native ExoPlayer draws to its own SurfaceView,
@@ -303,6 +305,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
                     override fun onPlaybackStateChanged(playbackState: Int) {
                         if (playbackState == Player.STATE_ENDED) {
+                            emitPluginEvent("videoend", "{}")
                             if (isMiniPlayerActive && extractVideoId(webView.url ?: "") != lastResolvedVideoId) {
                                 // WebView is showing Home/Shorts/Subs/etc,
                                 // not this video's watch page anymore — the
@@ -910,6 +913,30 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    // ---- plugin events + the snapshot plugins read through video.info() ----
+    @Volatile private var pluginVideoSnapshot = "{}"
+
+    private fun emitPluginEvent(name: String, dataJson: String) {
+        webView.post {
+            webView.evaluateJavascript(
+                "window.__sparkyPlugins&&window.__sparkyPlugins.emit(${org.json.JSONObject.quote(name)},$dataJson)", null
+            )
+        }
+    }
+
+    // refreshed from the poll loop (main thread), the bridge only reads the string
+    private fun updatePluginSnapshot() {
+        val c = mediaController
+        val j = org.json.JSONObject()
+            .put("videoId", lastResolvedVideoId ?: extractVideoId(webView.url ?: "") ?: "")
+            .put("title", c?.mediaMetadata?.title?.toString() ?: "")
+            .put("position", if (c != null) c.currentPosition / 1000.0 else 0.0)
+            .put("duration", if (c != null && c.duration > 0) c.duration / 1000.0 else 0.0)
+            .put("playing", c?.isPlaying ?: false)
+            .put("native", isNativePlaybackActive)
+        pluginVideoSnapshot = j.toString()
     }
 
     private var lastDownloadCardCheck = 0L
@@ -1610,6 +1637,9 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         items += Shortcut("Update", android.R.drawable.stat_sys_download_done) {
             startActivity(Intent(this, dev.sparkynox.sparkytube.update.UpdateActivity::class.java))
         }
+        items += Shortcut("Plugins", android.R.drawable.ic_menu_add) {
+            startActivity(Intent(this, dev.sparkynox.sparkytube.plugins.PluginsActivity::class.java))
+        }
         items += Shortcut("Logs", android.R.drawable.ic_menu_info_details) {
             startActivity(Intent(this, dev.sparkynox.sparkytube.logs.LogsActivity::class.java))
         }
@@ -2111,6 +2141,21 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
         // Continuous JS <-> Kotlin channel.
         webView.addJavascriptInterface(JsBridge(this), "SparkyBridge")
+        webView.addJavascriptInterface(
+            dev.sparkynox.sparkytube.plugins.PluginBridge(this, object : dev.sparkynox.sparkytube.plugins.PluginBridge.Host {
+                override fun toast(message: String) {
+                    runOnUiThread { android.widget.Toast.makeText(this@MainActivity, message, android.widget.Toast.LENGTH_SHORT).show() }
+                }
+                override fun videoInfoJson(): String = pluginVideoSnapshot
+                override fun downloadCurrent() {
+                    runOnUiThread { showDownloadQualityPicker() }
+                }
+                override fun openUrl(url: String) {
+                    runOnUiThread { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))) }
+                }
+            }),
+            "SparkyPlugins"
+        )
 
         webView.webChromeClient = object : android.webkit.WebChromeClient() {
             override fun onCreateWindow(
@@ -2311,6 +2356,13 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
         view.evaluateJavascript(cssInjectJs, null)
         view.evaluateJavascript(jsPayload, null)
+
+        // plugins: the runtime first, then each plugin on its own (only on youtube pages)
+        if ((view.url ?: "").contains("youtube.com")) {
+            dev.sparkynox.sparkytube.plugins.PluginStore.injectionScripts(this).forEach {
+                view.evaluateJavascript(it, null)
+            }
+        }
 
         // User-supplied CSS from Settings, injected as its own <style> tag
         // AFTER SparkyTube's own so it wins on any selector clash — lets
@@ -2959,6 +3011,10 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             binding.exoPlayerView.visibility = View.VISIBLE
             isNativePlaybackActive = true
             prefetchedForVideoId = null
+            emitPluginEvent(
+                "videostart",
+                org.json.JSONObject().put("videoId", lastResolvedVideoId ?: "").put("title", resolved.title).toString()
+            )
             applyMusicModeVisual()
         }
     }
@@ -3295,6 +3351,12 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         super.onResume()
         webView.onResume()
         webView.resumeTimers()
+        // a plugin was installed/toggled in the plugin screen, load the page again so it applies
+        // (not while a video is playing natively, that would cut it)
+        if (dev.sparkynox.sparkytube.plugins.PluginStore.dirty) {
+            dev.sparkynox.sparkytube.plugins.PluginStore.dirty = false
+            if (!isNativePlaybackActive) webView.reload()
+        }
         // Picks up a Data Saver toggle flipped on the Settings screen
         // while this Activity was paused (Settings is a separate
         // Activity, so it can't reach into this WebView instance
