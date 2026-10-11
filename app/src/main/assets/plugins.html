@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Plugins</title>
+<style>
+:root{--font:system-ui,"Roboto","Helvetica Neue",Arial,sans-serif;--ease:cubic-bezier(.2,.8,.2,1)}
+body[data-theme="dark"]{--bg:#0A0A0A;--surface:#141414;--raised:#1C1C1C;--text:#F5F5F5;--text2:#9A9A9A;--line:#262626;--accent:#FF3B3B;--accent2:#FF7A45;--on:#fff;--glow:rgba(255,59,59,.20);--track:#33333A;--ok:#4ADE80}
+body[data-theme="light"]{--bg:#F2F4F7;--surface:#FFFFFF;--raised:#E8EBF0;--text:#121214;--text2:#565B65;--line:#D6DAE1;--accent:#D92626;--accent2:#F0613A;--on:#fff;--glow:rgba(217,38,38,.16);--track:#CDD1D9;--ok:#15803D}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);font:400 16px/1.45 var(--font)}
+svg{display:block}.ico{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+header{position:sticky;top:0;z-index:10;padding:14px 16px 8px;background:linear-gradient(180deg,var(--bg) 75%,transparent)}
+header::before{content:"";position:absolute;inset:0 0 -30px 0;background:radial-gradient(90% 120% at 8% 0%,var(--glow),transparent 62%);pointer-events:none;z-index:-1}
+.top{display:flex;align-items:center;gap:6px}
+.back{all:unset;cursor:pointer;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.back:active{background:var(--raised)}
+h1{margin:0;font-size:1.6rem;font-weight:800;letter-spacing:-.02em}
+.tabs{display:flex;gap:8px;margin-top:10px}
+.tab{all:unset;cursor:pointer;padding:8px 16px;border-radius:999px;background:var(--surface);border:1px solid var(--line);font-weight:700;font-size:.88rem;color:var(--text2)}
+.tab.on{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent;color:var(--on)}
+main{padding:8px 16px 90px;max-width:640px;margin:0 auto}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:16px;margin-bottom:12px;animation:rise .4s var(--ease) both}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.name{font-weight:800;font-size:1.05rem}.ver{color:var(--text2);font-weight:600;font-size:.8rem;margin-left:6px}
+.sub{color:var(--text2);font-size:.88rem;margin-top:2px}
+.desc{margin-top:8px;font-size:.92rem}
+.head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.chips{margin-top:10px;display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:.7rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:99px;background:var(--raised);color:var(--text2)}
+.chip.p{color:var(--accent)}
+.sw{all:unset;cursor:pointer;flex:none;width:52px;height:30px;border-radius:99px;background:var(--track);position:relative;transition:background .25s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:transform .25s var(--ease)}
+.sw.on{background:linear-gradient(135deg,var(--accent),var(--accent2))}.sw.on::after{transform:translateX(22px)}
+.btn{all:unset;cursor:pointer;display:block;text-align:center;margin-top:12px;padding:12px;border-radius:14px;font-weight:800;color:var(--on);background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 6px 18px var(--glow)}
+.btn:active{transform:scale(.98)}.btn.ghost{background:var(--raised);color:var(--text);box-shadow:none}
+.btn.small{display:inline-block;margin-top:10px;padding:8px 14px;font-size:.85rem}
+.btn[disabled]{opacity:.5;pointer-events:none}
+h2{margin:0 0 4px;font-size:1.02rem}
+textarea,input[type=text]{width:100%;margin-top:10px;background:var(--raised);color:var(--text);border:1px solid var(--line);border-radius:12px;padding:11px;font:inherit;outline:none}
+textarea{min-height:130px;font:.82rem/1.4 ui-monospace,Menlo,Consolas,monospace;resize:vertical}
+.msg{border-radius:14px;padding:12px 14px;margin-bottom:12px;font-weight:600}
+.msg.ok{background:rgba(74,222,128,.14);color:var(--ok)}.msg.bad{background:rgba(255,59,59,.14);color:var(--accent)}
+.empty{text-align:center;color:var(--text2);padding:36px 10px}
+.hide{display:none}.note{color:var(--text2);font-size:.82rem;margin-top:6px}
+</style>
+</head>
+<body data-theme="dark">
+<header>
+  <div class="top">
+    <button class="back" id="back" aria-label="Back"><svg class="ico" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <h1>Plugins</h1>
+  </div>
+  <div class="tabs">
+    <button class="tab on" id="tabList">Installed</button>
+    <button class="tab" id="tabAdd">Add</button>
+  </div>
+</header>
+<main>
+  <div id="banner"></div>
+  <div id="vList"></div>
+  <div id="vAdd" class="hide">
+    <div class="card">
+      <h2>Paste code</h2>
+      <div class="sub">A plugin file that starts with the <b>// ==SparkyPlugin==</b> header.</div>
+      <textarea id="code" spellcheck="false" placeholder="// ==SparkyPlugin==&#10;// @id my-plugin&#10;// @name My plugin&#10;// ==/SparkyPlugin==&#10;sparky.toast('hi');"></textarea>
+      <button class="btn" id="goCode">Install</button>
+    </div>
+    <div class="card">
+      <h2>From a link</h2>
+      <div class="sub">https link to a .js plugin or a .zip bundle.</div>
+      <input type="text" id="url" placeholder="https://..." autocapitalize="off" autocomplete="off">
+      <button class="btn" id="goUrl">Install from link</button>
+    </div>
+    <div class="card">
+      <h2>From a file</h2>
+      <div class="sub">Pick a .js or .zip plugin from your phone.</div>
+      <button class="btn ghost" id="goFile">Choose file</button>
+      <div class="note">Plugins run inside the YouTube page. Install only the ones you trust, the chips on a plugin show what it is allowed to do.</div>
+    </div>
+  </div>
+</main>
+
+<script>
+(function () {
+  var bridge = window.SparkyPluginsUi || {
+    isNight: function () { return matchMedia("(prefers-color-scheme: dark)").matches; },
+    state: function () { return JSON.stringify({ plugins: [{ id: "hide-shorts", name: "Hide Shorts", version: "1.0", author: "you", description: "Hides the Shorts shelf", permissions: ["toast"], enabled: true }], busy: false, message: "", ok: true, seq: 0 }); },
+    setEnabled: function () {}, remove: function () {}, installCode: function () {}, installUrl: function () {}, pickFile: function () {}, openUrl: function () {}, close: function () {}
+  };
+  document.body.setAttribute("data-theme", bridge.isNight() ? "dark" : "light");
+
+  var tab = "list", S = null, last = "", shownSeq = 0, hideBannerAt = 0, hint = "", hintUntil = 0;
+  var vList = document.getElementById("vList"), vAdd = document.getElementById("vAdd"), banner = document.getElementById("banner");
+  var tabL = document.getElementById("tabList"), tabA = document.getElementById("tabAdd");
+
+  function esc(s) { var d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; }
+
+  function drawList() {
+    var p = S.plugins || [];
+    if (!p.length) return '<div class="empty">No plugins yet.<br>Tap <b>Add</b> to install one.</div>';
+    return p.map(function (x) {
+      var chips = '<span class="chip">storage</span>' + (x.permissions || []).map(function (q) { return '<span class="chip p">' + esc(q) + '</span>'; }).join("");
+      return '<div class="card"><div class="head"><div><span class="name">' + esc(x.name) + '</span><span class="ver">' + esc(x.version) + '</span>' +
+        '<div class="sub">' + esc(x.author || "unknown author") + ' · ' + esc(x.id) + '</div></div>' +
+        '<button class="sw' + (x.enabled ? ' on' : '') + '" data-toggle="' + esc(x.id) + '" aria-label="Enable"></button></div>' +
+        (x.description ? '<div class="desc">' + esc(x.description) + '</div>' : '') +
+        '<div class="chips">' + chips + '</div>' +
+        '<button class="btn ghost small" data-remove="' + esc(x.id) + '">Remove</button></div>';
+    }).join("");
+  }
+
+  function render() {
+    tabL.className = "tab" + (tab === "list" ? " on" : "");
+    tabA.className = "tab" + (tab === "add" ? " on" : "");
+    vList.className = tab === "list" ? "" : "hide";
+    vAdd.className = tab === "add" ? "" : "hide";
+
+    var b = "";
+    if (S.busy) b = '<div class="msg ok">Installing…</div>';
+    else if (S.message && Date.now() < hideBannerAt) b = '<div class="msg ' + (S.ok ? 'ok' : 'bad') + '">' + esc(S.message) + '</div>';
+    else if (hint && Date.now() < hintUntil) b = '<div class="msg ok">' + esc(hint) + '</div>';
+    banner.innerHTML = b;
+    ["goCode", "goUrl", "goFile"].forEach(function (id) { document.getElementById(id).disabled = !!S.busy; });
+
+    var h = drawList();
+    if (h !== last) { last = h; vList.innerHTML = h; }
+  }
+
+  function poll() {
+    try { S = JSON.parse(bridge.state()); } catch (e) { return; }
+    if (S.seq !== shownSeq && S.message) {
+      shownSeq = S.seq;
+      hideBannerAt = Date.now() + 6000;
+      if (S.ok) { tab = "list"; document.getElementById("code").value = ""; document.getElementById("url").value = ""; }
+    }
+    render();
+  }
+
+  tabL.onclick = function () { tab = "list"; render(); };
+  tabA.onclick = function () { tab = "add"; render(); };
+  document.getElementById("back").onclick = function () { bridge.close(); };
+  document.getElementById("goCode").onclick = function () {
+    var c = document.getElementById("code").value;
+    if (c.trim()) bridge.installCode(c);
+    setTimeout(poll, 100);
+  };
+  document.getElementById("goUrl").onclick = function () {
+    var u = document.getElementById("url").value;
+    if (u.trim()) bridge.installUrl(u);
+    setTimeout(poll, 100);
+  };
+  document.getElementById("goFile").onclick = function () { bridge.pickFile(); };
+
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("[data-toggle]");
+    if (t) {
+      var id = t.getAttribute("data-toggle"), on = !t.classList.contains("on");
+      bridge.setEnabled(id, on);
+      t.classList.toggle("on", on);
+      hint = "Applies the next time the page loads"; hintUntil = Date.now() + 4000;
+      setTimeout(poll, 150);
+      return;
+    }
+    var r = e.target.closest("[data-remove]");
+    if (r && confirm("Remove this plugin and its saved data?")) {
+      bridge.remove(r.getAttribute("data-remove"));
+      setTimeout(poll, 100);
+    }
+  });
+
+  poll();
+  setInterval(poll, 800);
+})();
+</script>
+</body>
+</html>
