@@ -25,6 +25,12 @@
         android:extractNativeLibs="true">
 
         <activity
+            android:name=".auth.LoginActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.SparkyTube.NoActionBar" />
+
+        <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
@@ -64,6 +70,11 @@
             android:name=".logs.LogsActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout"
+            android:theme="@style/Theme.SparkyTube.NoActionBar" />
+
+        <activity
+            android:name=".settings.SettingsComposeActivity"
+            android:exported="false"
             android:theme="@style/Theme.SparkyTube.NoActionBar" />
 
         <activity
