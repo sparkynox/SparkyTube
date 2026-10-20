@@ -1,4 +1,4 @@
-# ⚡ SparkyTube
+# ⚡ SparkyTube ★
 
 **SparkyTube** is a fast, lightweight, and modern open-source YouTube client built for Android. Enjoy seamless video playback and audio streaming with zero ad interruptions and a clean, user-focused interface.
 
