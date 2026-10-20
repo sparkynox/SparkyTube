@@ -92,6 +92,15 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
+        <!-- Native Home feed, drawn with Compose (ui/HomeFeed.kt, styled after LunoMusic).
+             Hidden by default, MainActivity swaps it against the WebView's visibility; the
+             WebView keeps running invisibly underneath. -->
+        <androidx.compose.ui.platform.ComposeView
+            android:id="@+id/nativeHomeFeedCompose"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
+
         <ProgressBar
             android:id="@+id/loadingSpinner"
             style="?android:attr/progressBarStyleLarge"
@@ -99,31 +108,6 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:indeterminateTint="@color/accent" />
-
-        <!-- v1.9: native (authenticated InnerTube) Home feed with
-             infinite scroll + pull-to-refresh. Hidden by default;
-             toggled from Settings > Native Home Feed. When shown, it
-             sits on top of the WebView (which keeps running invisibly
-             underneath, same "real session lives in the WebView"
-             approach as the rest of the app); MainActivity swaps this
-             vs the WebView's visibility rather than tearing either one
-             down. SwipeRefreshLayout wraps the list so pulling down
-             re-fetches the feed from scratch, same gesture the real
-             YouTube app uses. -->
-        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-            android:id="@+id/nativeHomeFeedSwipeRefresh"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:visibility="gone">
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/nativeHomeFeedList"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:clipToPadding="false"
-                android:paddingTop="8dp"
-                android:paddingBottom="16dp" />
-        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
         <!-- Music/audio mode background thumbnail: sits BEHIND
              exoPlayerView (declared before it, so it's earlier in
@@ -303,106 +287,14 @@
     </FrameLayout>
 
     <!-- Fixed bottom nav — always same position, 4 tabs like official app -->
-    <LinearLayout
+    <!-- Bottom navigation, drawn with Compose (ui/AppHost.kt: AppNavBar) -->
+    <androidx.compose.ui.platform.ComposeView
         android:id="@+id/bottomNav"
         android:layout_width="0dp"
-        android:layout_height="56dp"
-        android:orientation="horizontal"
-        android:background="@color/bg_surface"
-        android:elevation="8dp"
+        android:layout_height="wrap_content"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <LinearLayout
-            android:id="@+id/navHome"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:background="?attr/selectableItemBackgroundBorderless">
-            <ImageView
-                android:layout_width="22dp"
-                android:layout_height="22dp"
-                android:src="@drawable/ic_home"
-                app:tint="@drawable/nav_item_color" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="@string/nav_home"
-                android:textSize="10sp"
-                android:textColor="@drawable/nav_item_color" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/navShorts"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:background="?attr/selectableItemBackgroundBorderless">
-            <ImageView
-                android:layout_width="22dp"
-                android:layout_height="22dp"
-                android:src="@drawable/ic_shorts"
-                app:tint="@drawable/nav_item_color" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="@string/nav_shorts"
-                android:textSize="10sp"
-                android:textColor="@drawable/nav_item_color" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/navSubs"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:background="?attr/selectableItemBackgroundBorderless">
-            <ImageView
-                android:layout_width="22dp"
-                android:layout_height="22dp"
-                android:src="@drawable/ic_subscriptions"
-                app:tint="@drawable/nav_item_color" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="@string/nav_subscriptions"
-                android:textSize="10sp"
-                android:textColor="@drawable/nav_item_color" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/navLibrary"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:background="?attr/selectableItemBackgroundBorderless">
-            <ImageView
-                android:layout_width="22dp"
-                android:layout_height="22dp"
-                android:src="@drawable/ic_library"
-                app:tint="@drawable/nav_item_color" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="@string/nav_library"
-                android:textSize="10sp"
-                android:textColor="@drawable/nav_item_color" />
-        </LinearLayout>
-
-    </LinearLayout>
+        app:layout_constraintEnd_toEndOf="parent" />
 
     <!-- Floating mini-player: shown when the user collapses a video via the
          down-chevron on the full player. Holds the SAME PlayerView instance
