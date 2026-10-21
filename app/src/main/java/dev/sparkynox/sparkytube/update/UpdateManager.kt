@@ -185,6 +185,7 @@ object UpdateManager {
             install(ctx)
             return
         }
+        dev.sparkynox.sparkytube.logs.LogRecorder.i("Update", "download started: ${l.apkUrl}")
         phase = Phase.DOWNLOADING
         error = ""
         downloaded = 0
@@ -198,6 +199,7 @@ object UpdateManager {
             val part = File(dir, target.name + ".part")
             try {
                 http.newCall(Request.Builder().url(l.apkUrl).build()).execute().use { r ->
+                    dev.sparkynox.sparkytube.logs.LogRecorder.i("Update", "apk response: HTTP ${r.code}")
                     if (!r.isSuccessful) throw IllegalStateException("Server said ${r.code}")
                     val body = r.body ?: throw IllegalStateException("Empty response")
                     if (body.contentLength() > 0) total = body.contentLength()
@@ -232,6 +234,7 @@ object UpdateManager {
             } catch (e: Exception) {
                 part.delete()
                 error = e.message ?: "Download failed"
+                dev.sparkynox.sparkytube.logs.LogRecorder.w("Update", "download failed: $error", e)
                 phase = Phase.ERROR
             }
         }
@@ -253,6 +256,7 @@ object UpdateManager {
             return
         }
         error = ""
+        dev.sparkynox.sparkytube.logs.LogRecorder.i("Update", "opening installer for ${f.name}")
         val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", f)
         ctx.startActivity(
             Intent(Intent.ACTION_VIEW)

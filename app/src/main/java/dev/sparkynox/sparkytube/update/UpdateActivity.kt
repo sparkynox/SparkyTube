@@ -91,7 +91,8 @@ private fun UpdateScreen(prompt: Boolean, onCheck: () -> Unit, onClose: () -> Un
         if (UpdateManager.latest == null) onCheck()
         while (true) { delay(400); tick++ }
     }
-    @Suppress("UNUSED_EXPRESSION") tick
+    // reading tick here is what makes the screen redraw with the manager's latest state
+    val redraw = tick
 
     val m = UpdateManager
     val l = m.latest
@@ -101,7 +102,7 @@ private fun UpdateScreen(prompt: Boolean, onCheck: () -> Unit, onClose: () -> Un
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
-            Modifier.fillMaxSize().statusBarsPadding().padding(20.dp),
+            Modifier.fillMaxSize().statusBarsPadding().padding(20.dp).also { if (redraw < 0) Unit },
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
@@ -179,7 +180,10 @@ private fun UpdateScreen(prompt: Boolean, onCheck: () -> Unit, onClose: () -> Un
                 hasUpdate && m.phase == UpdateManager.Phase.READY ->
                     Button(onClick = { m.install(ctx) }, modifier = Modifier.fillMaxWidth()) { Text("Install") }
                 hasUpdate ->
-                    Button(onClick = { m.startDownload(ctx) }, modifier = Modifier.fillMaxWidth()) {
+                    Button(onClick = {
+                        android.widget.Toast.makeText(ctx, "Downloading update…", android.widget.Toast.LENGTH_SHORT).show()
+                        m.startDownload(ctx)
+                    }, modifier = Modifier.fillMaxWidth()) {
                         Text(if (m.phase == UpdateManager.Phase.ERROR) "Try again" else "Update now")
                     }
                 else -> OutlinedButton(
