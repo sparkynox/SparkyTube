@@ -183,6 +183,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     private var histPlayedMs = 0L
     private var histLastTick = 0L
     private var histActiveFor: String? = null
+    private var histLastJs = ""
     private val histHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val histKeepAlive = object : Runnable {
         override fun run() {
@@ -194,19 +195,30 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     private fun historyTick() {
         val c = mediaController ?: return
         val id = lastResolvedVideoId ?: return
-        if (!composeNav() || !dev.sparkynox.sparkytube.auth.Session.loggedIn || isResolving) return
+        if (isResolving) return
+        if (!composeNav()) return
+        if (!dev.sparkynox.sparkytube.auth.Session.loggedIn) {
+            if (histVideoId != id) {
+                histVideoId = id
+                dev.sparkynox.sparkytube.logs.LogRecorder.w("History", "not signed in (no SAPISID cookie), nothing to save")
+            }
+            return
+        }
         val now = android.os.SystemClock.elapsedRealtime()
         if (histVideoId != id) {
             stopHistoryWeb(blank = true)
             histVideoId = id
             histPlayedMs = 0
             histLastTick = now
+            dev.sparkynox.sparkytube.logs.LogRecorder.d("History", "counting played time for $id")
             return
         }
         if (c.isPlaying) histPlayedMs += (now - histLastTick).coerceAtMost(2000)
         histLastTick = now
         if (histActiveFor == null && histPlayedMs >= 30_000 && binding.nativeHomeFeedCompose.visibility == View.VISIBLE) {
             histActiveFor = id
+            histLastJs = ""
+            dev.sparkynox.sparkytube.adblock.AdBlockEngine.historyPlayerActive = true
             dev.sparkynox.sparkytube.logs.LogRecorder.i("History", "30s played, starting background player for $id")
             webView.loadUrl("https://m.youtube.com/watch?v=$id")
             histHandler.removeCallbacks(histKeepAlive)
@@ -229,19 +241,27 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         val pos = (mediaController?.currentPosition ?: 0L) / 1000
         webView.evaluateJavascript(
             "(function(play,pos){try{var v=document.querySelector('video');if(!v)return 'nov';" +
+                "document.body.classList.add('sparkytube-native-active');" +
                 "v.muted=true;v.volume=0;" +
                 "var p=document.getElementById('movie_player')||document.querySelector('.html5-video-player')||document.getElementById('player');" +
                 "try{if(p&&p.setPlaybackQualityRange){p.setPlaybackQualityRange('tiny','tiny');}}catch(e){}" +
                 "if(!window.__sparkyHistSynced&&v.readyState>0){if(pos>3)v.currentTime=pos;window.__sparkyHistSynced=true;}" +
                 "if(play){if(v.paused)v.play();}else{if(!v.paused)v.pause();}" +
-                "return 'ok';}catch(e){return 'err';}})($playing,$pos)",
-            null
-        )
+                "return v.paused?'paused':('playing '+Math.round(v.currentTime)+'s '+v.videoHeight+'p');}catch(e){return 'err';}})($playing,$pos)"
+        ) { r ->
+            // log only when the state changes, so the log stays readable
+            val res = r.orEmpty().replace(Regex("\\d+s"), "Ns")
+            if (res != histLastJs) {
+                histLastJs = res
+                dev.sparkynox.sparkytube.logs.LogRecorder.d("History", "background player: $r (url=${webView.url})")
+            }
+        }
     }
 
     private fun stopHistoryWeb(blank: Boolean) {
         val wasActive = histActiveFor != null
         histActiveFor = null
+        dev.sparkynox.sparkytube.adblock.AdBlockEngine.historyPlayerActive = false
         histHandler.removeCallbacks(histKeepAlive)
         if (wasActive && blank) webView.loadUrl("about:blank")
     }
@@ -1717,24 +1737,34 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
     // --- Top bar: search + quality + overflow (about/support) ---------------------------
 
+    private var topAudio by androidx.compose.runtime.mutableStateOf(false)
+    private var topQuality by androidx.compose.runtime.mutableStateOf(false)
+    private var overflowItems by androidx.compose.runtime.mutableStateOf<List<dev.sparkynox.sparkytube.ui.OverflowItem>?>(null)
+
     private fun setupTopBar() {
-        binding.searchBtn.setOnClickListener { showSearchDialog() }
-        binding.qualityBtn.setOnClickListener { showQualityPicker() }
-        binding.audioTrackBtn.setOnClickListener { showAudioTrackPicker() }
-        binding.settingsBtn.setOnClickListener {
-            startActivity(Intent(this, dev.sparkynox.sparkytube.settings.SettingsActivity::class.java))
+        binding.topBarCompose.setContent {
+            dev.sparkynox.sparkytube.ui.SparkyTheme(fill = false) {
+                dev.sparkynox.sparkytube.ui.TopBar(
+                    showAudio = topAudio,
+                    showQuality = topQuality,
+                    onAudio = { showAudioTrackPicker() },
+                    onQuality = { showQualityPicker() },
+                    onSearch = { showSearchDialog() },
+                    onSettings = {
+                        startActivity(Intent(this, dev.sparkynox.sparkytube.settings.SettingsComposeActivity::class.java))
+                    },
+                    onOverflow = { showOverflowMenu() },
+                )
+                overflowItems?.let { dev.sparkynox.sparkytube.ui.OverflowSheet(it) { overflowItems = null } }
+            }
         }
-        binding.overflowMenuBtn.setOnClickListener { showOverflowMenu(it) }
     }
 
     private class Shortcut(val label: String, val icon: Int, val run: () -> Unit)
 
     // quick-access grid instead of a plain popup, jumps straight into settings pages
     // so nobody has to dig through Settings. toggles (ad block etc) stay out on purpose
-    private fun showOverflowMenu(anchor: View) {
-        val dp = resources.displayMetrics.density
-        val sheet = com.google.android.material.bottomsheet.BottomSheetDialog(this)
-        var closeSheet: () -> Unit = { sheet.dismiss() }
+    private fun showOverflowMenu() {
 
         fun settingsAt(section: String) = {
             startActivity(Intent(this, dev.sparkynox.sparkytube.settings.SettingsComposeActivity::class.java)
@@ -1743,7 +1773,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
         val items = mutableListOf<Shortcut>()
         items += Shortcut("Settings", android.R.drawable.ic_menu_manage) {
-            startActivity(Intent(this, dev.sparkynox.sparkytube.settings.SettingsActivity::class.java))
+            startActivity(Intent(this, dev.sparkynox.sparkytube.settings.SettingsComposeActivity::class.java))
         }
         items += Shortcut("Downloads", R.drawable.ic_download) {
             startActivity(Intent(this, dev.sparkynox.sparkytube.download.DownloadsActivity::class.java))
@@ -1780,48 +1810,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         items += Shortcut("About", R.drawable.ic_about) { showAboutDialog() }
         items += Shortcut("Support", android.R.drawable.btn_star_big_off) { showSupportDialog() }
 
-        val grid = android.widget.GridLayout(this).apply {
-            columnCount = 4
-            setPadding((12 * dp).toInt(), (18 * dp).toInt(), (12 * dp).toInt(), (24 * dp).toInt())
-        }
-        val textColor = androidx.core.content.ContextCompat.getColor(this, R.color.text_primary)
-        val accent = androidx.core.content.ContextCompat.getColor(this, R.color.accent)
-        val cellW = (resources.displayMetrics.widthPixels - (24 * dp).toInt()) / 4
-
-        items.forEach { sc ->
-            val cell = android.widget.LinearLayout(this).apply {
-                orientation = android.widget.LinearLayout.VERTICAL
-                gravity = android.view.Gravity.CENTER_HORIZONTAL
-                setPadding(0, (10 * dp).toInt(), 0, (10 * dp).toInt())
-                isClickable = true
-                val tv = android.util.TypedValue()
-                theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, tv, true)
-                setBackgroundResource(tv.resourceId)
-                setOnClickListener {
-                    closeSheet()
-                    sc.run()
-                }
-            }
-            val icon = android.widget.ImageView(this).apply {
-                setImageResource(sc.icon)
-                setColorFilter(accent)
-                layoutParams = android.widget.LinearLayout.LayoutParams((26 * dp).toInt(), (26 * dp).toInt())
-            }
-            val label = android.widget.TextView(this).apply {
-                text = sc.label
-                setTextColor(textColor)
-                textSize = 12f
-                maxLines = 1
-                gravity = android.view.Gravity.CENTER
-                setPadding(0, (8 * dp).toInt(), 0, 0)
-            }
-            cell.addView(icon)
-            cell.addView(label)
-            grid.addView(cell, android.widget.GridLayout.LayoutParams().apply { width = cellW })
-        }
-
-        sheet.setContentView(grid)
-        sheet.show()
+        overflowItems = items.map { dev.sparkynox.sparkytube.ui.OverflowItem(it.label, it.icon, it.run) }
     }
 
     /**
@@ -2629,7 +2618,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                     nav = nav,
                     home = homeFeedVm,
                     onOpen = { openFeedItem(it) },
-                    onMore = { showFeedDownloadDialog(it) },
+                    onDownload = { showFeedDownloadDialog(it) },
                     onLogin = { startWebViewLogin() },
                     onChannel = { openChannel(it) },
                     onOpenDownloads = {
@@ -3051,7 +3040,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
      */
     private suspend fun resolveStream(videoId: String): StreamExtractor.ResolvedStream? {
         val method = dev.sparkynox.sparkytube.settings.SettingsPrefs.getExtractorMethod(this)
-        val localServerEnabled = dev.sparkynox.sparkytube.settings.SettingsPrefs.isLocalServerEnabled(this)
+        val localServerEnabled = false // local servers were removed from the app
 
         suspend fun tryLocalServer(): StreamExtractor.ResolvedStream? {
             if (!localServerEnabled) return null
@@ -3062,7 +3051,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
         return when (method) {
             dev.sparkynox.sparkytube.settings.SettingsPrefs.ExtractorMethod.LOCAL_SERVER ->
-                tryLocalServer()
+                StreamExtractor.resolvePlayableUrl(videoId) // old setting, local servers are gone
             dev.sparkynox.sparkytube.settings.SettingsPrefs.ExtractorMethod.NEWPIPE ->
                 StreamExtractor.resolvePlayableUrl(videoId)
             dev.sparkynox.sparkytube.settings.SettingsPrefs.ExtractorMethod.YT_DLP -> {
@@ -3200,8 +3189,8 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 // player, which is built for and tested against exactly
                 // this, keep handling it).
                 stopNativePlayback()
-                binding.qualityBtn.visibility = View.GONE
-                binding.audioTrackBtn.visibility = View.GONE
+                topQuality = false
+                topAudio = false
                 currentQualities = emptyList()
                 currentDownloadAudios = emptyList()
                 currentAudioTracks = emptyList()
@@ -3222,12 +3211,12 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
             currentQualityLabel = dataSaverQuality?.label
                 ?: resolved.defaultQualityLabel ?: resolved.availableQualities.firstOrNull()?.label ?: ""
-            binding.qualityBtn.visibility = if (currentQualities.size > 1) View.VISIBLE else View.GONE
+            topQuality = currentQualities.size > 1
 
             currentAudioTracks = resolved.availableAudioTracks
             currentAudioTrackLabel = currentAudioTracks.firstOrNull { it.isOriginal }?.label
                 ?: currentAudioTracks.firstOrNull()?.label ?: ""
-            binding.audioTrackBtn.visibility = if (currentAudioTracks.size > 1) View.VISIBLE else View.GONE
+            topAudio = currentAudioTracks.size > 1
 
             // web <video> stays muted and keeps playing so youtube counts a real
             // watch for history, it only stops by itself when it ends (see injected.js)
@@ -3312,8 +3301,8 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         mediaController?.clearMediaItems()
         binding.exoPlayerView.visibility = View.GONE
         binding.musicModeThumbnail.visibility = View.GONE
-        binding.qualityBtn.visibility = View.GONE
-        binding.audioTrackBtn.visibility = View.GONE
+        topQuality = false
+        topAudio = false
         isNativePlaybackActive = false
         lastResolvedVideoId = null
         currentQualities = emptyList()
