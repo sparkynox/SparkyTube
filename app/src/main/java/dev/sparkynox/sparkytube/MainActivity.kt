@@ -21,6 +21,7 @@ import android.webkit.WebViewClient
 import android.widget.EditText
 import android.widget.LinearLayout
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.viewModels
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -174,9 +175,81 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         val s = total % 60
         return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
     }
+    // ---------- watch history
+    // The real watch page can't be tracked from ExoPlayer, so after 30s of real playback the real
+    // page plays muted at 144p in the hidden WebView (signed in with the same cookies). It mirrors
+    // the native player: plays while ExoPlayer plays, pauses when it pauses, stops when the video changes.
+    private var histVideoId: String? = null
+    private var histPlayedMs = 0L
+    private var histLastTick = 0L
+    private var histActiveFor: String? = null
+    private val histHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val histKeepAlive = object : Runnable {
+        override fun run() {
+            historyKeepAlive()
+            if (histActiveFor != null) histHandler.postDelayed(this, 2000)
+        }
+    }
+
+    private fun historyTick() {
+        val c = mediaController ?: return
+        val id = lastResolvedVideoId ?: return
+        if (!composeNav() || !dev.sparkynox.sparkytube.auth.Session.loggedIn || isResolving) return
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (histVideoId != id) {
+            stopHistoryWeb(blank = true)
+            histVideoId = id
+            histPlayedMs = 0
+            histLastTick = now
+            return
+        }
+        if (c.isPlaying) histPlayedMs += (now - histLastTick).coerceAtMost(2000)
+        histLastTick = now
+        if (histActiveFor == null && histPlayedMs >= 30_000 && binding.nativeHomeFeedCompose.visibility == View.VISIBLE) {
+            histActiveFor = id
+            dev.sparkynox.sparkytube.logs.LogRecorder.i("History", "30s played, starting background player for $id")
+            webView.loadUrl("https://m.youtube.com/watch?v=$id")
+            histHandler.removeCallbacks(histKeepAlive)
+            histHandler.postDelayed(histKeepAlive, 2500)
+        }
+    }
+
+    private fun historyKeepAlive() {
+        val id = histActiveFor ?: return
+        if (id != lastResolvedVideoId || !isNativePlaybackActive) {
+            stopHistoryWeb(blank = true)
+            return
+        }
+        // user opened a channel / Shorts page in the WebView, it belongs to them now
+        if (binding.nativeHomeFeedCompose.visibility != View.VISIBLE) {
+            stopHistoryWeb(blank = false)
+            return
+        }
+        val playing = mediaController?.isPlaying == true
+        val pos = (mediaController?.currentPosition ?: 0L) / 1000
+        webView.evaluateJavascript(
+            "(function(play,pos){try{var v=document.querySelector('video');if(!v)return 'nov';" +
+                "v.muted=true;v.volume=0;" +
+                "var p=document.getElementById('movie_player')||document.querySelector('.html5-video-player')||document.getElementById('player');" +
+                "try{if(p&&p.setPlaybackQualityRange){p.setPlaybackQualityRange('tiny','tiny');}}catch(e){}" +
+                "if(!window.__sparkyHistSynced&&v.readyState>0){if(pos>3)v.currentTime=pos;window.__sparkyHistSynced=true;}" +
+                "if(play){if(v.paused)v.play();}else{if(!v.paused)v.pause();}" +
+                "return 'ok';}catch(e){return 'err';}})($playing,$pos)",
+            null
+        )
+    }
+
+    private fun stopHistoryWeb(blank: Boolean) {
+        val wasActive = histActiveFor != null
+        histActiveFor = null
+        histHandler.removeCallbacks(histKeepAlive)
+        if (wasActive && blank) webView.loadUrl("about:blank")
+    }
+
     private fun maybeSaveWatchPosition() {
         if (!isNativePlaybackActive) return
         updateChapterLabel()
+        historyTick()
         ticksSinceLastPositionSave++
         if (ticksSinceLastPositionSave < 8) return
         ticksSinceLastPositionSave = 0
@@ -321,6 +394,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                                 // advance to. Just close the mini-player.
                                 exitMiniPlayerMode()
                                 stopNativePlayback()
+                                nav.closeWatch()
                             } else {
                                 advanceToNextVideo()
                             }
@@ -1062,10 +1136,14 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         binding.miniPlayerContainer.visibility = View.VISIBLE
         setupMiniPlayerDragging()
 
-        binding.miniPlayerContainer.setOnClickListener { exitMiniPlayerMode() }
+        binding.miniPlayerContainer.setOnClickListener {
+            exitMiniPlayerMode()
+            if (composeNav() && nav.watchId != null) nav.watchVisible = true
+        }
         binding.miniPlayerCloseBtn.setOnClickListener {
             exitMiniPlayerMode()
             stopNativePlayback()
+            nav.closeWatch()
         }
     }
 
@@ -1291,6 +1369,18 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
      * then picks up as a fresh video ID.
      */
     private fun advanceToNextVideo(attempt: Int = 0) {
+        if (composeNav() && browseMode == BrowseMode.YOUTUBE) {
+            // Compose UI: "up next" is the first related video the Watch screen loaded
+            val next = nav.nextVideo()
+            val nextId = next?.videoId
+            if (next != null && nextId != null) {
+                openVideo(nextId, next.title, next.playlistId)
+            } else {
+                stopNativePlayback()
+                nav.closeWatch()
+            }
+            return
+        }
         if (attempt == 0) stopNativePlayback()
         webView.evaluateJavascript(
             "(function(){return window.__sparkyPlayNext ? window.__sparkyPlayNext() : false;})();"
@@ -1335,6 +1425,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
         setupConnectionErrorRetry()
         setupBottomNav()
+        if (composeNav()) showComposeHost()
         setupTopBar()
         setupPlayerZoomGesture()
 
@@ -1362,6 +1453,31 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                     hideSuggestionsPanel()
                     return
                 }
+                if (composeNav() && browseMode == BrowseMode.YOUTUBE) {
+                    when {
+                        loginInProgress -> {
+                            cancelWebViewLogin()
+                            showComposeHost()
+                        }
+                        // the WebView is showing (YouTube settings): back goes to the app, not WebView history
+                        binding.nativeHomeFeedCompose.visibility != View.VISIBLE -> {
+                            if (nav.tab == dev.sparkynox.sparkytube.ui.NavViewModel.Tab.SHORTS) {
+                                nav.tab = dev.sparkynox.sparkytube.ui.NavViewModel.Tab.HOME
+                            }
+                            showComposeHost()
+                        }
+                        nav.watchVisible -> leaveWatch()
+                        nav.pop() -> Unit
+                        nav.tab != dev.sparkynox.sparkytube.ui.NavViewModel.Tab.HOME ->
+                            nav.tab = dev.sparkynox.sparkytube.ui.NavViewModel.Tab.HOME
+                        else -> {
+                            isEnabled = false
+                            onBackPressedDispatcher.onBackPressed()
+                            isEnabled = true
+                        }
+                    }
+                    return
+                }
                 if (isNativePlaybackActive) {
                     stopNativePlayback()
                 }
@@ -1377,6 +1493,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
         dev.sparkynox.sparkytube.settings.YouTubeTheme.apply(this)
         if (intent?.getBooleanExtra(EXTRA_OPEN_YT_SETTINGS, false) == true) {
+            hideNativeHomeFeed()
             webView.loadUrl(YT_SETTINGS_URL)
         } else {
             webView.loadUrl(HOME_URL)
@@ -1395,6 +1512,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         if (intent.getBooleanExtra(EXTRA_OPEN_YT_SETTINGS, false)) {
             browseMode = BrowseMode.YOUTUBE
             binding.bottomNav.visibility = View.VISIBLE
+            hideNativeHomeFeed()
             webView.loadUrl(YT_SETTINGS_URL)
         }
         handleSendIntent(intent)
@@ -1619,8 +1737,8 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         var closeSheet: () -> Unit = { sheet.dismiss() }
 
         fun settingsAt(section: String) = {
-            startActivity(Intent(this, dev.sparkynox.sparkytube.settings.HtmlSettingsActivity::class.java)
-                .putExtra(dev.sparkynox.sparkytube.settings.HtmlSettingsActivity.EXTRA_OPEN_SECTION, section))
+            startActivity(Intent(this, dev.sparkynox.sparkytube.settings.SettingsComposeActivity::class.java)
+                .putExtra(dev.sparkynox.sparkytube.settings.SettingsComposeActivity.EXTRA_OPEN_SECTION, section))
         }
 
         val items = mutableListOf<Shortcut>()
@@ -1639,6 +1757,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         items += Shortcut("YT Settings", android.R.drawable.ic_menu_share) {
             browseMode = BrowseMode.YOUTUBE
             stopNativePlayback()
+            hideNativeHomeFeed()
             webView.loadUrl(YT_SETTINGS_URL)
         }
         items += Shortcut("Update", android.R.drawable.stat_sys_download_done) {
@@ -1719,8 +1838,11 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             stopNativePlayback()
             webView.loadUrl(HOME_URL)
             binding.bottomNav.visibility = View.VISIBLE
+            if (composeNav()) showComposeHost()
         } else {
             stopNativePlayback()
+            nav.closeWatch()
+            hideNativeHomeFeed()
             browseMode = BrowseMode.CRUNCHYROLL
             webView.loadUrl(CRUNCHYROLL_URL)
             // Home/Shorts/Subs/Library only make sense for YouTube — hide
@@ -1729,7 +1851,6 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             // YouTube) sitting on screen.
             binding.bottomNav.visibility = View.GONE
         }
-        highlightNav(binding.navHome)
     }
 
     /**
@@ -1856,7 +1977,11 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             .setView(container)
             .setPositiveButton("Search") { _, _ ->
                 val query = input.text?.toString()?.trim().orEmpty()
-                if (query.isNotEmpty()) {
+                if (query.isNotEmpty() && composeNav() && browseMode == BrowseMode.YOUTUBE) {
+                    leaveWatch()
+                    nav.push("Results for \"$query\"", dev.sparkynox.sparkytube.homefeed.FeedState.Source.Search(query))
+                    showComposeHost()
+                } else if (query.isNotEmpty()) {
                     val encoded = Uri.encode(query)
                     stopNativePlayback()
                     val searchUrl = "https://m.youtube.com/results?search_query=$encoded"
@@ -2047,23 +2172,33 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }
     }
 
-    // checks our update server on app open. no dialog, just a small bar at the bottom
-    // that opens the update screen (the notification comes from UpdateManager)
+    // checks the latest GitHub release when the app opens. A newer version opens the update screen
+    // (with Later), a release marked [force] opens it without a way out
     private fun checkForUpdatesOnce() {
-        if (!dev.sparkynox.sparkytube.settings.SettingsPrefs.isUpdaterEnabled(this)) return
-
         lifecycleScope.launch {
-            dev.sparkynox.sparkytube.update.UpdateManager.backgroundCheck(this@MainActivity)
             val m = dev.sparkynox.sparkytube.update.UpdateManager
-            if (!m.hasUpdate(this@MainActivity) || isFinishing || isDestroyed) return@launch
-            if (dev.sparkynox.sparkytube.settings.SettingsPrefs.arePopupsBlocked(this@MainActivity)) return@launch
-            val l = m.latest ?: return@launch
-            com.google.android.material.snackbar.Snackbar
-                .make(binding.root, "SparkyTube ${l.versionName} is available", com.google.android.material.snackbar.Snackbar.LENGTH_LONG)
-                .setAction("Update") {
-                    startActivity(Intent(this@MainActivity, dev.sparkynox.sparkytube.update.UpdateActivity::class.java))
-                }
-                .show()
+            m.checkNow(this@MainActivity)
+            val l = m.latest
+            if (l == null || !m.hasUpdate(this@MainActivity) || isFinishing || isDestroyed) return@launch
+            val optIn = dev.sparkynox.sparkytube.settings.SettingsPrefs.isUpdaterEnabled(this@MainActivity) &&
+                !dev.sparkynox.sparkytube.settings.SettingsPrefs.arePopupsBlocked(this@MainActivity)
+            if (!l.mandatory && !optIn) return@launch
+            startActivity(
+                Intent(this@MainActivity, dev.sparkynox.sparkytube.update.UpdateActivity::class.java)
+                    .putExtra(dev.sparkynox.sparkytube.update.UpdateActivity.EXTRA_PROMPT, true)
+            )
+        }
+    }
+
+    // coming back from the update screen (or Home) with a mandatory update still pending: show it again
+    private fun reopenForcedUpdate() {
+        val m = dev.sparkynox.sparkytube.update.UpdateManager
+        val l = m.latest ?: return
+        if (l.mandatory && m.hasUpdate(this)) {
+            startActivity(
+                Intent(this, dev.sparkynox.sparkytube.update.UpdateActivity::class.java)
+                    .putExtra(dev.sparkynox.sparkytube.update.UpdateActivity.EXTRA_PROMPT, true)
+            )
         }
     }
 
@@ -2395,42 +2530,45 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     }
 
     private fun setupBottomNav() {
-        highlightNav(binding.navHome)
-
-        binding.navHome.setOnClickListener {
-            navigateToSection(it as LinearLayout, HOME_URL)
-        }
-        binding.navShorts.setOnClickListener {
-            navigateToSection(it as LinearLayout, "https://m.youtube.com/shorts")
-        }
-        binding.navSubs.setOnClickListener {
-            navigateToSection(it as LinearLayout, "https://m.youtube.com/feed/subscriptions")
-        }
-        binding.navLibrary.setOnClickListener {
-            navigateToSection(it as LinearLayout, "https://m.youtube.com/feed/library")
+        binding.bottomNav.setContent {
+            dev.sparkynox.sparkytube.ui.SparkyTheme(fill = false) {
+                dev.sparkynox.sparkytube.ui.AppNavBar(selected = nav.tab, onSelect = { onTabSelected(it) })
+            }
         }
     }
 
-    /**
-     * Only actually reloads the WebView when the tap is a real section
-     * change (different tab, or coming back from Crunchyroll/a video
-     * watch page). Tapping the tab you're already sitting on used to call
-     * webView.loadUrl() unconditionally — a full network refetch and feed
-     * re-render every time, losing scroll position, for a tap that should
-     * just be a no-op (matches the real YouTube app: tapping the current
-     * tab again doesn't reload it). Comparing against webView.url (not
-     * just "which nav button was highlighted") also covers the case where
-     * the user left the section via an in-page link/back-press without
-     * touching the nav bar at all.
-     */
-    private fun navigateToSection(navItem: LinearLayout, targetUrl: String) {
-        highlightNav(navItem)
+    private fun onTabSelected(tab: dev.sparkynox.sparkytube.ui.NavViewModel.Tab) {
+        if (!composeNav()) {
+            // YouTube-skin / custom-HTML feed styles still browse the real site in the WebView
+            nav.tab = tab
+            navigateToSection(
+                when (tab) {
+                    dev.sparkynox.sparkytube.ui.NavViewModel.Tab.HOME -> HOME_URL
+                    dev.sparkynox.sparkytube.ui.NavViewModel.Tab.SHORTS -> "https://m.youtube.com/shorts"
+                    dev.sparkynox.sparkytube.ui.NavViewModel.Tab.SUBS -> "https://m.youtube.com/feed/subscriptions"
+                    dev.sparkynox.sparkytube.ui.NavViewModel.Tab.LIBRARY -> "https://m.youtube.com/feed/library"
+                }
+            )
+            return
+        }
+        cancelWebViewLogin()
+        leaveWatch()
+        nav.pages.clear()
+        nav.tab = tab
+        if (tab == dev.sparkynox.sparkytube.ui.NavViewModel.Tab.SHORTS) {
+            openWebPage("https://m.youtube.com/shorts")
+            return
+        }
+        showComposeHost()
+    }
 
+    /** Legacy path (WebView-based feed styles) -- the Compose UI does not go through here. */
+    private fun navigateToSection(targetUrl: String) {
         if (targetUrl == HOME_URL &&
             dev.sparkynox.sparkytube.settings.SettingsPrefs.isNativeHomeFeedEnabled(this)
         ) {
             when (dev.sparkynox.sparkytube.settings.SettingsPrefs.getFeedStyle(this)) {
-                dev.sparkynox.sparkytube.settings.SettingsPrefs.FeedStyle.KOTLIN_NATIVE -> showNativeHomeFeed()
+                dev.sparkynox.sparkytube.settings.SettingsPrefs.FeedStyle.KOTLIN_NATIVE -> showComposeHost()
                 dev.sparkynox.sparkytube.settings.SettingsPrefs.FeedStyle.YOUTUBE_SKIN -> showYoutubeSkinFeed()
                 dev.sparkynox.sparkytube.settings.SettingsPrefs.FeedStyle.CUSTOM_HTML -> showCustomHtmlFeed()
             }
@@ -2441,20 +2579,14 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
         val alreadyThere = browseMode == BrowseMode.YOUTUBE &&
             webView.url?.trimEnd('/') == targetUrl.trimEnd('/')
-
         if (alreadyThere) return
 
-        // While mini-player is active, playback should survive the tab
-        // switch (that's the whole point of collapsing it) — only the
-        // X button on the mini-player itself should stop it.
-        if (!isMiniPlayerActive) {
-            stopNativePlayback()
-        }
+        // the mini-player keeps playing across tab switches, only its X stops it
+        if (!isMiniPlayerActive) stopNativePlayback()
         browseMode = BrowseMode.YOUTUBE
         webView.loadUrl(targetUrl)
     }
 
-    private var nativeFeedAdapter: dev.sparkynox.sparkytube.homefeed.NativeFeedAdapter? = null
     private val assetLoader by lazy {
         androidx.webkit.WebViewAssetLoader.Builder()
             .addPathHandler("/assets/", androidx.webkit.WebViewAssetLoader.AssetsPathHandler(this))
@@ -2467,135 +2599,239 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         } catch (e: Exception) { null }
     }
 
+    private val homeFeedVm: dev.sparkynox.sparkytube.homefeed.HomeFeedViewModel by viewModels()
+    private val nav: dev.sparkynox.sparkytube.ui.NavViewModel by viewModels()
+    private var composeHostReady = false
+
+    // LoginActivity returns RESULT_OK once the session (cookie + visitor data) is stored
+    private val loginLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        if (r.resultCode == android.app.Activity.RESULT_OK) homeFeedVm.onLoggedIn()
+    }
+
+    /** True when the Compose UI owns navigation (the default "native" feed style). */
+    private fun composeNav(): Boolean =
+        dev.sparkynox.sparkytube.settings.SettingsPrefs.isNativeHomeFeedEnabled(this) &&
+            dev.sparkynox.sparkytube.settings.SettingsPrefs.getFeedStyle(this) ==
+            dev.sparkynox.sparkytube.settings.SettingsPrefs.FeedStyle.KOTLIN_NATIVE
+
     /**
-     * Shows the RecyclerView on top of the (still-running, invisible)
-     * WebView and kicks off an InnerTube fetch. The WebView is left
-     * alone rather than torn down -- same reasoning as the old
-     * native-feed system that was removed in v1.7 for Home/Search/Subs:
-     * it's still the thing holding the real logged-in session
-     * (CookieManager), just not what's currently on screen.
+     * Shows the Compose UI (ui/AppHost.kt) over the WebView, which keeps running invisibly: it still
+     * holds the cookie jar and the ad blocker, and Crunchyroll mode / YouTube settings still use it.
+     * Nothing the user taps in Compose goes through the WebView any more, so the 600ms URL poller is
+     * switched off while this is the active UI (see checkCurrentUrlForVideo).
      */
-    private fun showNativeHomeFeed() {
-        if (nativeFeedAdapter == null) {
-            nativeFeedAdapter = dev.sparkynox.sparkytube.homefeed.NativeFeedAdapter(
-                onItemClick = { item ->
-                    hideNativeHomeFeed()
-                    browseMode = BrowseMode.YOUTUBE
-
-                    if (item.videoId != null) {
-                        // Plain video, or a Mix/Playlist card that happened to
-                        // expose its first track's id directly -- play it
-                        // right away, same as before.
-                        webView.loadUrl("https://m.youtube.com/watch?v=${item.videoId}")
-                        lastResolvedVideoId = null
-                        resolveAndPlayNative(item.videoId, fallbackTitle = item.title)
-                    } else if (item.playlistId != null) {
-                        // Mix/Playlist card with no first-track id exposed --
-                        // this was the actual tap-does-nothing bug: these
-                        // cards used to build "watch?v=null" and silently
-                        // fail. Load the playlist page itself in the WebView
-                        // instead; the URL poller picks up whatever video
-                        // YouTube resolves as the first track from there, the
-                        // same way tapping this card on the real site would.
-                        webView.loadUrl("https://m.youtube.com/playlist?list=${item.playlistId}")
-                    } else {
-                        android.widget.Toast.makeText(this, "Couldn't open this item", android.widget.Toast.LENGTH_SHORT).show()
-                    }
-                },
-                onItemLongClick = { item -> showFeedDownloadDialog(item) }
-            )
-            binding.nativeHomeFeedList.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
-            binding.nativeHomeFeedList.adapter = nativeFeedAdapter
-
-            // Infinite scroll: fires loadMoreNativeFeed() a few rows
-            // before the actual end so the next batch is usually ready
-            // by the time the user scrolls that far, same pattern any
-            // infinite-scroll feed uses. Previously the feed just stopped
-            // dead after the first batch since nothing ever asked for
-            // more -- this is the pagination fix.
-            binding.nativeHomeFeedList.addOnScrollListener(object : androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
-                override fun onScrolled(recyclerView: androidx.recyclerview.widget.RecyclerView, dx: Int, dy: Int) {
-                    if (dy <= 0) return
-                    val layoutManager = recyclerView.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager ?: return
-                    val lastVisible = layoutManager.findLastVisibleItemPosition()
-                    val totalCount = layoutManager.itemCount
-                    if (lastVisible >= totalCount - 6) {
-                        loadMoreNativeFeed()
-                    }
-                }
-            })
-
-            binding.nativeHomeFeedSwipeRefresh.setColorSchemeResources(R.color.accent)
-            binding.nativeHomeFeedSwipeRefresh.setOnRefreshListener {
-                fetchAndPopulateNativeFeed(showSpinner = false)
+    private fun ensureComposeHost() {
+        if (composeHostReady) return
+        composeHostReady = true
+        binding.nativeHomeFeedCompose.setContent {
+            dev.sparkynox.sparkytube.ui.SparkyTheme {
+                dev.sparkynox.sparkytube.ui.AppHost(
+                    nav = nav,
+                    home = homeFeedVm,
+                    onOpen = { openFeedItem(it) },
+                    onMore = { showFeedDownloadDialog(it) },
+                    onLogin = { startWebViewLogin() },
+                    onChannel = { openChannel(it) },
+                    onOpenDownloads = {
+                        startActivity(Intent(this, dev.sparkynox.sparkytube.download.OfflineLibraryActivity::class.java))
+                    },
+                )
             }
         }
+    }
 
-        binding.nativeHomeFeedSwipeRefresh.visibility = View.VISIBLE
+    private fun showComposeHost() {
+        ensureComposeHost()
+        // a Short or channel page may still be playing in the WebView, stop it before hiding
+        if (webView.visibility == View.VISIBLE) {
+            webView.evaluateJavascript("document.querySelectorAll('video').forEach(function(v){v.pause()})", null)
+        }
+        binding.nativeHomeFeedCompose.visibility = View.VISIBLE
         webView.visibility = View.INVISIBLE
-        nativeFeedContinuationToken = null
-        isLoadingMoreNativeFeed = false
-
-        fetchAndPopulateNativeFeed(showSpinner = true)
     }
 
-    /**
-     * Shared fetch-and-populate for both the initial feed load (spinner)
-     * and pull-to-refresh (SwipeRefreshLayout's own spinner instead).
-     */
-    private fun fetchAndPopulateNativeFeed(showSpinner: Boolean) {
-        if (showSpinner) binding.loadingSpinner.visibility = View.VISIBLE
+    // Shorts and channel pages are YouTube's own mobile pages (real HTML5 player, subscribe, tabs).
+    // Back or any tab goes back to the Compose screens.
+    private fun openWebPage(url: String) {
+        if (browseMode != BrowseMode.YOUTUBE) return
+        cancelWebViewLogin()
+        stopHistoryWeb(blank = false)
+        leaveWatch()
+        hideNativeHomeFeed()
+        webView.loadUrl(url)
+    }
 
-        lifecycleScope.launch {
-            val result = dev.sparkynox.sparkytube.homefeed.InnerTubeClient.fetchHomeFeed()
+    private fun openChannel(channelId: String) = openWebPage("https://m.youtube.com/channel/$channelId")
+
+    private fun openFeedItem(item: dev.sparkynox.sparkytube.homefeed.HomeFeedItem) {
+        val videoId = item.videoId
+        val playlistId = item.playlistId
+        if (videoId != null && item.isShort) {
+            openWebPage("https://m.youtube.com/shorts/$videoId")
+        } else if (videoId != null) {
+            openVideo(videoId, item.title, playlistId)
+        } else if (playlistId != null) {
+            nav.push(
+                item.title.ifBlank { "Playlist" },
+                dev.sparkynox.sparkytube.homefeed.FeedState.Source.Browse("VL$playlistId")
+            )
+        } else {
+            android.widget.Toast.makeText(this, "Couldn't open this item", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun openVideo(videoId: String, title: String, playlistId: String? = null) {
+        nav.openWatch(videoId, title, playlistId)
+        if (videoId == lastResolvedVideoId && isNativePlaybackActive) {
+            // already playing (e.g. from the mini-player), just bring it back up
+            if (isMiniPlayerActive) exitMiniPlayerMode()
+            return
+        }
+        lastResolvedVideoId = null
+        resolveAndPlayNative(videoId, fallbackTitle = title)
+    }
+
+    /** Back / tab switch / search while a video is open: collapse it to the mini-player, like the YouTube app. */
+    private fun leaveWatch() {
+        if (!nav.watchVisible) return
+        nav.watchVisible = false
+        if (isNativePlaybackActive) {
+            enterMiniPlayerMode()
+            if (!isMiniPlayerActive) {
+                stopNativePlayback()
+                nav.closeWatch()
+            }
+        } else {
+            // still resolving the stream: drop it
+            resolveGeneration++
+            isResolving = false
             binding.loadingSpinner.visibility = View.GONE
-            binding.nativeHomeFeedSwipeRefresh.isRefreshing = false
-
-            if (!result.isLoggedIn) {
-                // No session yet, or the InnerTube request failed --
-                // fall back to the normal WebView Home feed rather than
-                // showing an empty native screen. This is the expected
-                // path for anyone who hasn't logged into YouTube at all.
-                hideNativeHomeFeed()
-                browseMode = BrowseMode.YOUTUBE
-                webView.loadUrl(HOME_URL)
-                android.widget.Toast.makeText(
-                    this@MainActivity,
-                    "Native Home Feed needs a YouTube login — showing the regular feed instead",
-                    android.widget.Toast.LENGTH_LONG
-                ).show()
-                return@launch
-            }
-
-            nativeFeedContinuationToken = result.continuationToken
-            nativeFeedAdapter?.submitItems(result.items)
+            nav.closeWatch()
         }
     }
 
-    private var nativeFeedContinuationToken: String? = null
-    private var isLoadingMoreNativeFeed = false
+    // ---------- login: through the main WebView, exactly like the old (non-Compose) app
+    //
+    // A separate login screen kept getting stuck on Google's identifier page, while the main WebView
+    // (the one the whole app browses with) signs in fine. So login simply shows that WebView on
+    // YouTube's sign-in page, and a watcher waits for the YouTube cookies to appear in the shared
+    // CookieManager. auth/Session reads that same jar, so nothing has to be copied around.
+    private var loginInProgress = false
+    private var loginTicks = 0
+    private val loginHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    // the signed-out Library page has YouTube's own Sign in button, that link starts a proper Google flow
+    private val loginUrl = "https://m.youtube.com/feed/library"
+    private val loginFallbackUrl =
+        "https://accounts.google.com/ServiceLogin?service=youtube&uilel=3&passive=true&continue=" +
+            "https%3A%2F%2Fm.youtube.com%2Ffeed%2Flibrary"
+    private val clickSignInJs =
+        "(function(){try{var a=document.querySelector('a[href*=\"accounts.google.com\"]');" +
+            "if(a){location.href=a.href;return 'go';}return '';}catch(e){return '';}})()"
+    private val loginConfigJs =
+        "(function(){try{var g=function(k){try{return window.ytcfg.get(k)}catch(e){return null}};" +
+            "return JSON.stringify({v:g('VISITOR_DATA')||'',d:g('DATASYNC_ID')||'',c:g('INNERTUBE_CLIENT_VERSION')||''});}" +
+            "catch(e){return '';}})()"
+
+    private val loginWatcher = object : Runnable {
+        override fun run() {
+            if (!loginInProgress) return
+            checkLoginDone()
+            loginHandler.postDelayed(this, 800)
+        }
+    }
+
+    private fun startWebViewLogin() {
+        if (browseMode != BrowseMode.YOUTUBE) return
+        leaveWatch()
+        loginInProgress = true
+        loginTicks = 0
+        loginNavTries = 0
+        hideNativeHomeFeed() // shows the WebView
+        webView.loadUrl(loginUrl)
+        dev.sparkynox.sparkytube.logs.LogRecorder.i("Login", "login started in the main WebView")
+        android.widget.Toast.makeText(this, "Sign in to YouTube. You'll come back here automatically.", android.widget.Toast.LENGTH_LONG).show()
+        loginHandler.removeCallbacks(loginWatcher)
+        loginHandler.postDelayed(loginWatcher, 1000)
+    }
+
+    private fun cancelWebViewLogin() {
+        loginInProgress = false
+        loginHandler.removeCallbacks(loginWatcher)
+    }
+
+    private var loginNavTries = 0
+
+    private fun checkLoginDone() {
+        val cm = android.webkit.CookieManager.getInstance()
+        val cookie = cm.getCookie(dev.sparkynox.sparkytube.auth.Session.ORIGIN)
+        if (cookie == null || !cookie.contains("SAPISID=")) {
+            // still on the signed-out Library page: press its Sign in link for the user
+            val u = webView.url.orEmpty()
+            if (u.startsWith("https://m.youtube.com/feed/library")) {
+                loginNavTries++
+                if (loginNavTries == 12) {
+                    webView.loadUrl(loginFallbackUrl)
+                } else if (loginNavTries < 12) {
+                    webView.evaluateJavascript(clickSignInJs, null)
+                }
+            }
+            return
+        }
+        // wait until Google has sent us back to YouTube so ytcfg (visitor data etc.) exists
+        val url = webView.url ?: return
+        if (!url.startsWith("https://m.youtube.com") && !url.startsWith("https://www.youtube.com")) return
+
+        loginTicks++
+        webView.evaluateJavascript(loginConfigJs) { raw ->
+            if (!loginInProgress) return@evaluateJavascript
+            val cfg = runCatching {
+                org.json.JSONObject(org.json.JSONTokener(raw).nextValue() as String)
+            }.getOrNull()
+            val visitor = cfg?.optString("v").orEmpty()
+            // ytcfg can lag a moment behind the page; after ~6s go on without it (it is optional)
+            if (visitor.isEmpty() && loginTicks < 8) return@evaluateJavascript
+
+            cancelWebViewLogin()
+            dev.sparkynox.sparkytube.auth.Session.save(
+                cookie = cm.getCookie(dev.sparkynox.sparkytube.auth.Session.ORIGIN) ?: cookie,
+                visitor = visitor,
+                sync = cfg?.optString("d").orEmpty().substringBefore("||"),
+                clientVersion = cfg?.optString("c").orEmpty(),
+            )
+            cm.flush()
+            dev.sparkynox.sparkytube.logs.LogRecorder.i("Login", "signed in, session saved (visitor data: ${visitor.isNotEmpty()})")
+            nav.pages.clear()
+            nav.tab = dev.sparkynox.sparkytube.ui.NavViewModel.Tab.HOME
+            homeFeedVm.onLoggedIn()
+            showComposeHost()
+        }
+    }
+
+    private var multiTouchGuard = false
 
     /**
-     * Fetches and appends the next batch using the continuation token
-     * from the last fetch -- this is what makes the feed's scroll
-     * genuinely infinite instead of stopping after one screenful.
-     * isLoadingMoreNativeFeed guards against the scroll listener firing
-     * this multiple times before the first request even finishes (easy
-     * to trigger with a fast fling).
+     * Three-finger gestures (the system screenshot swipe) used to land on the video card under the
+     * fingers and count as a tap. When a third finger goes down the children get a CANCEL and the
+     * rest of that gesture is swallowed. Two-finger pinch-zoom on the player is unaffected.
      */
-    private fun loadMoreNativeFeed() {
-        val token = nativeFeedContinuationToken ?: return
-        if (isLoadingMoreNativeFeed) return
-        isLoadingMoreNativeFeed = true
-
-        lifecycleScope.launch {
-            val result = dev.sparkynox.sparkytube.homefeed.InnerTubeClient.fetchHomeFeedContinuation(token)
-            isLoadingMoreNativeFeed = false
-            nativeFeedContinuationToken = result.continuationToken
-            if (result.items.isNotEmpty()) {
-                nativeFeedAdapter?.appendItems(result.items)
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        when (ev.actionMasked) {
+            android.view.MotionEvent.ACTION_DOWN -> multiTouchGuard = false
+            android.view.MotionEvent.ACTION_POINTER_DOWN -> if (ev.pointerCount >= 3 && !multiTouchGuard) {
+                multiTouchGuard = true
+                val cancel = android.view.MotionEvent.obtain(ev)
+                cancel.action = android.view.MotionEvent.ACTION_CANCEL
+                super.dispatchTouchEvent(cancel)
+                cancel.recycle()
+                return true
+            }
+            android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> if (multiTouchGuard) {
+                multiTouchGuard = false
+                return true
             }
         }
+        if (multiTouchGuard) return true
+        return super.dispatchTouchEvent(ev)
     }
 
     /**
@@ -2709,14 +2945,8 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     }
 
     private fun hideNativeHomeFeed() {
-        binding.nativeHomeFeedSwipeRefresh.visibility = View.GONE
+        binding.nativeHomeFeedCompose.visibility = View.GONE
         webView.visibility = View.VISIBLE
-    }
-
-    private fun highlightNav(selected: LinearLayout) {
-        listOf(binding.navHome, binding.navShorts, binding.navSubs, binding.navLibrary).forEach {
-            it.isSelected = (it == selected)
-        }
     }
 
     /**
@@ -3185,6 +3415,20 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         val remaining = duration - position
         if (remaining > 20_000) return // not close enough to the end yet
 
+        if (composeNav() && browseMode == BrowseMode.YOUTUBE) {
+            val nextId = nav.nextVideo()?.videoId
+            if (nextId != null && nextId != prefetchedForVideoId) {
+                prefetchedForVideoId = nextId
+                if (dev.sparkynox.sparkytube.settings.SettingsPrefs.getExtractorMethod(this) ==
+                    dev.sparkynox.sparkytube.settings.SettingsPrefs.ExtractorMethod.YT_DLP
+                ) {
+                    prefetchViaYtDlp(nextId)
+                } else {
+                    StreamExtractor.prefetch(nextId, lifecycleScope)
+                }
+            }
+            return
+        }
         webView.evaluateJavascript(
             "(function(){return window.__sparkyPredictNextVideoId ? window.__sparkyPredictNextVideoId() : null;})();"
         ) { rawResult ->
@@ -3205,6 +3449,20 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
     private fun checkCurrentUrlForVideo() {
         if (browseMode != BrowseMode.YOUTUBE) return
+        // The Compose UI opens videos itself. The one exception is the WebView being shown (channel page):
+        // a video tapped there is handed to the native player and the page steps back.
+        if (composeNav()) {
+            if (binding.nativeHomeFeedCompose.visibility != View.VISIBLE && !loginInProgress) {
+                val id = webView.url?.let { extractVideoId(it) }
+                if (id != null) {
+                    webView.evaluateJavascript("document.querySelectorAll('video').forEach(function(v){v.pause()})", null)
+                    if (webView.canGoBack()) webView.goBack()
+                    showComposeHost()
+                    openVideo(id, "")
+                }
+            }
+            return
+        }
         val currentUrl = webView.url ?: return
         val videoId = extractVideoId(currentUrl)
 
@@ -3359,6 +3617,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     }
 
     override fun onResume() {
+        reopenForcedUpdate()
         super.onResume()
         webView.onResume()
         webView.resumeTimers()
