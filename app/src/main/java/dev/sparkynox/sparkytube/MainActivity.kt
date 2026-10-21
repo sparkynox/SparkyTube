@@ -27,6 +27,8 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.media3.common.Player
 import coil.load
 import androidx.media3.session.MediaController
