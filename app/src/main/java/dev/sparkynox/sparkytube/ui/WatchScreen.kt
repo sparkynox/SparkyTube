@@ -13,6 +13,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
@@ -56,6 +57,7 @@ import dev.sparkynox.sparkytube.homefeed.HomeFeedItem
 fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (HomeFeedItem) -> Unit) {
     val info = nav.watchInfo
     val openChannel = LocalOpenChannel.current
+    val openMenu = LocalOpenMenu.current
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     // 0 none, 1 liked, 2 disliked. YouTube's current state isn't read, so it starts neutral
@@ -170,6 +172,19 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
                             ctx.startActivity(Intent.createChooser(send, "Share").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                         }
                     }) { Text("Share") }
+                    FilledTonalButton(onClick = {
+                        if (vid != null) openMenu(
+                            dev.sparkynox.sparkytube.homefeed.HomeFeedItem(
+                                videoId = vid, playlistId = null,
+                                title = info?.title ?: nav.watchTitle,
+                                channelName = info?.channelName ?: "",
+                                thumbnailUrl = "https://i.ytimg.com/vi/$vid/hqdefault.jpg",
+                                channelAvatarUrl = info?.channelAvatar,
+                                durationText = "", viewCountText = "",
+                                channelId = info?.channelId,
+                            )
+                        )
+                    }) { Text("More") }
                 }
             }
 
@@ -186,6 +201,38 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = if (expanded) Int.MAX_VALUE else 3, overflow = TextOverflow.Ellipsis,
                     )
+                }
+            }
+
+            if (nav.userQueue.isNotEmpty()) {
+                item(key = "uq-title") {
+                    Text(
+                        "Your queue (${nav.userQueue.size})",
+                        Modifier.padding(horizontal = 16.dp),
+                        style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                items(nav.userQueue.toList(), key = { "uq-" + it.videoId }) { q ->
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 12.dp).clip(RoundedCornerShape(14.dp))
+                            .clickable { onOpen(q) }.padding(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        AsyncImage(
+                            q.thumbnailUrl, q.title,
+                            Modifier.width(112.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(10.dp)),
+                            contentScale = ContentScale.Crop,
+                        )
+                        Column(Modifier.weight(1f)) {
+                            Text(q.title, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                q.channelName, style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        TextButton(onClick = { nav.userQueue.remove(q) }) { Text("Remove") }
+                    }
                 }
             }
 

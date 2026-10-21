@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -56,6 +58,7 @@ import coil.compose.AsyncImage
 import dev.sparkynox.sparkytube.R
 import dev.sparkynox.sparkytube.homefeed.FeedState
 import dev.sparkynox.sparkytube.homefeed.HomeFeedItem
+import dev.sparkynox.sparkytube.homefeed.HiddenVideos
 import dev.sparkynox.sparkytube.homefeed.HomeFeedViewModel
 import dev.sparkynox.sparkytube.homefeed.InnerTubeClient
 
@@ -71,12 +74,14 @@ fun AppHost(
     nav: NavViewModel,
     home: HomeFeedViewModel,
     onOpen: (HomeFeedItem) -> Unit,
-    onMore: (HomeFeedItem) -> Unit,
+    onDownload: (HomeFeedItem) -> Unit,
     onLogin: () -> Unit,
     onOpenDownloads: () -> Unit,
     onChannel: (String) -> Unit = {},
 ) {
-    CompositionLocalProvider(LocalOpenChannel provides onChannel) {
+    var menuItem by remember { mutableStateOf<HomeFeedItem?>(null) }
+    val onMore: (HomeFeedItem) -> Unit = { menuItem = it }
+    CompositionLocalProvider(LocalOpenChannel provides onChannel, LocalOpenMenu provides onMore) {
     Box(Modifier.fillMaxSize()) {
         val page = nav.pages.lastOrNull()
         if (page != null) {
@@ -118,6 +123,7 @@ fun AppHost(
         }
 
         if (nav.watchVisible) WatchScreen(nav, onOpen = onOpen, onMore = onMore)
+        menuItem?.let { VideoMenuSheet(it, nav, onDownload, onDismiss = { menuItem = null }) }
     }
     }
 }
@@ -192,7 +198,7 @@ fun FeedScreen(
                         style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                items(state.items, key = { it.videoId ?: it.playlistId ?: it.title }) { item ->
+                items(HiddenVideos.visible(state.items), key = { it.videoId ?: it.playlistId ?: it.title }) { item ->
                     VideoCard(item, onOpen = { onOpen(item) }, onMore = { onMore(item) })
                 }
                 if (state.loadingMore) item(key = "more") {

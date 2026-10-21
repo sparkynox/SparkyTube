@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -116,7 +117,7 @@ fun HomeFeedScreen(
                 if (vm.items.isEmpty()) item(key = "error") { ErrorCard(msg) { vm.refresh() } }
             }
 
-            items(vm.items, key = { it.videoId ?: it.playlistId ?: it.title }) { item ->
+            items(dev.sparkynox.sparkytube.homefeed.HiddenVideos.visible(vm.items), key = { it.videoId ?: it.playlistId ?: it.title }) { item ->
                 VideoCard(item, onOpen = { onOpen(item) }, onMore = { onMore(item) })
             }
 
@@ -219,6 +220,7 @@ internal fun VideoCard(item: HomeFeedItem, onOpen: () -> Unit, onMore: () -> Uni
     val openChannel = LocalOpenChannel.current
     val chId = item.channelId
     val chTap = if (chId != null) Modifier.clickable { openChannel(chId) } else Modifier
+    val openMenu = LocalOpenMenu.current
     Column(
         Modifier.fillMaxWidth().combinedClickable(onClick = onOpen, onLongClick = onMore).padding(horizontal = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -259,6 +261,9 @@ internal fun VideoCard(item: HomeFeedItem, onOpen: () -> Unit, onMore: () -> Uni
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2, overflow = TextOverflow.Ellipsis,
                 )
+            }
+            androidx.compose.material3.IconButton(onClick = { openMenu(item) }, Modifier.size(32.dp)) {
+                androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Filled.MoreVert, "More")
             }
         }
     }

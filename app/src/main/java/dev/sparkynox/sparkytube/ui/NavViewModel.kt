@@ -90,6 +90,11 @@ class NavViewModel : ViewModel() {
     private var watchJob: Job? = null
 
     var watchPlaylistId by mutableStateOf<String?>(null); private set
+
+    // videos added from the ⋮ menu, they play before playlist / related
+    val userQueue = androidx.compose.runtime.mutableStateListOf<HomeFeedItem>()
+    fun playNext(item: HomeFeedItem) { userQueue.removeAll { it.videoId == item.videoId }; userQueue.add(0, item) }
+    fun addToQueue(item: HomeFeedItem) { if (userQueue.none { it.videoId == item.videoId }) userQueue.add(item) }
     val queue: List<HomeFeedItem> get() = watchInfo?.queue ?: emptyList()
 
     fun openWatch(videoId: String, title: String, playlistId: String? = null) {
@@ -97,6 +102,7 @@ class NavViewModel : ViewModel() {
             watchVisible = true
             return
         }
+        userQueue.removeAll { it.videoId == videoId }
         watchId = videoId
         watchPlaylistId = playlistId
         watchTitle = title
@@ -146,6 +152,7 @@ class NavViewModel : ViewModel() {
 
     /** What autoplay moves on to when the current video ends. */
     fun nextVideo(): HomeFeedItem? {
+        userQueue.firstOrNull()?.let { return it }
         val q = queue
         if (q.isNotEmpty()) {
             val i = q.indexOfFirst { it.videoId == watchId }
