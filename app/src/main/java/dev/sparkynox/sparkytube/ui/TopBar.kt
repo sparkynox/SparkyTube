@@ -26,7 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -35,6 +35,20 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import dev.sparkynox.sparkytube.R
 
 class OverflowItem(val label: String, val icon: Int, val run: () -> Unit)
+
+// painterResource only takes vectors and bitmaps; some of the menu icons are framework selectors and crashed it.
+// an ImageView takes whatever drawable it is
+@Composable
+private fun ResIcon(res: Int, tint: androidx.compose.ui.graphics.Color, size: androidx.compose.ui.unit.Dp = 24.dp) {
+    androidx.compose.ui.viewinterop.AndroidView(
+        factory = { c -> android.widget.ImageView(c).apply { scaleType = android.widget.ImageView.ScaleType.FIT_CENTER } },
+        update = { v ->
+            v.setImageResource(res)
+            v.imageTintList = android.content.res.ColorStateList.valueOf(tint.toArgb())
+        },
+        modifier = Modifier.size(size),
+    )
+}
 
 @Composable
 fun TopBar(
@@ -55,8 +69,9 @@ fun TopBar(
             style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
             maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
-        if (showAudio) IconButton(onClick = onAudio) { Icon(painterResource(R.drawable.ic_audio_track), "Audio track") }
-        if (showQuality) IconButton(onClick = onQuality) { Icon(painterResource(R.drawable.ic_quality), "Video quality") }
+        val tint = MaterialTheme.colorScheme.onSurface
+        if (showAudio) IconButton(onClick = onAudio) { ResIcon(R.drawable.ic_audio_track, tint) }
+        if (showQuality) IconButton(onClick = onQuality) { ResIcon(R.drawable.ic_quality, tint) }
         IconButton(onClick = onSearch) { Icon(Icons.Filled.Search, "Search") }
         IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, "Settings") }
         IconButton(onClick = onOverflow) { Icon(Icons.Filled.MoreVert, "More options") }
@@ -78,7 +93,7 @@ fun OverflowSheet(items: List<OverflowItem>, onDismiss: () -> Unit) {
                     Modifier.clip(RoundedCornerShape(16.dp)).clickable { onDismiss(); sc.run() }.padding(vertical = 12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Icon(painterResource(sc.icon), null, Modifier.size(26.dp), tint = MaterialTheme.colorScheme.primary)
+                    ResIcon(sc.icon, MaterialTheme.colorScheme.primary, 26.dp)
                     Text(
                         sc.label, Modifier.padding(top = 8.dp, start = 2.dp, end = 2.dp),
                         style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center,
