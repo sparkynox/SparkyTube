@@ -108,6 +108,8 @@ class AdBlockEngine private constructor(
      * Saver Mode is on, never mixed into the always-on ad-block path.
      */
     fun shouldBlockForDataSaver(url: String): Boolean {
+        // while the hidden history player runs these watch-time pings ARE the history, let them through
+        if (historyPlayerActive) return false
         val lower = url.lowercase()
         for (p in dataSaverPaths) {
             if (lower.contains(p)) {
@@ -120,6 +122,9 @@ class AdBlockEngine private constructor(
 
     companion object {
         private const val TAG = "AdBlockEngine"
+
+        @Volatile
+        var historyPlayerActive = false
 
         @Volatile
         private var instance: AdBlockEngine? = null
