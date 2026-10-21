@@ -16,5 +16,7 @@ data class HomeFeedItem(
     // Shorts (9:16) -- only produced by InnerTubeClient.fetchShorts, never mixed into the normal feeds
     val isShort: Boolean = false,
     // channel page id (UC...), null when the renderer doesn't carry one
-    val channelId: String? = null
+    val channelId: String? = null,
+    // YouTube's "Not interested" token when the renderer carried one
+    val feedbackToken: String? = null
 )

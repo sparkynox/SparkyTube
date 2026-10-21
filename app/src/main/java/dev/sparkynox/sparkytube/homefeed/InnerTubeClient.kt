@@ -263,6 +263,45 @@ object InnerTubeClient {
     suspend fun unsubscribe(channelId: String) =
         action("subscription/unsubscribe", JSONObject().put("channelIds", JSONArray().put(channelId)).put("params", "CgIIAhgA"))
 
+    suspend fun notInterested(token: String) =
+        action("feedback", JSONObject().put("feedbackTokens", JSONArray().put(token)))
+
+    // ---------- playlists
+
+    data class PlaylistOption(val id: String, val title: String, val hasVideo: Boolean)
+
+    suspend fun fetchPlaylistsFor(videoId: String): List<PlaylistOption> = withContext(Dispatchers.IO) {
+        if (!Session.loggedIn) return@withContext emptyList()
+        try {
+            val root = post("playlist/get_add_to_playlist", JSONObject().put("videoIds", JSONArray().put(videoId)).put("excludeWatchLater", false))
+            val out = ArrayList<PlaylistOption>()
+            fun walk(n: Any?) {
+                when (n) {
+                    is JSONObject -> {
+                        n.optJSONObject("playlistAddToOptionRenderer")?.let { r ->
+                            val id = r.optString("playlistId").takeIf { it.isNotBlank() } ?: return@let
+                            val title = text(r.optJSONObject("title")) ?: id
+                            out.add(PlaylistOption(id, title, r.optString("containsSelectedVideos") == "ALL"))
+                        }
+                        n.keys().forEach { walk(n.opt(it)) }
+                    }
+                    is JSONArray -> for (i in 0 until n.length()) walk(n.opt(i))
+                }
+            }
+            walk(root)
+            out
+        } catch (e: Exception) {
+            LogRecorder.w(TAG, "playlist list failed: ${e.message}")
+            emptyList()
+        }
+    }
+
+    suspend fun addToPlaylist(playlistId: String, videoId: String) = action(
+        "browse/edit_playlist",
+        JSONObject().put("playlistId", playlistId)
+            .put("actions", JSONArray().put(JSONObject().put("action", "ACTION_ADD_VIDEO").put("addedVideoId", videoId)))
+    )
+
     // ---------- subscribed channels (the avatar strip on the Subs tab)
 
     data class ChannelItem(val id: String, val name: String, val avatar: String?)
@@ -406,7 +445,24 @@ object InnerTubeClient {
             durationText = duration,
             viewCountText = listOf(views, age).filter { it.isNotBlank() }.joinToString(" • "),
             channelId = findChannelId(r),
+            feedbackToken = findNotInterestedToken(r),
         )
+    }
+
+    private fun findNotInterestedToken(node: Any?): String? {
+        when (node) {
+            is JSONObject -> {
+                node.optJSONObject("menuServiceItemRenderer")?.let { m ->
+                    if (m.optJSONObject("icon")?.optString("iconType") == "NOT_INTERESTED") {
+                        m.optJSONObject("serviceEndpoint")?.optJSONObject("feedbackEndpoint")?.optString("feedbackToken")
+                            ?.takeIf { it.isNotBlank() }?.let { return it }
+                    }
+                }
+                node.keys().forEach { k -> findNotInterestedToken(node.opt(k))?.let { return it } }
+            }
+            is JSONArray -> for (i in 0 until node.length()) findNotInterestedToken(node.opt(i))?.let { return it }
+        }
+        return null
     }
 
     // first browseEndpoint under the node that points at a channel (UC...)
