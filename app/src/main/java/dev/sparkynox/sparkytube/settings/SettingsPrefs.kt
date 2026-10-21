@@ -158,20 +158,18 @@ object SettingsPrefs {
     }
 
     // v1.8 test flag: native (authenticated InnerTube) Home feed instead
-    // of the WebView-rendered one. Off by default -- this is a fresh,
+    // of the WebView-rendered one. On by default now that it has a real login flow (auth/LoginActivity) -- originally a fresh,
     // hand-written client (see homefeed/InnerTubeClient.kt) being tested
     // on Home only before any decision to expand it further.
     fun isNativeHomeFeedEnabled(context: Context) =
-        prefs(context).getBoolean(KEY_NATIVE_HOME_FEED_ENABLED, false)
+        prefs(context).getBoolean(KEY_NATIVE_HOME_FEED_ENABLED, true)
 
     fun setNativeHomeFeedEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_NATIVE_HOME_FEED_ENABLED, enabled).apply()
     }
 
     // Once native feed is on, this picks HOW it's rendered. KOTLIN_NATIVE
-    // is the original RecyclerView-based one (native_feed_item.xml) --
-    // fine but animations/shelf-layouts are a pain to make smooth in
-    // Kotlin XML. The other two both render inside the existing WebView
+    // is the Compose one (ui/HomeFeed.kt, styled after LunoMusic). The other two both render inside the existing WebView
     // instead: YOUTUBE_SKIN just restyles YouTube's own real page with
     // injected CSS/JS (real DOM, real YT behavior, just reskinned).
     // CUSTOM_HTML throws YouTube's page away entirely and builds a fresh

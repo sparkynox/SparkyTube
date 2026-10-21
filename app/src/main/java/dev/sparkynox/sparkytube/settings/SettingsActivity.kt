@@ -17,7 +17,7 @@ class SettingsActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         // html settings is the only settings screen now
-        startActivity(android.content.Intent(this, HtmlSettingsActivity::class.java))
+        startActivity(android.content.Intent(this, SettingsComposeActivity::class.java))
         finish()
         return
         binding = ActivitySettingsBinding.inflate(layoutInflater)
