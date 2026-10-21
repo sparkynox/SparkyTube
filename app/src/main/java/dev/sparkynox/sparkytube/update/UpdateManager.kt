@@ -20,13 +20,11 @@ import java.io.File
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
-// talks to our own update server (api/ folder on the website), downloads the apk
-// itself and hands it to the system installer. state lives here so the update
-// screen can be closed and reopened while a download is running
+// reads the latest GitHub release, downloads the apk itself and hands it to the system installer.
+// state lives here so the update screen can be closed and reopened while a download is running.
+// a release whose notes contain [force] is a mandatory update
 object UpdateManager {
 
-    // the Render service (see sparkytube-server). change this if your Render url is different
-    private const val BASE = "https://sparkytube-api.onrender.com"
     private const val GITHUB_LATEST = "https://api.github.com/repos/sparkynox/SparkyTube/releases/latest"
     private const val PREFS = "sparky_update"
 
@@ -68,8 +66,6 @@ object UpdateManager {
         .followRedirects(true)
         .build()
 
-    // a sleeping free Render service needs up to a minute to wake on the first request
-    private val apiHttp = http.newBuilder().readTimeout(75, TimeUnit.SECONDS).build()
 
     private fun prefs(c: Context) = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -93,93 +89,54 @@ object UpdateManager {
 
     private fun get(url: String): String? {
         val req = Request.Builder().url(url).header("Accept", "application/json").build()
-        apiHttp.newCall(req).execute().use { r ->
+        http.newCall(req).execute().use { r ->
             if (!r.isSuccessful) return null
             return r.body?.string()
         }
     }
 
-    suspend fun fetchLatest(): Latest? = withContext(Dispatchers.IO) {
-        fetchFromServer() ?: fetchFromGithub()
-    }
+    suspend fun fetchLatest(): Latest? = withContext(Dispatchers.IO) { fetchFromGithub() }
 
-    private fun fetchFromServer(): Latest? {
-        return try {
-            val body = get("$BASE/api/latest") ?: return null
-            val j = JSONObject(body)
-            if (!j.optBoolean("ok")) return null
-            val u = j.optJSONObject("assets")?.optJSONObject("universal") ?: return null
-            Latest(
-                versionName = j.getString("versionName"),
-                versionCode = j.optInt("versionCode", 0),
-                changelog = j.optString("changelog", ""),
-                publishedAt = j.optString("publishedAt", ""),
-                apkUrl = u.getString("url") + "&src=app",
-                size = u.optLong("size", 0L),
-                sha256 = u.optString("sha256", ""),
-                mandatory = j.optBoolean("mandatory", false)
-            )
-        } catch (e: Exception) { null }
-    }
-
-    // when our server is down or still waking up, the GitHub release works the same way
     private fun fetchFromGithub(): Latest? {
         return try {
             val body = get(GITHUB_LATEST) ?: return null
             val j = JSONObject(body)
             val assets = j.optJSONArray("assets") ?: return null
-            var apk: JSONObject? = null
-            for (i in 0 until assets.length()) {
-                val a = assets.getJSONObject(i)
-                val n = a.optString("name").lowercase()
-                if (n.endsWith(".apk") && n.contains("universal")) { apk = a; break }
-            }
-            val a = apk ?: return null
+            val apks = (0 until assets.length()).map { assets.getJSONObject(it) }
+                .filter { it.optString("name").lowercase().endsWith(".apk") }
+            if (apks.isEmpty()) return null
+
+            // universal first, then the build for this phone's ABI, then whatever apk there is
+            val abi = android.os.Build.SUPPORTED_ABIS.firstOrNull().orEmpty()
+            val key = if (abi.startsWith("arm64")) "arm64" else if (abi.startsWith("armeabi")) "armeabi" else abi
+            val a = apks.firstOrNull { it.optString("name").lowercase().contains("universal") }
+                ?: apks.firstOrNull { it.optString("name").lowercase().contains(key) }
+                ?: apks.first()
+
+            val notes = j.optString("body", "")
             val digest = a.optString("digest", "")
             Latest(
                 versionName = j.optString("tag_name").trimStart('v', 'V'),
-                versionCode = 0,
-                changelog = j.optString("body", ""),
+                versionCode = Regex("versionCode\\s*[:=]\\s*(\\d+)", RegexOption.IGNORE_CASE).find(notes)
+                    ?.groupValues?.get(1)?.toIntOrNull() ?: 0,
+                changelog = notes.replace(Regex("\\[force]|force_update", RegexOption.IGNORE_CASE), "").trim(),
                 publishedAt = j.optString("published_at", ""),
                 apkUrl = a.getString("browser_download_url"),
                 size = a.optLong("size", 0L),
                 sha256 = if (digest.startsWith("sha256:")) digest.substring(7) else "",
-                mandatory = false
+                mandatory = notes.contains("[force]", ignoreCase = true) || notes.contains("force_update", ignoreCase = true)
             )
         } catch (e: Exception) { null }
     }
 
-    suspend fun fetchMessages(after: Int = 0): List<Message>? = withContext(Dispatchers.IO) {
-        try {
-            val body = get("$BASE/api/messages?after=$after") ?: return@withContext null
-            val arr = JSONObject(body).optJSONArray("messages") ?: return@withContext emptyList()
-            (0 until arr.length()).map {
-                val m = arr.getJSONObject(it)
-                Message(m.getInt("id"), m.optString("title"), m.optString("body"), m.optString("type", "info"),
-                    m.optString("link", ""), m.optString("createdAt", ""))
-            }
-        } catch (e: Exception) { null }
-    }
-
-    // update + messages in one go, both requests run at the same time
     suspend fun checkNow(c: Context) {
         if (phase == Phase.DOWNLOADING) return
         phase = Phase.CHECKING
         error = ""
         val ctx = c.applicationContext
-        var gotLatest: Latest? = null
-        var gotMessages: List<Message>? = null
-        coroutineScope {
-            val a = async { fetchLatest() }
-            val b = async { fetchMessages(0) }
-            gotLatest = a.await()
-            gotMessages = b.await()
-        }
-        val l = gotLatest
-        val m = gotMessages
-        lastCheckOk = l != null || m != null
+        val l = fetchLatest()
+        lastCheckOk = l != null
         if (l != null) latest = l
-        if (m != null) messages = m
         phase = if (isApkReady(ctx)) Phase.READY else Phase.IDLE
     }
 
@@ -201,21 +158,9 @@ object UpdateManager {
         val l = fetchLatest()
         if (l != null) latest = l
         val notify = SettingsPrefs.isUpdateNotificationsEnabled(ctx)
-
-        if (l != null && hasUpdate(ctx) && notify && prefs(ctx).getInt("notified_code", 0) < l.versionCode) {
-            prefs(ctx).edit().putInt("notified_code", l.versionCode).apply()
+        if (l != null && hasUpdate(ctx) && notify && prefs(ctx).getInt("notified_code", 0) < maxOf(l.versionCode, 1)) {
+            prefs(ctx).edit().putInt("notified_code", maxOf(l.versionCode, 1)).apply()
             UpdateNotifier.notifyUpdate(ctx, l.versionName, l.changelog)
-        }
-
-        val seen = prefs(ctx).getInt("notified_msg", 0)
-        val fresh = fetchMessages(seen)
-        if (fresh != null) {
-            messages = (fresh + messages).distinctBy { it.id }.sortedByDescending { it.id }
-            if (fresh.isNotEmpty()) {
-                prefs(ctx).edit().putInt("notified_msg", fresh.maxOf { it.id }).apply()
-                // very first run: don't spam old messages, they're still in the inbox
-                if (notify && seen > 0) fresh.sortedBy { it.id }.forEach { UpdateNotifier.notifyMessage(ctx, it) }
-            }
         }
     }
 
