@@ -217,11 +217,13 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }
         if (c.isPlaying) histPlayedMs += (now - histLastTick).coerceAtMost(2000)
         histLastTick = now
-        if (histActiveFor == null && histPlayedMs >= 30_000 && binding.nativeHomeFeedCompose.visibility == View.VISIBLE) {
+        if (histActiveFor == null && histPlayedMs >= 2_000 && binding.nativeHomeFeedCompose.visibility == View.VISIBLE) {
             histActiveFor = id
             histLastJs = ""
             dev.sparkynox.sparkytube.adblock.AdBlockEngine.historyPlayerActive = true
-            dev.sparkynox.sparkytube.logs.LogRecorder.i("History", "30s played, starting background player for $id")
+            dev.sparkynox.sparkytube.logs.LogRecorder.i("History", "playing, starting background player for $id")
+            // the page has to count as visible or chromium pauses a muted video; the compose screen covers it
+            webView.visibility = View.VISIBLE
             webView.loadUrl("https://m.youtube.com/watch?v=$id")
             histHandler.removeCallbacks(histKeepAlive)
             histHandler.postDelayed(histKeepAlive, 2500)
@@ -266,6 +268,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         dev.sparkynox.sparkytube.adblock.AdBlockEngine.historyPlayerActive = false
         histHandler.removeCallbacks(histKeepAlive)
         if (wasActive && blank) webView.loadUrl("about:blank")
+        if (wasActive && binding.nativeHomeFeedCompose.visibility == View.VISIBLE) webView.visibility = View.INVISIBLE
     }
 
     private fun maybeSaveWatchPosition() {
@@ -2634,11 +2637,12 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     private fun showComposeHost() {
         ensureComposeHost()
         // a Short or channel page may still be playing in the WebView, stop it before hiding
-        if (webView.visibility == View.VISIBLE) {
+        // (the hidden history player is the exception, it stays alive underneath)
+        if (histActiveFor == null && webView.visibility == View.VISIBLE) {
             webView.evaluateJavascript("document.querySelectorAll('video').forEach(function(v){v.pause()})", null)
         }
         binding.nativeHomeFeedCompose.visibility = View.VISIBLE
-        webView.visibility = View.INVISIBLE
+        webView.visibility = if (histActiveFor != null) View.VISIBLE else View.INVISIBLE
     }
 
     // Shorts and channel pages are YouTube's own mobile pages (real HTML5 player, subscribe, tabs).
@@ -3288,6 +3292,9 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     }
 
     private fun stopNativePlayback() {
+        // closing the video closes its background copy too
+        stopHistoryWeb(blank = true)
+        histVideoId = null
         if (!isNativePlaybackActive) return
         // final save before the controller gets torn down, so leaving a
         // video mid-way always keeps the latest position, not just the
