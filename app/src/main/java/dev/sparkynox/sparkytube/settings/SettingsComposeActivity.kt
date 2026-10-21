@@ -184,21 +184,17 @@ class SettingsComposeActivity : AppCompatActivity() {
                         "Blocks YouTube telemetry, disables images, starts videos at the lowest quality",
                         { p.isDataSaverEnabled(this) }, { p.setDataSaverEnabled(this, it); StreamExtractor.clearCache() })
             )),
-            Section("extraction", "Extraction", "code", "Extractors, local servers and fallbacks", listOf(
+            Section("extraction", "Extraction", "code", "Extractors and fallbacks", listOf(
                 choice("extractor", "Extractor Method", "code",
-                        listOf("AUTO" to "Auto", "LOCAL_SERVER" to "Local Servers", "NEWPIPE" to "NewPipe", "YT_DLP" to "yt-dlp (default)"),
+                        listOf("AUTO" to "Auto", "NEWPIPE" to "NewPipe", "YT_DLP" to "yt-dlp (default)"),
                         { p.getExtractorMethod(this).name }, { p.setExtractorMethod(this, SettingsPrefs.ExtractorMethod.valueOf(it)) },
                         sub = {
                             when (it) {
-                                "LOCAL_SERVER" -> "Local Servers only — set up under Local Servers above"
-                                "NEWPIPE" -> "NewPipe only — skips the local server and JS fast path"
+                                "NEWPIPE" -> "NewPipe only — skips the JS fast path"
                                 "YT_DLP" -> "yt-dlp first, NewPipe takes over if yt-dlp fails"
-                                else -> "Auto — local server (if enabled) → JavaScript → NewPipe"
+                                else -> "Auto — JavaScript → NewPipe"
                             }
                         }),
-                link("localservers", "Local Servers", "server", {
-                        if (p.isLocalServerEnabled(this)) "Enabled — ${p.getLocalServerUrl(this)}" else "Off — using NewPipe/JavaScript extraction"
-                    }) { open(LocalServerActivity::class.java) },
                 toggle("piped", "Piped fallback", "globe",
                         "Fixes age-restricted videos by routing through a public Piped instance when NewPipe fails",
                         { p.isPipedFallbackEnabled(this) }, { p.setPipedFallbackEnabled(this, it) }),
