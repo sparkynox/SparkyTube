@@ -3,101 +3,158 @@ package dev.sparkynox.sparkytube.download
 import android.app.DownloadManager
 import android.content.Context
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
-import coil.load
-import dev.sparkynox.sparkytube.databinding.ActivityDownloadsBinding
-import dev.sparkynox.sparkytube.databinding.ItemDownloadBinding
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.background
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import dev.sparkynox.sparkytube.ui.SparkyTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import java.util.Locale
 
-/**
- * VidMate-style downloads screen. Shows two kinds of jobs, merged into one
- * list: plain DownloadManager downloads (combined-format progressive
- * streams), AND adaptive video+audio+mux jobs tracked separately via
- * MuxTaskTracker (DownloadManager has no concept of "two downloads that
- * become one file", so those were previously invisible here even though
- * they were actually downloading -- see VideoDownloader.kt). Polls both
- * sources on a timer while visible and stops polling in onPause.
- */
+// Downloads screen. Plain DownloadManager downloads, adaptive video+audio+mux jobs
+// (MuxTaskTracker) and the waiting queue are merged into one list that refreshes every second.
 class DownloadsActivity : AppCompatActivity() {
 
-    private lateinit var binding: ActivityDownloadsBinding
-    private lateinit var adapter: DownloadsAdapter
     private lateinit var downloadManager: DownloadManager
-
-    private val pollHandler = Handler(Looper.getMainLooper())
-    // Keyed by "dm_<id>" or "mux_<id>" so DownloadManager ids and
-    // MuxTask ids (both plain Longs, easy to collide) never overwrite
-    // each other's speed-tracking entries.
+    // keyed "dm_<id>" / "mux_.." so ids from different sources never share a speed entry
     private val lastBytesSeen = HashMap<String, Pair<Long, Long>>()
-
-    private val pollRunnable = object : Runnable {
-        override fun run() {
-            refreshDownloads()
-            pollHandler.postDelayed(this, POLL_INTERVAL_MS)
-        }
-    }
+    private var rows by mutableStateOf<List<DownloadRowUi>>(emptyList())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityDownloadsBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-
         downloadManager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-
-        binding.downloadsBackBtn.setOnClickListener { finish() }
-        binding.downloadsCancelQueuedBtn.setOnClickListener {
-            DownloadQueue.cancelAllPending()
-            refreshDownloads()
-        }
-
-        adapter = DownloadsAdapter { row ->
-            if (row.isQueued) {
-                DownloadQueue.cancelPending(row.id)
-            } else if (row.isMuxTask) {
-                MuxTaskTracker.remove(row.id)
-            } else {
-                downloadManager.remove(row.id)
-            }
-            refreshDownloads()
-        }
-        binding.downloadsList.layoutManager = LinearLayoutManager(this)
-        binding.downloadsList.adapter = adapter
+        setContentView(ComposeView(this).apply {
+            setContent { SparkyTheme { DownloadsScreen() } }
+        })
     }
 
-    override fun onResume() {
-        super.onResume()
-        pollHandler.post(pollRunnable)
-    }
-
-    override fun onPause() {
-        super.onPause()
-        pollHandler.removeCallbacks(pollRunnable)
-    }
-
-    private fun refreshDownloads() {
+    private fun loadRows(): List<DownloadRowUi> {
         val items = mutableListOf<DownloadRowUi>()
         items.addAll(readDownloadManagerRows())
         items.addAll(readMuxTaskRows())
         items.addAll(readQueuedRows())
-
         // active first, then queued, then finished; newest first inside each group
         items.sortWith(compareBy<DownloadRowUi> { it.state }.thenByDescending { it.sortKey })
+        return items
+    }
 
-        val active = items.count { it.state == 0 }
-        val queued = items.count { it.state == 1 }
-        val finished = items.count { it.state == 2 }
-        binding.downloadsSummary.text = "Downloading $active  •  Queued $queued  •  Finished $finished"
-        binding.downloadsCancelQueuedBtn.visibility = if (queued > 0) View.VISIBLE else View.GONE
+    private fun remove(row: DownloadRowUi) {
+        if (row.isQueued) DownloadQueue.cancelPending(row.id)
+        else if (row.isMuxTask) MuxTaskTracker.remove(row.id)
+        else downloadManager.remove(row.id)
+        rows = rows.filterNot { it.id == row.id && it.isMuxTask == row.isMuxTask && it.isQueued == row.isQueued }
+    }
 
-        adapter.submitList(items)
-        binding.downloadsEmptyText.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
+    @Composable
+    private fun DownloadsScreen() {
+        LaunchedEffect(Unit) {
+            while (true) {
+                rows = withContext(Dispatchers.IO) { loadRows() }
+                delay(1000)
+            }
+        }
+        val active = rows.count { it.state == 0 }
+        val queued = rows.count { it.state == 1 }
+        val finished = rows.count { it.state == 2 }
+
+        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            Column(Modifier.fillMaxSize().statusBarsPadding()) {
+                Row(Modifier.padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { finish() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+                    Column(Modifier.weight(1f).padding(start = 4.dp)) {
+                        Text("Downloads", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Downloading $active  \u2022  Queued $queued  \u2022  Finished $finished",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (queued > 0) TextButton(onClick = { DownloadQueue.cancelAllPending() }) { Text("Cancel queued") }
+                }
+                if (rows.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("No downloads yet", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                } else {
+                    LazyColumn(
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(rows, key = { "${it.isMuxTask}-${it.isQueued}-${it.id}" }) { r -> DownloadCard(r) }
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun DownloadCard(r: DownloadRowUi) {
+        Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+            Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.width(72.dp).height(48.dp).clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                ) {
+                    if (!r.videoId.isNullOrBlank()) {
+                        AsyncImage(
+                            "https://i.ytimg.com/vi/${r.videoId}/mqdefault.jpg", null,
+                            Modifier.fillMaxSize(), contentScale = ContentScale.Crop,
+                        )
+                    }
+                }
+                Column(Modifier.weight(1f).padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        r.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
+                    if (r.showProgress) {
+                        if (r.indeterminate) LinearProgressIndicator(Modifier.fillMaxWidth())
+                        else LinearProgressIndicator(progress = { r.progress / 100f }, modifier = Modifier.fillMaxWidth())
+                    }
+                    Text(r.statusText, style = MaterialTheme.typography.labelMedium, color = Color(r.statusColor))
+                }
+                IconButton(onClick = { remove(r) }, Modifier.size(36.dp)) { Icon(Icons.Filled.Delete, "Remove") }
+            }
+        }
     }
 
     private fun readDownloadManagerRows(): List<DownloadRowUi> {
@@ -301,10 +358,6 @@ class DownloadsActivity : AppCompatActivity() {
             localUri
         }
     }
-
-    companion object {
-        private const val POLL_INTERVAL_MS = 1000L
-    }
 }
 
 /**
@@ -328,54 +381,6 @@ data class DownloadRowUi(
     // 0 = active, 1 = queued, 2 = finished
     val state: Int = 0
 )
-
-class DownloadsAdapter(
-    private val onDelete: (DownloadRowUi) -> Unit
-) : RecyclerView.Adapter<DownloadsAdapter.ViewHolder>() {
-
-    private var items: List<DownloadRowUi> = emptyList()
-
-    fun submitList(newItems: List<DownloadRowUi>) {
-        items = newItems
-        notifyDataSetChanged() // small list (a handful of downloads at most) -- DiffUtil would be overkill here
-    }
-
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        val binding = ItemDownloadBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-        return ViewHolder(binding)
-    }
-
-    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.bind(items[position], onDelete)
-    }
-
-    override fun getItemCount() = items.size
-
-    class ViewHolder(private val binding: ItemDownloadBinding) : RecyclerView.ViewHolder(binding.root) {
-        fun bind(item: DownloadRowUi, onDelete: (DownloadRowUi) -> Unit) {
-            binding.itemDownloadTitle.text = item.title
-
-            if (!item.videoId.isNullOrBlank()) {
-                binding.itemDownloadThumbnail.load("https://i.ytimg.com/vi/${item.videoId}/mqdefault.jpg") {
-                    crossfade(true)
-                }
-            } else {
-                binding.itemDownloadThumbnail.setImageDrawable(null)
-            }
-
-            binding.itemDownloadProgress.visibility = if (item.showProgress) View.VISIBLE else View.GONE
-            binding.itemDownloadProgress.isIndeterminate = item.indeterminate
-            if (!item.indeterminate) {
-                binding.itemDownloadProgress.progress = item.progress
-            }
-
-            binding.itemDownloadStatus.text = item.statusText
-            binding.itemDownloadStatus.setTextColor(item.statusColor)
-
-            binding.itemDownloadDeleteBtn.setOnClickListener { onDelete(item) }
-        }
-    }
-}
 
 /**
  * Human-readable byte formatting (KB/MB/GB), shared by size and speed
