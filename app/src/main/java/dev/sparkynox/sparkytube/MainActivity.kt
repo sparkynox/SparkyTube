@@ -190,7 +190,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     private val histKeepAlive = object : Runnable {
         override fun run() {
             historyKeepAlive()
-            if (histActiveFor != null) histHandler.postDelayed(this, 2000)
+            if (histActiveFor != null) histHandler.postDelayed(this, 1000)
         }
     }
 
@@ -222,11 +222,9 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             histLastJs = ""
             dev.sparkynox.sparkytube.adblock.AdBlockEngine.historyPlayerActive = true
             dev.sparkynox.sparkytube.logs.LogRecorder.i("History", "playing, starting background player for $id")
-            // the page has to count as visible or chromium pauses a muted video; the compose screen covers it
-            webView.visibility = View.VISIBLE
             webView.loadUrl("https://m.youtube.com/watch?v=$id")
             histHandler.removeCallbacks(histKeepAlive)
-            histHandler.postDelayed(histKeepAlive, 2500)
+            histHandler.postDelayed(histKeepAlive, 700)
         }
     }
 
@@ -241,6 +239,15 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             stopHistoryWeb(blank = false)
             return
         }
+        // only touch the page once it really is this video's watch page. the home page that sits
+        // there before it loads plays muted feed previews, and those end up in the user's history
+        val u = webView.url.orEmpty()
+        if (!u.contains("/watch") || !u.contains(id)) {
+            webView.visibility = View.INVISIBLE
+            return
+        }
+        // a visible page keeps youtube from pausing the muted video; the compose screen covers it
+        webView.visibility = View.VISIBLE
         val playing = mediaController?.isPlaying == true
         val pos = (mediaController?.currentPosition ?: 0L) / 1000
         webView.evaluateJavascript(
@@ -2642,7 +2649,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             webView.evaluateJavascript("document.querySelectorAll('video').forEach(function(v){v.pause()})", null)
         }
         binding.nativeHomeFeedCompose.visibility = View.VISIBLE
-        webView.visibility = if (histActiveFor != null) View.VISIBLE else View.INVISIBLE
+        webView.visibility = if (histActiveFor != null && webView.url.orEmpty().contains("/watch")) View.VISIBLE else View.INVISIBLE
     }
 
     // Shorts and channel pages are YouTube's own mobile pages (real HTML5 player, subscribe, tabs).
