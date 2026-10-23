@@ -177,168 +177,25 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         val s = total % 60
         return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
     }
-    // ---------- watch history
-    // The real watch page can't be tracked from ExoPlayer, so after 30s of real playback the real
-    // page plays muted at 144p in the hidden WebView (signed in with the same cookies). It mirrors
-    // the native player: plays while ExoPlayer plays, pauses when it pauses, stops when the video changes.
-    private var histVideoId: String? = null
-    private var histPlayedMs = 0L
-    private var histLastTick = 0L
-    private var histActiveFor: String? = null
-    private var histLastJs = ""
-    private var histLastRaw = ""
-
-    // ---- temporary: look at what the hidden history WebView is doing
-    private var histDebugView = false
-    private var histDebugExoVis = View.GONE
-    private var histDebugText: android.widget.TextView? = null
-
-    private fun showHistoryDebugView() {
-        if (histDebugView) return
-        histDebugView = true
-        histDebugExoVis = binding.exoPlayerView.visibility
-        binding.exoPlayerView.visibility = View.INVISIBLE
-        binding.nativeHomeFeedCompose.visibility = View.INVISIBLE
-        webView.visibility = View.VISIBLE
-        val tv = android.widget.TextView(this).apply {
-            setTextColor(android.graphics.Color.WHITE)
-            setBackgroundColor(0xCC000000.toInt())
-            textSize = 11f
-            typeface = android.graphics.Typeface.MONOSPACE
-            setPadding(16, 12, 16, 12)
-            elevation = 80f
-        }
-        histDebugText = tv
-        binding.webViewContainer.addView(
-            tv,
-            android.widget.FrameLayout.LayoutParams(
-                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
-                android.view.Gravity.BOTTOM
-            )
+    // saves what plays natively into the YouTube history, see history/BackgroundHistory.kt
+    private val bgHistory by lazy {
+        dev.sparkynox.sparkytube.history.BackgroundHistory(
+            webView = { webView },
+            container = binding.webViewContainer,
+            compose = binding.nativeHomeFeedCompose,
+            exo = binding.exoPlayerView,
+            controller = { mediaController },
+            videoId = { lastResolvedVideoId },
+            resolving = { isResolving },
+            nativeActive = { isNativePlaybackActive },
+            enabled = { composeNav() },
         )
-        refreshHistoryDebugText()
-    }
-
-    private fun hideHistoryDebugView() {
-        if (!histDebugView) return
-        histDebugView = false
-        histDebugText?.let { binding.webViewContainer.removeView(it) }
-        histDebugText = null
-        binding.exoPlayerView.visibility = histDebugExoVis
-    }
-
-    private fun refreshHistoryDebugText() {
-        val tv = histDebugText ?: return
-        val c = mediaController
-        tv.text = "history for: ${histActiveFor ?: "(not started)"}\n" +
-            "playing id: $lastResolvedVideoId  played=${histPlayedMs / 1000}s\n" +
-            "native: playing=${c?.isPlaying} pos=${(c?.currentPosition ?: 0) / 1000}s\n" +
-            "page: ${webView.url}\n" +
-            "js: $histLastRaw\n" +
-            "back button = return to the app"
-    }
-    private val histHandler = android.os.Handler(android.os.Looper.getMainLooper())
-    private val histKeepAlive = object : Runnable {
-        override fun run() {
-            historyKeepAlive()
-            if (histActiveFor != null) histHandler.postDelayed(this, 1000)
-        }
-    }
-
-    private fun historyTick() {
-        val c = mediaController ?: return
-        val id = lastResolvedVideoId ?: return
-        if (isResolving) return
-        if (!composeNav()) return
-        if (!dev.sparkynox.sparkytube.auth.Session.loggedIn) {
-            if (histVideoId != id) {
-                histVideoId = id
-                dev.sparkynox.sparkytube.logs.LogRecorder.w("History", "not signed in (no SAPISID cookie), nothing to save")
-            }
-            return
-        }
-        val now = android.os.SystemClock.elapsedRealtime()
-        if (histVideoId != id) {
-            stopHistoryWeb(blank = true)
-            histVideoId = id
-            histPlayedMs = 0
-            histLastTick = now
-            dev.sparkynox.sparkytube.logs.LogRecorder.d("History", "counting played time for $id")
-            return
-        }
-        if (c.isPlaying) histPlayedMs += (now - histLastTick).coerceAtMost(2000)
-        histLastTick = now
-        if (histDebugView) refreshHistoryDebugText()
-        if (histActiveFor == null && histPlayedMs >= 2_000 && (binding.nativeHomeFeedCompose.visibility == View.VISIBLE || histDebugView)) {
-            histActiveFor = id
-            histLastJs = ""
-            dev.sparkynox.sparkytube.adblock.AdBlockEngine.historyPlayerActive = true
-            dev.sparkynox.sparkytube.logs.LogRecorder.i("History", "playing, starting background player for $id")
-            webView.loadUrl("https://m.youtube.com/watch?v=$id")
-            histHandler.removeCallbacks(histKeepAlive)
-            histHandler.postDelayed(histKeepAlive, 700)
-        }
-    }
-
-    private fun historyKeepAlive() {
-        val id = histActiveFor ?: return
-        if (id != lastResolvedVideoId || !isNativePlaybackActive) {
-            stopHistoryWeb(blank = true)
-            return
-        }
-        // user opened a channel / Shorts page in the WebView, it belongs to them now
-        if (binding.nativeHomeFeedCompose.visibility != View.VISIBLE && !histDebugView) {
-            stopHistoryWeb(blank = false)
-            return
-        }
-        // only touch the page once it really is this video's watch page. the home page that sits
-        // there before it loads plays muted feed previews, and those end up in the user's history
-        val u = webView.url.orEmpty()
-        if (!u.contains("/watch") || !u.contains(id)) {
-            if (!histDebugView) webView.visibility = View.INVISIBLE
-            histLastRaw = "waiting for the watch page"
-            refreshHistoryDebugText()
-            return
-        }
-        // a visible page keeps youtube from pausing the muted video; the compose screen covers it
-        webView.visibility = View.VISIBLE
-        val playing = mediaController?.isPlaying == true
-        val pos = (mediaController?.currentPosition ?: 0L) / 1000
-        webView.evaluateJavascript(
-            "(function(play,pos){try{var v=document.querySelector('video');if(!v)return 'nov';" +
-                "document.body.classList.add('sparkytube-native-active');" +
-                "v.muted=true;v.volume=0;" +
-                "var p=document.getElementById('movie_player')||document.querySelector('.html5-video-player')||document.getElementById('player');" +
-                "try{if(p&&p.setPlaybackQualityRange){p.setPlaybackQualityRange('tiny','tiny');}}catch(e){}" +
-                "if(!window.__sparkyHistSynced&&v.readyState>0){if(pos>3)v.currentTime=pos;window.__sparkyHistSynced=true;}" +
-                "if(play){if(v.paused)v.play();}else{if(!v.paused)v.pause();}" +
-                "return v.paused?'paused':('playing '+Math.round(v.currentTime)+'s '+v.videoHeight+'p');}catch(e){return 'err';}})($playing,$pos)"
-        ) { r ->
-            // log only when the state changes, so the log stays readable
-            histLastRaw = r.orEmpty()
-            refreshHistoryDebugText()
-            val res = r.orEmpty().replace(Regex("\\d+s"), "Ns")
-            if (res != histLastJs) {
-                histLastJs = res
-                dev.sparkynox.sparkytube.logs.LogRecorder.d("History", "background player: $r (url=${webView.url})")
-            }
-        }
-    }
-
-    private fun stopHistoryWeb(blank: Boolean) {
-        val wasActive = histActiveFor != null
-        histActiveFor = null
-        dev.sparkynox.sparkytube.adblock.AdBlockEngine.historyPlayerActive = false
-        histHandler.removeCallbacks(histKeepAlive)
-        if (wasActive && blank) webView.loadUrl("about:blank")
-        if (wasActive && binding.nativeHomeFeedCompose.visibility == View.VISIBLE) webView.visibility = View.INVISIBLE
     }
 
     private fun maybeSaveWatchPosition() {
         if (!isNativePlaybackActive) return
         updateChapterLabel()
-        historyTick()
+        bgHistory.tick()
         ticksSinceLastPositionSave++
         if (ticksSinceLastPositionSave < 8) return
         ticksSinceLastPositionSave = 0
@@ -1841,7 +1698,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }
 
         val items = mutableListOf<Shortcut>()
-        items += Shortcut("Debug WebView", android.R.drawable.ic_menu_view) { showHistoryDebugView() }
+        items += Shortcut("Debug WebView", android.R.drawable.ic_menu_view) { bgHistory.showDebug() }
         items += Shortcut("Settings", android.R.drawable.ic_menu_manage) {
             startActivity(Intent(this, dev.sparkynox.sparkytube.settings.SettingsComposeActivity::class.java))
         }
@@ -2701,14 +2558,14 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
     private fun showComposeHost() {
         ensureComposeHost()
-        hideHistoryDebugView()
+        bgHistory.leaveDebug()
         // a Short or channel page may still be playing in the WebView, stop it before hiding
         // (the hidden history player is the exception, it stays alive underneath)
-        if (histActiveFor == null && webView.visibility == View.VISIBLE) {
+        if (!bgHistory.active && webView.visibility == View.VISIBLE) {
             webView.evaluateJavascript("document.querySelectorAll('video').forEach(function(v){v.pause()})", null)
         }
         binding.nativeHomeFeedCompose.visibility = View.VISIBLE
-        webView.visibility = if (histActiveFor != null && webView.url.orEmpty().contains("/watch")) View.VISIBLE else View.INVISIBLE
+        webView.visibility = bgHistory.webViewVisibility()
     }
 
     // Shorts and channel pages are YouTube's own mobile pages (real HTML5 player, subscribe, tabs).
@@ -2716,7 +2573,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     private fun openWebPage(url: String) {
         if (browseMode != BrowseMode.YOUTUBE) return
         cancelWebViewLogin()
-        stopHistoryWeb(blank = false)
+        bgHistory.stop(blank = false)
         leaveWatch()
         hideNativeHomeFeed()
         webView.loadUrl(url)
@@ -2750,6 +2607,8 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }
         lastResolvedVideoId = null
         resolveAndPlayNative(videoId, fallbackTitle = title)
+        // the old url-watching flow set this; the compose flow never did, so history, saved positions and downloads saw no video
+        lastResolvedVideoId = videoId
     }
 
     /** Back / tab switch / search while a video is open: collapse it to the mini-player, like the YouTube app. */
@@ -3359,8 +3218,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
     private fun stopNativePlayback() {
         // closing the video closes its background copy too
-        stopHistoryWeb(blank = true)
-        histVideoId = null
+        bgHistory.stop(blank = true)
         if (!isNativePlaybackActive) return
         // final save before the controller gets torn down, so leaving a
         // video mid-way always keeps the latest position, not just the
