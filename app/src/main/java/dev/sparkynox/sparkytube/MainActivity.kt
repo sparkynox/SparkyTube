@@ -480,6 +480,19 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         applyMusicModeVisual()
     }
 
+    // music mode picture: transparent player + a copy inside the mini player, see ui/MusicModeArt.kt
+    private val musicArt by lazy {
+        dev.sparkynox.sparkytube.ui.MusicModeArt(
+            big = binding.musicModeThumbnail,
+            mini = binding.miniPlayerContainer,
+            player = binding.exoPlayerView,
+            musicOn = { isMusicModeActive },
+            miniOn = { isMiniPlayerActive },
+            nativeActive = { isNativePlaybackActive },
+            videoId = { lastResolvedVideoId },
+        )
+    }
+
     private fun applyMusicModeVisual() {
         val controller = mediaController
 
@@ -541,6 +554,8 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             binding.exoPlayerView.visibility = if (isNativePlaybackActive) View.VISIBLE else View.GONE
             binding.musicModeThumbnail.visibility = View.GONE
         }
+
+        musicArt.sync()
 
         val musicModeBtn = binding.exoPlayerView.findViewById<android.widget.ImageButton>(R.id.exo_music_mode_btn)
         musicModeBtn?.setColorFilter(
@@ -1091,6 +1106,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             stopNativePlayback()
             nav.closeWatch()
         }
+        musicArt.sync()
     }
 
     /**
@@ -1114,6 +1130,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             )
         binding.webViewContainer.addView(binding.exoPlayerView, restoredParams) // appended at the end -- exact index doesn't matter here, just needs to sit above webView (index 0) to stay visible
         binding.exoPlayerView.useController = true
+        musicArt.sync()
     }
 
     /**
