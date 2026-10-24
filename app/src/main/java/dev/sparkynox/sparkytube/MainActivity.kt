@@ -23,7 +23,7 @@ import android.widget.LinearLayout
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.viewModels
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
+import dev.sparkynox.sparkytube.ui.ComposeAlertDialog as AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -1430,6 +1430,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                             showComposeHost()
                         }
                         nav.watchVisible -> leaveWatch()
+                        nav.searchVisible -> nav.searchVisible = false
                         nav.pop() -> Unit
                         nav.tab != dev.sparkynox.sparkytube.ui.NavViewModel.Tab.HOME ->
                             nav.tab = dev.sparkynox.sparkytube.ui.NavViewModel.Tab.HOME
@@ -1692,7 +1693,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                     showQuality = topQuality,
                     onAudio = { showAudioTrackPicker() },
                     onQuality = { showQualityPicker() },
-                    onSearch = { showSearchDialog() },
+                    onSearch = { openSearch() },
                     onSettings = {
                         startActivity(Intent(this, dev.sparkynox.sparkytube.settings.SettingsComposeActivity::class.java))
                     },
@@ -1896,6 +1897,12 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    private fun openSearch() {
+        leaveWatch()
+        nav.searchVisible = true
+        showComposeHost()
     }
 
     private fun showSearchDialog() {
