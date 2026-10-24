@@ -93,13 +93,17 @@ fun PlayerControls(h: PlayerControlsHost) {
         val l = object : Player.Listener {
             override fun onEvents(player: Player, events: Player.Events) { tick++ }
         }
-        c?.addListener(l)
-        onDispose { c?.removeListener(l) }
+        runCatching { c?.addListener(l) }
+        onDispose { runCatching { c?.removeListener(l) } }
     }
     LaunchedEffect(Unit) { while (true) { delay(400); tick++ } }
     @Suppress("UNUSED_VARIABLE") val redraw = tick
 
-    if (!h.enabled()) return
+    if (!h.enabled()) {
+        // mini player / picture in picture: nothing to draw
+        Box(Modifier.size(0.dp))
+        return
+    }
 
     val playing = c?.isPlaying == true
     val buffering = h.loading() || c?.playbackState == Player.STATE_BUFFERING
