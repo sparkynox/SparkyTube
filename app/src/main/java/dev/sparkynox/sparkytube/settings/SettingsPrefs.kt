@@ -247,11 +247,11 @@ object SettingsPrefs {
     enum class ExtractorMethod { AUTO, LOCAL_SERVER, NEWPIPE, YT_DLP }
 
     fun getExtractorMethod(context: Context): ExtractorMethod {
-        val stored = prefs(context).getString(KEY_EXTRACTOR_METHOD, ExtractorMethod.YT_DLP.name)
+        val stored = prefs(context).getString(KEY_EXTRACTOR_METHOD, ExtractorMethod.NEWPIPE.name)
         return try {
-            ExtractorMethod.valueOf(stored ?: ExtractorMethod.YT_DLP.name)
+            ExtractorMethod.valueOf(stored ?: ExtractorMethod.NEWPIPE.name)
         } catch (e: IllegalArgumentException) {
-            ExtractorMethod.YT_DLP
+            ExtractorMethod.NEWPIPE
         }
     }
 

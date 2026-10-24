@@ -186,7 +186,7 @@ class SettingsComposeActivity : AppCompatActivity() {
             )),
             Section("extraction", "Extraction", "code", "Extractors and fallbacks", listOf(
                 choice("extractor", "Extractor Method", "code",
-                        listOf("AUTO" to "Auto", "NEWPIPE" to "NewPipe", "YT_DLP" to "yt-dlp (default)"),
+                        listOf("AUTO" to "Auto", "NEWPIPE" to "NewPipe (default)", "YT_DLP" to "yt-dlp"),
                         { p.getExtractorMethod(this).name }, { p.setExtractorMethod(this, SettingsPrefs.ExtractorMethod.valueOf(it)) },
                         sub = {
                             when (it) {
