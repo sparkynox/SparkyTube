@@ -122,6 +122,7 @@ fun AppHost(
             )
         }
 
+        if (nav.searchVisible) SearchScreen(nav, onOpen = onOpen, onClose = { nav.searchVisible = false })
         if (nav.watchVisible) WatchScreen(nav, onOpen = onOpen, onMore = onMore)
         menuItem?.let { VideoMenuSheet(it, nav, onDownload, onDismiss = { menuItem = null }) }
     }

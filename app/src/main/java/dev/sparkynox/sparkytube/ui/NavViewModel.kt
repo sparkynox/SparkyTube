@@ -28,6 +28,10 @@ class NavViewModel : ViewModel() {
     class Page(val title: String, val feed: FeedState)
 
     var tab by mutableStateOf(Tab.HOME)
+
+    // full-screen search (NewPipe), drawn above the tabs
+    var searchVisible by mutableStateOf(false)
+    val search = dev.sparkynox.sparkytube.search.SearchState(viewModelScope)
     val pages = mutableStateListOf<Page>()
 
     val subs = FeedState(viewModelScope, FeedState.Source.Browse("FEsubscriptions"))
