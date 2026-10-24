@@ -1936,8 +1936,8 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     }
 
     private fun openSearch() {
-        leaveWatch()
         nav.searchVisible = true
+        leaveWatch()
         showComposeHost()
     }
 
@@ -2528,6 +2528,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             return
         }
         cancelWebViewLogin()
+        nav.searchVisible = false
         leaveWatch()
         nav.pages.clear()
         nav.tab = tab
