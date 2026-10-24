@@ -392,6 +392,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                     }
                 })
                 setupCustomPlayerControls()
+                attachPlayerControls()
 
                 // Flush anything that was requested before we got here.
                 pendingPlay?.let { pending ->
@@ -575,6 +576,41 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         // "1x" not "1.0x" for the common case -- 0.5x/1.5x still show
         // their decimal since dropping it there would be ambiguous.
         return if (speed == speed.toInt().toFloat()) "${speed.toInt()}x" else "${speed}x"
+    }
+
+    // Compose controls on top of the player, see ui/PlayerControls.kt
+    private var playerControlsAttached = false
+    private fun attachPlayerControls() {
+        if (playerControlsAttached) return
+        playerControlsAttached = true
+        val speedLabelHolder = android.widget.TextView(this)
+        dev.sparkynox.sparkytube.ui.attachComposePlayerControls(
+            binding.exoPlayerView,
+            dev.sparkynox.sparkytube.ui.PlayerControlsHost(
+                controller = { mediaController },
+                enabled = { binding.exoPlayerView.useController },
+                loading = { isResolving },
+                title = { mediaController?.mediaMetadata?.title?.toString()?.takeIf { it.isNotBlank() } ?: nav.watchTitle },
+                speedLabel = { formatSpeedLabel(currentPlaybackSpeed) },
+                musicOn = { isMusicModeActive },
+                downloadEnabled = { dev.sparkynox.sparkytube.settings.SettingsPrefs.isDownloadEnabled(this) },
+                audioTracks = { currentAudioTracks.size },
+                onMinimize = { enterMiniPlayerMode() },
+                onFullscreen = { toggleFullscreenPlayer() },
+                onDownload = { showDownloadQualityPicker() },
+                onDownloadsList = { startActivity(Intent(this, dev.sparkynox.sparkytube.download.DownloadsActivity::class.java)) },
+                onQuality = { showQualityPicker() },
+                onAudio = { showAudioTrackPicker() },
+                onMusic = { toggleMusicMode() },
+                onSpeed = { cyclePlaybackSpeed(speedLabelHolder) },
+                onPlayPause = {
+                    mediaController?.let { c ->
+                        userInitiatedPause = c.isPlaying
+                        if (c.isPlaying) c.pause() else c.play()
+                    }
+                },
+            )
+        )
     }
 
     private fun cyclePlaybackSpeed(speedBtn: android.widget.TextView) {
