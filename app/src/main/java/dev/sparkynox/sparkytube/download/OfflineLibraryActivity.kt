@@ -1,50 +1,61 @@
 package dev.sparkynox.sparkytube.download
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
 import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.FileProvider
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
-import dev.sparkynox.sparkytube.databinding.ActivityOfflineLibraryBinding
-import dev.sparkynox.sparkytube.databinding.ItemOfflineVideoBinding
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import dev.sparkynox.sparkytube.ui.SparkyTheme
 import java.io.File
 import java.util.Locale
 
-/**
- * Offline playlist: lists every video file SparkyTube has downloaded to
- * the public Downloads folder and lets the user play them back without
- * any network connection, or delete ones they no longer want. Reuses
- * OfflinePlayerActivity (a minimal ExoPlayer wrapper) for actual
- * playback rather than routing local files through MainActivity's
- * WebView+extractor pipeline, since none of that applies to a file
- * that's already sitting on disk.
- */
+// Offline playlist: every video file SparkyTube downloaded to the public Downloads folder.
+// Plays them through OfflinePlayerActivity, no network needed, and deletes the ones you don't want.
 class OfflineLibraryActivity : AppCompatActivity() {
 
-    private lateinit var binding: ActivityOfflineLibraryBinding
-    private lateinit var adapter: OfflineVideoAdapter
+    private var files by mutableStateOf<List<File>>(emptyList())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityOfflineLibraryBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-
-        binding.offlineLibraryBackBtn.setOnClickListener { finish() }
-
-        adapter = OfflineVideoAdapter(
-            onPlay = { file -> playFile(file) },
-            onDelete = { file -> confirmDelete(file) }
-        )
-        binding.offlineLibraryList.layoutManager = LinearLayoutManager(this)
-        binding.offlineLibraryList.adapter = adapter
+        setContentView(ComposeView(this).apply {
+            setContent { SparkyTheme { LibraryScreen() } }
+        })
     }
 
     override fun onResume() {
@@ -52,80 +63,86 @@ class OfflineLibraryActivity : AppCompatActivity() {
         refreshList()
     }
 
-    /**
-     * Scans the public Downloads folder for video files SparkyTube would
-     * have produced (.mp4/.webm/.mkv), sorted newest-first. Simple
-     * directory listing rather than a MediaStore query -- Downloads is a
-     * small, flat folder in practice, and this avoids needing
-     * READ_MEDIA_VIDEO permission handling just to show a handful of
-     * files the app itself just wrote.
-     */
+    // plain directory listing, Downloads is a small flat folder and this needs no media permission
     private fun refreshList() {
-        val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-        val videoExtensions = setOf("mp4", "webm", "mkv")
-
-        val files = downloadsDir.listFiles { f ->
-            f.isFile && f.extension.lowercase(Locale.US) in videoExtensions
-        }?.sortedByDescending { it.lastModified() } ?: emptyList()
-
-        adapter.submitList(files)
-        binding.offlineLibraryEmptyText.visibility = if (files.isEmpty()) View.VISIBLE else View.GONE
+        val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        val ext = setOf("mp4", "webm", "mkv")
+        files = dir.listFiles { f -> f.isFile && f.extension.lowercase(Locale.US) in ext }
+            ?.sortedByDescending { it.lastModified() } ?: emptyList()
     }
 
-    private fun playFile(file: File) {
-        val intent = Intent(this, OfflinePlayerActivity::class.java).apply {
-            putExtra(OfflinePlayerActivity.EXTRA_FILE_PATH, file.absolutePath)
-            putExtra(OfflinePlayerActivity.EXTRA_TITLE, file.nameWithoutExtension)
-        }
-        startActivity(intent)
+    private fun play(file: File) {
+        startActivity(
+            Intent(this, OfflinePlayerActivity::class.java)
+                .putExtra(OfflinePlayerActivity.EXTRA_FILE_PATH, file.absolutePath)
+                .putExtra(OfflinePlayerActivity.EXTRA_TITLE, file.nameWithoutExtension)
+        )
     }
 
-    private fun confirmDelete(file: File) {
-        AlertDialog.Builder(this)
-            .setTitle("Delete this download?")
-            .setMessage(file.nameWithoutExtension)
-            .setPositiveButton("Delete") { _, _ ->
-                if (file.delete()) {
-                    Toast.makeText(this, "Deleted", Toast.LENGTH_SHORT).show()
-                    refreshList()
+    @Composable
+    private fun LibraryScreen() {
+        var deleting by remember { mutableStateOf<File?>(null) }
+
+        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            Column(Modifier.fillMaxSize().statusBarsPadding()) {
+                Row(Modifier.padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { finish() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+                    Text(
+                        "Offline library", Modifier.padding(start = 4.dp),
+                        style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                if (files.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("No downloaded videos yet", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 } else {
-                    Toast.makeText(this, "Couldn't delete file", Toast.LENGTH_SHORT).show()
+                    LazyColumn(
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(files, key = { it.absolutePath }) { f ->
+                            Surface(
+                                Modifier.fillMaxWidth().clickable { play(f) },
+                                shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainer,
+                            ) {
+                                Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Filled.PlayArrow, null, Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)
+                                    Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
+                                        Text(
+                                            f.nameWithoutExtension, style = MaterialTheme.typography.bodyLarge,
+                                            maxLines = 2, overflow = TextOverflow.Ellipsis,
+                                        )
+                                        Text(
+                                            "${formatBytes(f.length())}  \u2022  ${f.extension.uppercase(Locale.US)}",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                    IconButton(onClick = { deleting = f }) { Icon(Icons.Filled.Delete, "Delete") }
+                                }
+                            }
+                        }
+                    }
                 }
             }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
-}
+        }
 
-class OfflineVideoAdapter(
-    private val onPlay: (File) -> Unit,
-    private val onDelete: (File) -> Unit
-) : RecyclerView.Adapter<OfflineVideoAdapter.ViewHolder>() {
-
-    private var items: List<File> = emptyList()
-
-    fun submitList(newItems: List<File>) {
-        items = newItems
-        notifyDataSetChanged() // small local list -- a full library rescan is cheap and simple here
-    }
-
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        val binding = ItemOfflineVideoBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-        return ViewHolder(binding)
-    }
-
-    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.bind(items[position], onPlay, onDelete)
-    }
-
-    override fun getItemCount() = items.size
-
-    class ViewHolder(private val binding: ItemOfflineVideoBinding) : RecyclerView.ViewHolder(binding.root) {
-        fun bind(file: File, onPlay: (File) -> Unit, onDelete: (File) -> Unit) {
-            binding.itemOfflineTitle.text = file.nameWithoutExtension
-            binding.itemOfflineMeta.text = "${formatBytes(file.length())}  •  ${file.extension.uppercase(Locale.US)}"
-            binding.root.setOnClickListener { onPlay(file) }
-            binding.itemOfflineDeleteBtn.setOnClickListener { onDelete(file) }
+        deleting?.let { f ->
+            AlertDialog(
+                onDismissRequest = { deleting = null },
+                title = { Text("Delete this download?") },
+                text = { Text(f.nameWithoutExtension) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        val ok = f.delete()
+                        Toast.makeText(this@OfflineLibraryActivity, if (ok) "Deleted" else "Couldn't delete file", Toast.LENGTH_SHORT).show()
+                        deleting = null
+                        refreshList()
+                    }) { Text("Delete") }
+                },
+                dismissButton = { TextButton(onClick = { deleting = null }) { Text("Cancel") } },
+            )
         }
     }
 }
