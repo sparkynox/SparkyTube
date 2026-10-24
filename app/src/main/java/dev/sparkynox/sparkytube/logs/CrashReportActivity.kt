@@ -21,10 +21,16 @@ class CrashReportActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setTheme(R.style.Theme_SparkyTube_NoActionBar)
+        // the Compose dialog needs the lifecycle owners that setContentView installs, this screen has no layout
+        setContentView(android.view.View(this))
+
+        // the error itself, so it can be read right here even if the Logs screen is what crashed
+        val detail = LogRecorder.getLastCrash(this)?.lineSequence()
+            ?.map { it.trim() }?.filter { it.isNotEmpty() }?.take(16)?.joinToString("\n").orEmpty()
 
         AlertDialog.Builder(this)
             .setTitle("App Crashed")
-            .setMessage("SparkyTube ran into an error and had to restart. Check Logs for details.")
+            .setMessage("SparkyTube ran into an error and had to restart.\n\n$detail")
             .setCancelable(false)
             .setPositiveButton("Check Logs") { _, _ ->
                 startActivity(Intent(this, LogsActivity::class.java))
