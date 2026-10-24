@@ -12,6 +12,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.rotate
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TextField
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -83,39 +90,53 @@ fun SearchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onClose: () 
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
-            Row(Modifier.padding(horizontal = 4.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.padding(start = 4.dp, end = 16.dp, top = 6.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
-                OutlinedTextField(
+                TextField(
                     value = s.query,
                     onValueChange = { s.onType(it) },
                     modifier = Modifier.weight(1f).focusRequester(requester),
                     placeholder = { Text("Search YouTube") },
                     singleLine = true,
-                    shape = RoundedCornerShape(28.dp),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(onSearch = { go(s.query) }),
+                    shape = CircleShape,
+                    leadingIcon = { Icon(Icons.Filled.Search, null) },
                     trailingIcon = {
                         if (s.query.isNotEmpty()) IconButton(onClick = { s.clear(); requester.requestFocus() }) {
                             Icon(Icons.Filled.Clear, "Clear")
                         }
                     },
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                    ),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { go(s.query) }),
                 )
-                IconButton(onClick = { go(s.query) }) { Icon(Icons.Filled.Search, "Search") }
             }
 
-            if (s.submitted.isNotEmpty() && s.suggestions.isEmpty()) {
-                Row(Modifier.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FILTERS.forEach { (key, label) ->
-                        FilterChip(selected = s.filter == key, onClick = { s.changeFilter(key) }, label = { Text(label) })
-                    }
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(FILTERS) { (key, label) ->
+                    FilterChip(
+                        selected = s.filter == key,
+                        onClick = { s.changeFilter(key) },
+                        label = { Text(label) },
+                        shape = CircleShape,
+                        border = null,
+                    )
                 }
             }
+            if (s.loading && s.hits.isEmpty()) LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp))
 
             when {
                 // typing: suggestions
-                s.suggestions.isNotEmpty() -> LazyColumn {
+                s.suggestions.isNotEmpty() -> LazyColumn(contentPadding = PaddingValues(vertical = 4.dp)) {
                     items(s.suggestions.toList()) { sug ->
-                        TextRow(sug) { go(sug) }
+                        TextRow(sug, onFill = { s.onType("$sug ") }) { go(sug) }
                     }
                 }
                 // nothing searched yet: recent searches
@@ -172,13 +193,20 @@ fun SearchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onClose: () 
 }
 
 @Composable
-private fun TextRow(text: String, onRemove: (() -> Unit)? = null, onClick: () -> Unit) {
+private fun TextRow(text: String, onRemove: (() -> Unit)? = null, onFill: (() -> Unit)? = null, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 8.dp).clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Icon(Icons.Filled.Search, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(text, Modifier.weight(1f).padding(start = 16.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
-        if (onRemove != null) IconButton(onClick = onRemove, Modifier.size(32.dp)) { Icon(Icons.Filled.Clear, "Remove") }
+        Text(text, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (onFill != null) Icon(
+            Icons.AutoMirrored.Filled.ArrowBack, "Use this text",
+            Modifier.size(20.dp).rotate(45f).clickable(onClick = onFill),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (onRemove != null) IconButton(onClick = onRemove, Modifier.size(28.dp)) { Icon(Icons.Filled.Clear, "Remove") }
     }
 }

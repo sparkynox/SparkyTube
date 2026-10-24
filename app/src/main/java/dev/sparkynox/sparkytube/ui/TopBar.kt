@@ -39,7 +39,7 @@ class OverflowItem(val label: String, val icon: Int, val run: () -> Unit)
 // painterResource only takes vectors and bitmaps; some of the menu icons are framework selectors and crashed it.
 // an ImageView takes whatever drawable it is
 @Composable
-private fun ResIcon(res: Int, tint: androidx.compose.ui.graphics.Color, size: androidx.compose.ui.unit.Dp = 24.dp) {
+internal fun ResIcon(res: Int, tint: androidx.compose.ui.graphics.Color, size: androidx.compose.ui.unit.Dp = 24.dp) {
     androidx.compose.ui.viewinterop.AndroidView(
         factory = { c -> android.widget.ImageView(c).apply { scaleType = android.widget.ImageView.ScaleType.FIT_CENTER } },
         update = { v ->
