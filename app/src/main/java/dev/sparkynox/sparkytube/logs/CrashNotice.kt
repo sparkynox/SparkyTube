@@ -24,7 +24,7 @@ object CrashNotice {
             .setMessage(lines.take(30).joinToString("\n").take(3500))
             .setPositiveButton("Copy") { _, _ ->
                 val cm = activity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                cm.setPrimaryClip(ClipData.newPlainText("SparkyTube crash", report))
+                cm.setPrimaryClip(ClipData.newPlainText("SparkyTube crash", report.take(60_000)))
                 Toast.makeText(activity, "Copied", Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton("Close", null)

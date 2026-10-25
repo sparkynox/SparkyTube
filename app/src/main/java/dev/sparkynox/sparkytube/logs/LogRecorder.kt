@@ -39,6 +39,8 @@ object LogRecorder {
     private var appContext: Context? = null
 
     private val writeLock = Any()
+    private var lastKey = ""
+    private var repeats = 0
 
     fun init(context: Context) {
         appContext = context.applicationContext
@@ -74,7 +76,17 @@ object LogRecorder {
 
         synchronized(writeLock) {
             try {
-                val line = buildString {
+                // the same line over and over is spam, count it instead of writing it
+                val key = "$level/$tag: $message"
+                if (throwable == null && key == lastKey) {
+                    repeats++
+                    return
+                }
+                val flushRepeats = if (repeats > 0) "    (line above repeated $repeats more times)\n" else ""
+                repeats = 0
+                lastKey = key
+
+                val line = flushRepeats + buildString {
                     append(timeFormat.format(Date()))
                     append(' ').append(level).append('/').append(tag).append(": ").append(message)
                     if (throwable != null) {
@@ -156,7 +168,7 @@ object LogRecorder {
             val report = buildString {
                 append("=== SparkyTube crash ${timeFormat.format(Date())} ===\n")
                 append("Thread: ${thread.name}\n\n")
-                append(sw.toString())
+                append(sw.toString().take(30_000)) // some traces run to megabytes
                 append("\n\n=== Session log leading up to crash ===\n")
                 append(getSessionLog(context).takeLast(20_000)) // last ~20k chars is plenty of lead-up context
             }

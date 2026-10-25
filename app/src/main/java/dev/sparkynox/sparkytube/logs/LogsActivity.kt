@@ -56,15 +56,16 @@ class LogsActivity : AppCompatActivity() {
 
     @Composable
     private fun LogsScreen() {
-        var crash by remember { mutableStateOf(LogRecorder.getLastCrash(this@LogsActivity)) }
-        var session by remember { mutableStateOf(LogRecorder.getSessionLog(this@LogsActivity)) }
+        // the files can be megabytes, one Text with all of it freezes and then kills the screen. show the tail only
+        var crash by remember { mutableStateOf(LogRecorder.getLastCrash(this@LogsActivity)?.take(12_000)) }
+        var session by remember { mutableStateOf(LogRecorder.getSessionLog(this@LogsActivity).takeLast(60_000)) }
         var confirmClear by remember { mutableStateOf(false) }
 
         // keeps up with new lines while the screen is open
         LaunchedEffect(Unit) {
             while (true) {
                 delay(2000)
-                session = LogRecorder.getSessionLog(this@LogsActivity)
+                session = LogRecorder.getSessionLog(this@LogsActivity).takeLast(60_000)
             }
         }
 
