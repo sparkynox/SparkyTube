@@ -73,7 +73,7 @@ fun attachComposePlayerControls(playerView: PlayerView, host: PlayerControlsHost
     val overlay = playerView.overlayFrameLayout ?: return
     overlay.addView(
         androidx.compose.ui.platform.ComposeView(playerView.context).apply {
-            setContent { SparkyTheme(fill = false) { PlayerControls(host) } }
+            setContent { SparkyTheme(fill = false, background = false) { PlayerControls(host) } }
         },
         android.view.ViewGroup.LayoutParams(-1, -1)
     )
@@ -114,7 +114,18 @@ fun PlayerControls(h: PlayerControlsHost) {
     var dragValue by remember { mutableStateOf(0f) }
     val shown = if (dragging) dragValue else position.toFloat()
 
+    // tap on the video shows / hides the controls, they hide on their own while playing
+    val vis = PlayerControlsVisibility
+    LaunchedEffect(vis.visible, vis.pokes, playing, dragging) {
+        if (vis.visible && playing && !dragging) {
+            delay(3500)
+            vis.visible = false
+        }
+    }
+    fun poke(f: () -> Unit): () -> Unit = { vis.poke(); f() }
+
     Box(Modifier.fillMaxSize()) {
+      if (vis.visible) {
         Box(Modifier.fillMaxWidth().height(90.dp).align(Alignment.TopCenter).background(ScrimTop))
         Box(Modifier.fillMaxWidth().height(100.dp).align(Alignment.BottomCenter).background(ScrimBottom))
 
@@ -124,38 +135,39 @@ fun PlayerControls(h: PlayerControlsHost) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            RoundButton(onClick = h.onMinimize) { Icon(Icons.Filled.KeyboardArrowDown, "Minimize", tint = Color.White) }
+            RoundButton(onClick = poke(h.onMinimize)) { Icon(Icons.Filled.KeyboardArrowDown, "Minimize", tint = Color.White) }
             Text(
                 h.title(), Modifier.weight(1f).padding(horizontal = 4.dp),
                 color = Color.White, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold,
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
-            if (h.downloadEnabled()) RoundButton(onClick = h.onDownload, onLongClick = h.onDownloadsList) { ResIcon(R.drawable.ic_download, Color.White, 22.dp) }
-            if (h.audioTracks() > 1) RoundButton(onClick = h.onAudio) { ResIcon(R.drawable.ic_audio_track, Color.White, 22.dp) }
-            RoundButton(onClick = h.onMusic, highlight = h.musicOn()) { ResIcon(R.drawable.ic_music_note, Color.White, 22.dp) }
-            RoundButton(onClick = h.onQuality) { ResIcon(R.drawable.ic_quality, Color.White, 22.dp) }
+            if (h.downloadEnabled()) RoundButton(onClick = poke(h.onDownload), onLongClick = h.onDownloadsList) { ResIcon(R.drawable.ic_download, Color.White, 22.dp) }
+            if (h.audioTracks() > 1) RoundButton(onClick = poke(h.onAudio)) { ResIcon(R.drawable.ic_audio_track, Color.White, 22.dp) }
+            RoundButton(onClick = poke(h.onMusic), highlight = h.musicOn()) { ResIcon(R.drawable.ic_music_note, Color.White, 22.dp) }
+            RoundButton(onClick = poke(h.onQuality)) { ResIcon(R.drawable.ic_quality, Color.White, 22.dp) }
         }
+      }
 
-        // centre: spinner while loading, play/pause otherwise
+        // centre: spinner while loading (always), play/pause only while the controls are shown
         Box(Modifier.align(Alignment.Center)) {
             if (buffering) {
                 CircularProgressIndicator(Modifier.size(56.dp), color = Color.White, strokeWidth = 4.dp)
-            } else {
-                RoundButton(onClick = h.onPlayPause, size = 64.dp, highlight = true) {
+            } else if (vis.visible) {
+                RoundButton(onClick = poke(h.onPlayPause), size = 64.dp, highlight = true) {
                     ResIcon(if (playing) R.drawable.ic_pause else R.drawable.ic_play, Color.White, 34.dp)
                 }
             }
         }
 
         // bottom row: time, seek bar, duration, speed, fullscreen
-        Row(
+        if (vis.visible) Row(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(clock(shown.toLong()), color = Color.White, style = MaterialTheme.typography.labelMedium)
             Slider(
                 value = shown.coerceIn(0f, duration.coerceAtLeast(1L).toFloat()),
-                onValueChange = { dragging = true; dragValue = it },
+                onValueChange = { vis.poke(); dragging = true; dragValue = it },
                 onValueChangeFinished = {
                     c?.seekTo(dragValue.toLong())
                     dragging = false
@@ -164,10 +176,10 @@ fun PlayerControls(h: PlayerControlsHost) {
                 modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
             )
             Text(clock(duration), color = Color.White, style = MaterialTheme.typography.labelMedium)
-            RoundButton(onClick = h.onSpeed, modifier = Modifier.padding(start = 8.dp), wide = true) {
+            RoundButton(onClick = poke(h.onSpeed), modifier = Modifier.padding(start = 8.dp), wide = true) {
                 Text(h.speedLabel(), color = Color.White, style = MaterialTheme.typography.labelLarge)
             }
-            RoundButton(onClick = h.onFullscreen, modifier = Modifier.padding(start = 6.dp)) {
+            RoundButton(onClick = poke(h.onFullscreen), modifier = Modifier.padding(start = 6.dp)) {
                 ResIcon(R.drawable.ic_fullscreen, Color.White, 22.dp)
             }
         }
@@ -203,4 +215,12 @@ private fun clock(ms: Long): String {
     val m = (s % 3600) / 60
     val sec = s % 60
     return if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%d:%02d".format(m, sec)
+}
+
+// shared so the activity's tap gesture can flip it: a tap on the video (not on a button) shows or hides the controls
+object PlayerControlsVisibility {
+    var visible by mutableStateOf(true)
+    var pokes by mutableIntStateOf(0)
+    fun poke() { visible = true; pokes++ }
+    fun toggle() { visible = !visible; pokes++ }
 }

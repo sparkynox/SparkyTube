@@ -76,7 +76,8 @@ private val LightScheme = lightColorScheme(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun SparkyTheme(fill: Boolean = true, content: @Composable () -> Unit) {
+// background = false: no Surface, so what sits underneath (the video) stays visible. Used by the player controls.
+fun SparkyTheme(fill: Boolean = true, background: Boolean = true, content: @Composable () -> Unit) {
     val ctx = LocalContext.current
     // Settings > Appearance sets the app's night mode, which isSystemInDarkTheme() follows
     val dark = isSystemInDarkTheme()
@@ -94,11 +95,18 @@ fun SparkyTheme(fill: Boolean = true, content: @Composable () -> Unit) {
         motionScheme = MotionScheme.expressive(),
         typography = AppTypography,
     ) {
-        Surface(
-            modifier = if (fill) Modifier.fillMaxSize() else Modifier,
-            color = MaterialTheme.colorScheme.background,
-            contentColor = MaterialTheme.colorScheme.onBackground,
-            content = content,
-        )
+        if (background) {
+            Surface(
+                modifier = if (fill) Modifier.fillMaxSize() else Modifier,
+                color = MaterialTheme.colorScheme.background,
+                contentColor = MaterialTheme.colorScheme.onBackground,
+                content = content,
+            )
+        } else {
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.material3.LocalContentColor provides MaterialTheme.colorScheme.onBackground,
+                content = content,
+            )
+        }
     }
 }
