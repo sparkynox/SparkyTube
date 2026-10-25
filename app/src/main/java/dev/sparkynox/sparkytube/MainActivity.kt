@@ -3600,6 +3600,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     }
 
     override fun onResume() {
+        dev.sparkynox.sparkytube.logs.CrashNotice.showIfAny(this)
         reopenForcedUpdate()
         super.onResume()
         webView.onResume()
