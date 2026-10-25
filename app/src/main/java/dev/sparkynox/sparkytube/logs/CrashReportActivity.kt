@@ -2,7 +2,7 @@ package dev.sparkynox.sparkytube.logs
 
 import android.content.Intent
 import android.os.Bundle
-import dev.sparkynox.sparkytube.ui.ComposeAlertDialog as AlertDialog
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import dev.sparkynox.sparkytube.MainActivity
 import dev.sparkynox.sparkytube.R
