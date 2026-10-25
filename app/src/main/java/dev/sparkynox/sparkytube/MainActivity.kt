@@ -655,6 +655,11 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                     return false
                 }
 
+                override fun onSingleTapConfirmed(e: android.view.MotionEvent): Boolean {
+                    dev.sparkynox.sparkytube.ui.PlayerControlsVisibility.toggle()
+                    return false
+                }
+
                 override fun onDoubleTap(e: android.view.MotionEvent): Boolean {
                     if (videoScale > 1f) {
                         // Already zoomed in — double-tap resets back to normal
