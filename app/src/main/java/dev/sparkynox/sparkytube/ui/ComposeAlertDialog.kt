@@ -47,7 +47,7 @@ class ComposeAlertDialog private constructor(
         if (host != null || activity.isFinishing || activity.isDestroyed) return this
         val root = activity.findViewById<ViewGroup>(android.R.id.content) ?: return this
         host = ComposeView(activity).apply {
-            setContent { SparkyTheme(fill = false) { Content() } }
+            setContent { SparkyTheme(fill = false) { DialogBody() } }
         }
         root.addView(host, ViewGroup.LayoutParams(0, 0))
         return this
@@ -66,8 +66,10 @@ class ComposeAlertDialog private constructor(
         dismiss()
     }
 
+    // not named Content: inside ComposeView.apply { } that name resolves to the ComposeView's own Content method,
+    // which runs this same lambda again and again until the stack overflows
     @Composable
-    private fun Content() {
+    private fun DialogBody() {
         var checked by remember { mutableIntStateOf(b.checked) }
         val cancelable = b.cancelable
 
