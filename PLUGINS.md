@@ -78,10 +78,31 @@ or other plugins.
 - Each plugin has its own private token, a page script can't call the app on its behalf.
 - Values saved with `sparky.storage` are removed with the plugin.
 
+## Native plugins (dex / jar / Kotlin)
+
+For things JS can't do. A native plugin is a `.dex` file, or a `.jar` / `.zip` with `classes.dex` inside, plus an optional `plugin.json` (same fields as above, and `"main"` = the main class, default `SparkyPluginMain`). Install it from Settings > Plugins > File or Link. A raw `.dex` takes its id from the file name (`my-plugin.dex`).
+
+**Native plugins run inside the app with the app's full access. The permission list only gates the PluginHost helpers, it is not a sandbox.** SparkyTube asks before installing one.
+
+Extend `SparkyPlugin` (copy `app/src/main/java/dev/sparkynox/sparkytube/plugins/api/SparkyPlugin.kt` into your plugin project, same package, and don't ship it in the dex):
+
+```kotlin
+class SparkyPluginMain : SparkyPlugin() {
+    override fun onLoad(host: PluginHost) {
+        host.log("hello")
+        host.toast("Plugin loaded")      // needs "toast" permission
+    }
+    override fun onEvent(name: String, dataJson: String) { }   // play, pause, videoend...
+    override fun onUnload() { }
+}
+```
+
+Everything is called on the main thread, don't block. Build: compile with kotlinc (android.jar on the classpath), exclude the `plugins/api` classes, run `d8 --release --output out plugin.jar kotlin-stdlib.jar`, then zip `classes.dex` + `plugin.json`. Bundle the Kotlin stdlib in the dex, the app's own copy is shrunk. Plugins are reloaded when you come back from the plugin screen.
+
 ## Later
 
-Plugins are JS/CSS only for now. Planned for a later version:
+Native plugins (below) can't touch screens or the player yet. Planned for a later version:
 
-- Kotlin/dex style plugins, for things JS can't reach (native screens, the player, settings pages)
+- A bigger native API (screens, the player, settings pages)
 - Image changing support (swap the app's images/icons from a plugin)
 - A plugin store, so plugins can be browsed and installed from the app

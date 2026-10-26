@@ -1,5 +1,19 @@
 # SparkyTube Changelog
 
+# v2.3
+
+## New Features
+
+- **Native plugins**: install `.dex` / `.jar` Kotlin plugins from Settings > Plugins. They get a small API (events, saved data, toast, current video, download) and the app asks before installing one. See `PLUGINS.md`
+- **Media cache**: 256 MB disk cache for video, so replays and rewinds don't hit the network again
+
+## Improvements
+
+- **Long videos start much faster**: googlevideo files are now requested in small range pieces instead of one open-ended request, which YouTube throttles
+- Player uses OkHttp (HTTP/2, kept-alive connections), 20s back buffer
+- Next video's first chunk is prefetched while the current one ends, sized to your measured speed
+- Small C++ library (`libsparkynet`) measures network speed and warms DNS for the stream host
+
 # v2.1
 
 ## New Features
