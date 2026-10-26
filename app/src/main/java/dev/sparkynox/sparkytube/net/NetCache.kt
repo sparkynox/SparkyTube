@@ -127,11 +127,12 @@ object NetCache {
     /** disk cached, used for progressive/adaptive files */
     fun cachedFactory(context: Context): DataSource.Factory {
         init(context)
-        val upstream = networkFactory(context.applicationContext)
-        val c = getCache() ?: return upstream
+        val net = networkFactory(context.applicationContext)
+        val chunked = DataSource.Factory { ChunkedDataSource(net.createDataSource()) }
+        val c = getCache() ?: return chunked
         return CacheDataSource.Factory()
             .setCache(c)
-            .setUpstreamDataSourceFactory(upstream)
+            .setUpstreamDataSourceFactory(chunked)
             .setCacheKeyFactory { spec -> keyFor(spec) }
             .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
     }
