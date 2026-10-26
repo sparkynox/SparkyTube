@@ -42,3 +42,6 @@
 
 ## native network helper (libsparkynet.so), JNI looks these up by name
 -keep class dev.sparkynox.sparkytube.net.NativeNet { *; }
+
+## native plugin api, plugins are compiled against these names
+-keep class dev.sparkynox.sparkytube.plugins.api.** { *; }
