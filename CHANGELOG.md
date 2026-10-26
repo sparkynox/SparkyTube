@@ -5,6 +5,7 @@
 ## New Features
 
 - **Native plugins**: install `.dex` / `.jar` Kotlin plugins from Settings > Plugins. They get full access: the Activity, WebView and player objects, JS eval, saved data, events. The app asks before installing one. See `PLUGINS.md`
+- **Audio FX (LunoFX)**: a native C++ audio engine inside the player. 10-band equalizer, bass boost, stereo width, reverb, **8D audio** (sound circles around your head), a **volume normalizer** that evens out loud and quiet videos, and a limiter so nothing clips. Presets: Bass Boost, Lofi Chill, Slowed + Reverb, Nightcore, 8D Audio, Vocal Boost, Loud + Even. Settings > App > Audio FX, or the ⋮ menu
 - **Media cache**: 256 MB disk cache for video, so replays and rewinds don't hit the network again
 
 ## Improvements

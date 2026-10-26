@@ -97,7 +97,7 @@ class SparkyPluginMain : SparkyPlugin() {
 }
 ```
 
-`host.activity()`, `host.webView()` and `host.player()` (the Media3 MediaController) hand you the real objects, and `host.evaluateJs()` runs JS in the page. Every class in the app is kept un-renamed in release builds, so reflection on MainActivity and the rest works. Everything is called on the main thread, don't block. Build: compile with kotlinc (android.jar on the classpath), exclude the `plugins/api` classes, run `d8 --release --output out plugin.jar kotlin-stdlib.jar`, then zip `classes.dex` + `plugin.json`. The app's Kotlin stdlib and Media3 are kept whole, but bundling your own stdlib in the dex is still safest. Plugins are reloaded when you come back from the plugin screen.
+`host.activity()`, `host.webView()` and `host.player()` (the Media3 MediaController) hand you the real objects, and `host.evaluateJs()` runs JS in the page. `dev.sparkynox.sparkytube.fx.LunoFx.update(ctx, params)` changes the audio engine live. Every class in the app is kept un-renamed in release builds, so reflection on MainActivity and the rest works. Everything is called on the main thread, don't block. Build: compile with kotlinc (android.jar on the classpath), exclude the `plugins/api` classes, run `d8 --release --output out plugin.jar kotlin-stdlib.jar`, then zip `classes.dex` + `plugin.json`. The app's Kotlin stdlib and Media3 are kept whole, but bundling your own stdlib in the dex is still safest. Plugins are reloaded when you come back from the plugin screen.
 
 ## Later
 
