@@ -1015,6 +1015,9 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         override fun openUrl(url: String) {
             runOnUiThread { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))) }
         }
+        override fun activity(): android.app.Activity = this@MainActivity
+        override fun webView(): WebView = this@MainActivity.webView
+        override fun controller(): androidx.media3.session.MediaController? = mediaController
     }
 
     private fun emitPluginEvent(name: String, dataJson: String) {
