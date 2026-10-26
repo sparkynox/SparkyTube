@@ -16,13 +16,20 @@ abstract class SparkyPlugin {
 interface PluginHost {
     fun context(): Context
 
-    // these need the permission in plugin.json: toast, video, download, open_url
+    // helpers, no permission needed for native plugins
     fun toast(message: String)
     fun videoInfoJson(): String
     fun downloadCurrent()
     fun openUrl(url: String)
+    fun runOnUi(r: Runnable)
+    fun evaluateJs(js: String)
 
-    // always allowed
+    // the real objects, do whatever you want with them (call on the main thread).
+    // MainActivity's own members can be reached with reflection
+    fun activity(): android.app.Activity
+    fun webView(): android.webkit.WebView
+    fun player(): androidx.media3.session.MediaController?
+
     fun log(message: String)
     fun storageGet(key: String): String?
     fun storageSet(key: String, value: String): Boolean
