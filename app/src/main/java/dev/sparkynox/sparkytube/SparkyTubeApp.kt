@@ -17,6 +17,7 @@ class SparkyTubeApp : Application() {
         Thread.setDefaultUncaughtExceptionHandler(dev.sparkynox.sparkytube.logs.CrashHandler(this))
 
         dev.sparkynox.sparkytube.net.NetCache.init(this)
+        dev.sparkynox.sparkytube.fx.LunoFx.init(this)
 
         // YouTube login state (cookie + visitor data), used by the home feed
         dev.sparkynox.sparkytube.auth.Session.init(this)

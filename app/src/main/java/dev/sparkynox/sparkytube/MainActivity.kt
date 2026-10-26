@@ -1794,6 +1794,9 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         items += Shortcut("Offline", R.drawable.ic_library) {
             startActivity(Intent(this, dev.sparkynox.sparkytube.download.OfflineLibraryActivity::class.java))
         }
+        items += Shortcut("Audio FX", R.drawable.ic_volume_up) {
+            startActivity(Intent(this, dev.sparkynox.sparkytube.fx.AudioFxActivity::class.java))
+        }
         items += Shortcut("Appearance", android.R.drawable.ic_menu_gallery, settingsAt("appearance"))
         items += Shortcut("Player", R.drawable.ic_play, settingsAt("player"))
         items += Shortcut("Extraction", android.R.drawable.ic_menu_edit, settingsAt("extraction"))
