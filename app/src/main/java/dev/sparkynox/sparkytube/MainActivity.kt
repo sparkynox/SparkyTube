@@ -1004,7 +1004,21 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     // ---- plugin events + the snapshot plugins read through video.info() ----
     @Volatile private var pluginVideoSnapshot = "{}"
 
+    private val pluginHost = object : dev.sparkynox.sparkytube.plugins.PluginBridge.Host {
+        override fun toast(message: String) {
+            runOnUiThread { android.widget.Toast.makeText(this@MainActivity, message, android.widget.Toast.LENGTH_SHORT).show() }
+        }
+        override fun videoInfoJson(): String = pluginVideoSnapshot
+        override fun downloadCurrent() {
+            runOnUiThread { showDownloadQualityPicker() }
+        }
+        override fun openUrl(url: String) {
+            runOnUiThread { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))) }
+        }
+    }
+
     private fun emitPluginEvent(name: String, dataJson: String) {
+        dev.sparkynox.sparkytube.plugins.NativePlugins.emit(name, dataJson)
         webView.post {
             webView.evaluateJavascript(
                 "window.__sparkyPlugins&&window.__sparkyPlugins.emit(${org.json.JSONObject.quote(name)},$dataJson)", null
@@ -2275,20 +2289,10 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         // Continuous JS <-> Kotlin channel.
         webView.addJavascriptInterface(JsBridge(this), "SparkyBridge")
         webView.addJavascriptInterface(
-            dev.sparkynox.sparkytube.plugins.PluginBridge(this, object : dev.sparkynox.sparkytube.plugins.PluginBridge.Host {
-                override fun toast(message: String) {
-                    runOnUiThread { android.widget.Toast.makeText(this@MainActivity, message, android.widget.Toast.LENGTH_SHORT).show() }
-                }
-                override fun videoInfoJson(): String = pluginVideoSnapshot
-                override fun downloadCurrent() {
-                    runOnUiThread { showDownloadQualityPicker() }
-                }
-                override fun openUrl(url: String) {
-                    runOnUiThread { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))) }
-                }
-            }),
+            dev.sparkynox.sparkytube.plugins.PluginBridge(this, pluginHost),
             "SparkyPlugins"
         )
+        dev.sparkynox.sparkytube.plugins.NativePlugins.start(this, pluginHost)
 
         webView.webChromeClient = object : android.webkit.WebChromeClient() {
             override fun onCreateWindow(
@@ -3628,6 +3632,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         // (not while a video is playing natively, that would cut it)
         if (dev.sparkynox.sparkytube.plugins.PluginStore.dirty) {
             dev.sparkynox.sparkytube.plugins.PluginStore.dirty = false
+            dev.sparkynox.sparkytube.plugins.NativePlugins.start(this, pluginHost)
             if (!isNativePlaybackActive) webView.reload()
         }
         // Picks up a Data Saver toggle flipped on the Settings screen
