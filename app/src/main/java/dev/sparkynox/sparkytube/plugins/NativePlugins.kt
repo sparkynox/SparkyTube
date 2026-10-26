@@ -40,7 +40,7 @@ object NativePlugins {
         DexClassLoader(path, null, null, parent) {
         override fun loadClass(name: String, resolve: Boolean): Class<*> {
             if (name.startsWith("kotlin.") || name.startsWith("kotlinx.")) {
-                synchronized(getClassLoadingLock(name)) {
+                synchronized(this) {
                     findLoadedClass(name)?.let { return it }
                     try {
                         return findClass(name)
