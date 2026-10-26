@@ -101,7 +101,7 @@ object StreamExtractor {
     fun prefetch(videoId: String, scope: kotlinx.coroutines.CoroutineScope) {
         if (cache.containsKey(videoId) || inFlight.containsKey(videoId)) return
         scope.launch(Dispatchers.IO) {
-            resolvePlayableUrl(videoId)
+            resolvePlayableUrl(videoId)?.let { dev.sparkynox.sparkytube.net.NetCache.prefetch(it) }
         }
     }
 
@@ -184,6 +184,7 @@ object StreamExtractor {
             cache.remove(cache.keys.first())
         }
         cache[videoId] = System.currentTimeMillis() to resolved
+        dev.sparkynox.sparkytube.net.NetCache.warm(resolved.url)
     }
 
     /**
