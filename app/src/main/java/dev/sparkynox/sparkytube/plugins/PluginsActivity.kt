@@ -217,7 +217,7 @@ class PluginsActivity : AppCompatActivity() {
             AlertDialog(
                 onDismissRequest = { consent = null },
                 title = { Text("Native plugin") },
-                text = { Text("This plugin runs code inside SparkyTube with the same access as the app (files, network, your login). The permission list is not a sandbox. Install only if you trust where it came from.") },
+                text = { Text("This plugin gets full access to SparkyTube: the screen, the player, the WebView, files, network and your login. Nothing is restricted. Install only if you trust where it came from.") },
                 confirmButton = {
                     TextButton(onClick = {
                         consent = null

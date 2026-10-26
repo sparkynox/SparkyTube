@@ -13,6 +13,9 @@ class PluginBridge(private val context: Context, private val host: Host) {
         fun videoInfoJson(): String
         fun downloadCurrent()
         fun openUrl(url: String)
+        fun activity(): android.app.Activity
+        fun webView(): android.webkit.WebView
+        fun controller(): androidx.media3.session.MediaController?
     }
 
     @JavascriptInterface

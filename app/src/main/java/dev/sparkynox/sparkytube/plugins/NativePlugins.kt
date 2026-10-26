@@ -17,8 +17,7 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 // native plugins: a .dex, or a .jar/.zip/.apk with classes.dex inside (+ optional plugin.json).
-// they run inside the app process with the app's full access, the permissions in
-// plugin.json only gate the PluginHost helpers, they are NOT a sandbox
+// they run inside the app process with the app's full access, no permission checks
 object NativePlugins {
 
     const val DEFAULT_MAIN = "SparkyPluginMain"
@@ -146,22 +145,22 @@ object NativePlugins {
         }
     }
 
+    // no permission checks here, native plugins already run with the app's full access
     private class Host(
         private val c: Context,
         private val id: String,
         private val base: PluginBridge.Host
     ) : PluginHost {
-        private fun ok(perm: String): Boolean {
-            val allowed = PluginStore.hasPermission(c, id, perm)
-            if (!allowed) LogRecorder.i(TAG, "$id used a \"$perm\" call without the permission")
-            return allowed
-        }
-
         override fun context(): Context = c.applicationContext
-        override fun toast(message: String) { if (ok("toast")) main.post { base.toast(message.take(200)) } }
-        override fun videoInfoJson(): String = if (ok("video")) base.videoInfoJson() else "{}"
-        override fun downloadCurrent() { if (ok("download")) main.post { base.downloadCurrent() } }
-        override fun openUrl(url: String) { if (ok("open_url") && url.startsWith("http")) main.post { base.openUrl(url) } }
+        override fun toast(message: String) { main.post { base.toast(message.take(200)) } }
+        override fun videoInfoJson(): String = base.videoInfoJson()
+        override fun downloadCurrent() { main.post { base.downloadCurrent() } }
+        override fun openUrl(url: String) { main.post { base.openUrl(url) } }
+        override fun runOnUi(r: Runnable) { main.post(r) }
+        override fun evaluateJs(js: String) { main.post { base.webView().evaluateJavascript(js, null) } }
+        override fun activity() = base.activity()
+        override fun webView() = base.webView()
+        override fun player() = base.controller()
         override fun log(message: String) { LogRecorder.i(TAG, "$id: ${message.take(300)}") }
         override fun storageGet(key: String): String? = PluginStore.dataGet(c, id, key)
         override fun storageSet(key: String, value: String): Boolean = PluginStore.dataSet(c, id, key, value)
