@@ -288,6 +288,9 @@ class SettingsComposeActivity : AppCompatActivity() {
             Section("app", "App", "file", "Plugins, popups and logs", listOf(
                 toggle("popups", "Block all popups", "eyeoff", "Hides the contact-reminder, update, and welcome dialogs",
                         { p.arePopupsBlocked(this) }, { p.setPopupsBlocked(this, it) }),
+                link("audiofx", "Audio FX", "sliders", { "Equalizer, reverb, 8D audio, bass boost, volume normalizer" }) {
+                        open(dev.sparkynox.sparkytube.fx.AudioFxActivity::class.java)
+                    },
                 link("plugins", "Plugins", "layers", { "Beta: install and manage JS plugins" }) {
                         open(dev.sparkynox.sparkytube.plugins.PluginsActivity::class.java)
                     },
