@@ -39,3 +39,6 @@
 ## the renamed class and dies with an AssertionError -> yt-dlp never starts.
 -keep class org.json.** { *; }
 -dontwarn org.json.**
+
+## native network helper (libsparkynet.so), JNI looks these up by name
+-keep class dev.sparkynox.sparkytube.net.NativeNet { *; }
