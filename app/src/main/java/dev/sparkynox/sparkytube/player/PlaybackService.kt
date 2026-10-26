@@ -5,8 +5,7 @@ import android.net.Uri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.datasource.DefaultDataSource
-import androidx.media3.datasource.DefaultHttpDataSource
+import dev.sparkynox.sparkytube.net.NetCache
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.hls.HlsMediaSource
@@ -51,6 +50,7 @@ class PlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
+        NetCache.init(this)
 
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
@@ -70,11 +70,14 @@ class PlaybackService : MediaSessionService() {
             // to actually begin -- prioritize starting fast over starting
             // "safe" with a large buffer cushion already banked.
             .setPrioritizeTimeOverSizeThresholds(true)
+            // keep the last 20s so small rewinds come from memory, not the network
+            .setBackBuffer(20_000, true)
             .build()
 
         val exoPlayer = ExoPlayer.Builder(this)
             .setHandleAudioBecomingNoisy(true)
             .setLoadControl(loadControl)
+            .setUseLazyPreparation(false)
             .setMediaSourceFactory(buildMediaSourceFactory())
             .setWakeMode(androidx.media3.common.C.WAKE_MODE_NETWORK)
             .build()
@@ -140,19 +143,9 @@ class PlaybackService : MediaSessionService() {
      * progressive streams and HLS manifests already contain audio).
      */
     private fun buildMediaSourceFactory(): MediaSource.Factory {
-        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
-            .setUserAgent("Mozilla/5.0 (Linux; Android 13) SparkyTube")
-            // googlevideo.com stream URLs frequently 30x-redirect to a
-            // different edge host (sometimes http->https or vice versa
-            // depending on region/CDN) -- without this, ExoPlayer refuses
-            // to follow those redirects at all and the connection just
-            // fails/stalls until DefaultHttpDataSource gives up, which is
-            // part of what was showing up as "stuck for a few seconds
-            // before it starts playing."
-            .setAllowCrossProtocolRedirects(true)
-            .setConnectTimeoutMs(8_000)
-            .setReadTimeoutMs(8_000)
-        val dataSourceFactory = DefaultDataSource.Factory(this, httpDataSourceFactory)
+        // OkHttp (pooled, HTTP/2) + disk cache for progressive files; HLS skips the cache
+        val dataSourceFactory = NetCache.cachedFactory(this)
+        val hlsDataSourceFactory = NetCache.plainFactory(this)
 
         return object : MediaSource.Factory {
             private var drmSessionManagerProvider: androidx.media3.exoplayer.drm.DrmSessionManagerProvider? = null
@@ -181,7 +174,7 @@ class PlaybackService : MediaSessionService() {
                 val isHls = mediaItem.localConfiguration?.mimeType == androidx.media3.common.MimeTypes.APPLICATION_M3U8
 
                 if (isHls) {
-                    return HlsMediaSource.Factory(dataSourceFactory).createMediaSource(mediaItem)
+                    return HlsMediaSource.Factory(hlsDataSourceFactory).createMediaSource(mediaItem)
                 }
 
                 val videoSource = ProgressiveMediaSource.Factory(dataSourceFactory)
