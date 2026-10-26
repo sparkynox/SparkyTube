@@ -350,6 +350,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                             // failure on this same video still gets its
                             // own fresh set of retries.
                             consecutivePlayerErrorCount = 0
+                            if (isNativePlaybackActive) binding.exoPlayerView.visibility = View.VISIBLE
                         }
                     }
 
@@ -382,6 +383,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                             dev.sparkynox.sparkytube.extractor.StreamExtractor.invalidate(failedVideoId)
                             lastResolvedVideoId = null
                             resolveAndPlayNative(failedVideoId, fallbackTitle = "")
+                            lastResolvedVideoId = failedVideoId
                         } else {
                             // Either genuinely broken (retried twice, still
                             // failing) or we don't know which video it
@@ -657,6 +659,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
                 override fun onSingleTapConfirmed(e: android.view.MotionEvent): Boolean {
                     dev.sparkynox.sparkytube.ui.PlayerControlsVisibility.toggle()
+                    hideSystemBarsInFullscreen()
                     return false
                 }
 
@@ -1055,6 +1058,13 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             startActivity(Intent(this, dev.sparkynox.sparkytube.download.DownloadsActivity::class.java))
         }
         card.visibility = View.VISIBLE
+    }
+
+    // status bar (time) and navigation buttons stay hidden while the player is fullscreen
+    private fun hideSystemBarsInFullscreen() {
+        if (!isPlayerFullscreen) return
+        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+            .hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
     }
 
     private fun toggleFullscreenPlayer() {
@@ -3243,6 +3253,9 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 org.json.JSONObject().put("videoId", lastResolvedVideoId ?: "").put("title", resolved.title).toString()
             )
             applyMusicModeVisual()
+            // a new video starts with the controls shown (they may have auto-hidden on the last one)
+            dev.sparkynox.sparkytube.ui.PlayerControlsVisibility.poke()
+            binding.exoPlayerView.visibility = View.VISIBLE
         }
     }
 
@@ -3635,6 +3648,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         if (!hasFocus && ::webView.isInitialized) {
             webView.forceVisible()
         }
+        if (hasFocus) hideSystemBarsInFullscreen()
     }
 
     override fun onDestroy() {
