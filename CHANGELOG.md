@@ -4,7 +4,7 @@
 
 ## New Features
 
-- **Native plugins**: install `.dex` / `.jar` Kotlin plugins from Settings > Plugins. They get a small API (events, saved data, toast, current video, download) and the app asks before installing one. See `PLUGINS.md`
+- **Native plugins**: install `.dex` / `.jar` Kotlin plugins from Settings > Plugins. They get full access: the Activity, WebView and player objects, JS eval, saved data, events. The app asks before installing one. See `PLUGINS.md`
 - **Media cache**: 256 MB disk cache for video, so replays and rewinds don't hit the network again
 
 ## Improvements

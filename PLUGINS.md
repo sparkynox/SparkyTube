@@ -82,7 +82,7 @@ or other plugins.
 
 For things JS can't do. A native plugin is a `.dex` file, or a `.jar` / `.zip` with `classes.dex` inside, plus an optional `plugin.json` (same fields as above, and `"main"` = the main class, default `SparkyPluginMain`). Install it from Settings > Plugins > File or Link. A raw `.dex` takes its id from the file name (`my-plugin.dex`).
 
-**Native plugins run inside the app with the app's full access. The permission list only gates the PluginHost helpers, it is not a sandbox.** SparkyTube asks before installing one.
+**Native plugins have full access to the app, nothing is restricted and the permissions list is ignored.** SparkyTube asks before installing one.
 
 Extend `SparkyPlugin` (copy `app/src/main/java/dev/sparkynox/sparkytube/plugins/api/SparkyPlugin.kt` into your plugin project, same package, and don't ship it in the dex):
 
@@ -97,7 +97,7 @@ class SparkyPluginMain : SparkyPlugin() {
 }
 ```
 
-Everything is called on the main thread, don't block. Build: compile with kotlinc (android.jar on the classpath), exclude the `plugins/api` classes, run `d8 --release --output out plugin.jar kotlin-stdlib.jar`, then zip `classes.dex` + `plugin.json`. Bundle the Kotlin stdlib in the dex, the app's own copy is shrunk. Plugins are reloaded when you come back from the plugin screen.
+`host.activity()`, `host.webView()` and `host.player()` (the Media3 MediaController) hand you the real objects, and `host.evaluateJs()` runs JS in the page. Every class in the app is kept un-renamed in release builds, so reflection on MainActivity and the rest works. Everything is called on the main thread, don't block. Build: compile with kotlinc (android.jar on the classpath), exclude the `plugins/api` classes, run `d8 --release --output out plugin.jar kotlin-stdlib.jar`, then zip `classes.dex` + `plugin.json`. The app's Kotlin stdlib and Media3 are kept whole, but bundling your own stdlib in the dex is still safest. Plugins are reloaded when you come back from the plugin screen.
 
 ## Later
 
