@@ -7,7 +7,12 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import dev.sparkynox.sparkytube.net.NetCache
 import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
+import dev.sparkynox.sparkytube.fx.LunoAudioProcessor
+import dev.sparkynox.sparkytube.fx.LunoFx
 import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.MergingMediaSource
@@ -74,7 +79,24 @@ class PlaybackService : MediaSessionService() {
             .setBackBuffer(20_000, true)
             .build()
 
-        val exoPlayer = ExoPlayer.Builder(this)
+        LunoFx.init(this)
+        // same default audio path, plus the native LunoFX processor (16-bit PCM so it can touch the audio)
+        val renderers = object : DefaultRenderersFactory(this) {
+            override fun buildAudioSink(
+                context: android.content.Context,
+                enableFloatOutput: Boolean,
+                enableAudioTrackPlaybackParams: Boolean
+            ): AudioSink? {
+                return DefaultAudioSink.Builder(context)
+                    .setEnableFloatOutput(false)
+                    .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+                    .setAudioProcessors(arrayOf(LunoAudioProcessor()))
+                    .build()
+            }
+        }
+        renderers.setEnableDecoderFallback(true)
+
+        val exoPlayer = ExoPlayer.Builder(this, renderers)
             .setHandleAudioBecomingNoisy(true)
             .setLoadControl(loadControl)
             .setUseLazyPreparation(false)
@@ -101,6 +123,9 @@ class PlaybackService : MediaSessionService() {
         })
 
         player = exoPlayer
+        LunoFx.speedHook = { speed, pitch ->
+            exoPlayer.playbackParameters = androidx.media3.common.PlaybackParameters(speed, pitch)
+        }
 
         // Notification tap target: without this, tapping the media
         // notification/lock-screen controls does nothing (Media3's
@@ -215,6 +240,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        LunoFx.speedHook = null
         mediaSession?.run {
             player.release()
             release()
