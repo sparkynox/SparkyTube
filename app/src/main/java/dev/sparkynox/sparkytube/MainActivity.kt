@@ -3402,6 +3402,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             dev.sparkynox.sparkytube.extractor.PyYtDlp.init(this@MainActivity)
             dev.sparkynox.sparkytube.extractor.PyYtDlp.resolve(videoId)?.let {
                 StreamExtractor.cacheResolved(videoId, it)
+                dev.sparkynox.sparkytube.net.NetCache.prefetch(it)
             }
         }
     }
