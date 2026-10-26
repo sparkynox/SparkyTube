@@ -29,8 +29,12 @@ object PluginStore {
         val author: String,
         val description: String,
         val permissions: List<String>,
-        val enabled: Boolean
+        val enabled: Boolean,
+        val kind: String = "js"
     )
+
+    // a native plugin (dex/jar) was picked, the user has to confirm first
+    class NativeConsent(val bytes: ByteArray, val name: String?) : Exception("Native plugin needs confirmation")
 
     class Parsed(
         val id: String,
@@ -52,8 +56,8 @@ object PluginStore {
         .build()
 
     private fun prefs(c: Context) = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-    private fun root(c: Context) = File(c.filesDir, "plugins").apply { mkdirs() }
-    private fun dirOf(c: Context, id: String) = File(root(c), id)
+    fun root(c: Context) = File(c.filesDir, "plugins").apply { mkdirs() }
+    fun dirOf(c: Context, id: String) = File(root(c), id)
 
     private val idRegex = Regex("^[a-z0-9][a-z0-9._-]{2,39}$")
 
@@ -75,7 +79,8 @@ object PluginStore {
                         author = m.optString("author", ""),
                         description = m.optString("description", ""),
                         permissions = perms,
-                        enabled = prefs(c).getBoolean("on_" + d.name, true)
+                        enabled = prefs(c).getBoolean("on_" + d.name, true),
+                        kind = m.optString("kind", "js")
                     )
                 )
             } catch (e: Exception) {
@@ -233,10 +238,50 @@ object PluginStore {
         return Plugin(p.id, p.name, p.version, p.author, p.description, p.permissions, prefs(c).getBoolean("on_${p.id}", true))
     }
 
-    fun installAuto(c: Context, bytes: ByteArray): Plugin {
+    fun installAuto(c: Context, bytes: ByteArray, name: String? = null, allowNative: Boolean = false): Plugin {
+        if (NativePlugins.looksNative(bytes)) {
+            if (!allowNative) throw NativeConsent(bytes, name)
+            return installNative(c, NativePlugins.parse(bytes, name))
+        }
         val isZip = bytes.size > 3 && bytes[0] == 'P'.code.toByte() && bytes[1] == 'K'.code.toByte()
         val parsed = if (isZip) parseBundle(bytes) else parseUserscript(String(bytes, Charsets.UTF_8))
         return install(c, parsed)
+    }
+
+    fun installNative(c: Context, n: NativePlugins.Parsed): Plugin {
+        if (!idRegex.matches(n.id)) throw IllegalArgumentException("Bad id \"${n.id}\", use 3 to 40 chars of a-z 0-9 . _ -")
+        val unknown = n.permissions.filter { it !in PERMISSIONS }
+        if (unknown.isNotEmpty()) throw IllegalArgumentException("Unknown permission: ${unknown.joinToString()}")
+
+        val d = dirOf(c, n.id)
+        d.mkdirs()
+        // Android 14 refuses to load a dex file that is writable, so the jar is made read-only
+        val stage = File(d, "plugin.jar.new")
+        stage.delete()
+        stage.writeBytes(n.jar)
+        stage.setReadOnly()
+        try {
+            NativePlugins.validate(c, stage, n.main)
+        } catch (e: Exception) {
+            stage.delete()
+            if (d.list().isNullOrEmpty()) d.delete()
+            throw e
+        }
+        val jar = File(d, "plugin.jar")
+        jar.delete()
+        stage.renameTo(jar)
+        File(d, "main.js").delete()
+        File(d, "style.css").delete()
+
+        val meta = JSONObject()
+            .put("id", n.id).put("name", n.name).put("version", n.version)
+            .put("author", n.author).put("description", n.description)
+            .put("permissions", JSONArray(n.permissions))
+            .put("kind", "native").put("main", n.main)
+        File(d, "meta.json").writeText(meta.toString())
+        tokenFor(c, n.id)
+        dirty = true
+        return Plugin(n.id, n.name, n.version, n.author, n.description, n.permissions, prefs(c).getBoolean("on_${n.id}", true), "native")
     }
 
     fun installFromUrl(c: Context, url: String): Plugin {
@@ -244,8 +289,8 @@ object PluginStore {
         http.newCall(Request.Builder().url(url).build()).execute().use { r ->
             if (!r.isSuccessful) throw IllegalStateException("Server said ${r.code}")
             val body = r.body ?: throw IllegalStateException("Empty response")
-            if (body.contentLength() > 2 * 1024 * 1024) throw IllegalArgumentException("File is too big")
-            return installAuto(c, body.bytes())
+            if (body.contentLength() > 8 * 1024 * 1024) throw IllegalArgumentException("File is too big")
+            return installAuto(c, body.bytes(), url.substringBefore('?').substringAfterLast('/'))
         }
     }
 
@@ -263,7 +308,7 @@ object PluginStore {
     // first script is the runtime, then one script per enabled plugin so a broken
     // plugin can't take the others down with it. empty list = nothing to inject
     fun injectionScripts(c: Context): List<String> {
-        val enabled = list(c).filter { it.enabled }
+        val enabled = list(c).filter { it.enabled && it.kind == "js" }
         if (enabled.isEmpty()) return emptyList()
         val out = ArrayList<String>()
         out.add(runtime(c))

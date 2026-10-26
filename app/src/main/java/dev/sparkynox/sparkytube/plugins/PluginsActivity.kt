@@ -2,6 +2,7 @@ package dev.sparkynox.sparkytube.plugins
 
 import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.Arrangement
@@ -52,9 +53,10 @@ class PluginsActivity : AppCompatActivity() {
     private var message by mutableStateOf("")
     private var messageOk by mutableStateOf(true)
     private var tick by mutableIntStateOf(0)
+    private var consent by mutableStateOf<PluginStore.NativeConsent?>(null)
 
     private val filePicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) runInstall { PluginStore.installAuto(this, bytes(uri)) }
+        if (uri != null) runInstall { PluginStore.installAuto(this, bytes(uri), nameOf(uri)) }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,11 +66,17 @@ class PluginsActivity : AppCompatActivity() {
         })
     }
 
+    private fun nameOf(uri: Uri): String? = try {
+        contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+            if (it.moveToFirst()) it.getString(0) else null
+        }
+    } catch (e: Exception) { null }
+
     private fun bytes(uri: Uri): ByteArray {
         val input = contentResolver.openInputStream(uri) ?: throw IllegalStateException("Couldn't open the file")
         input.use {
             val data = it.readBytes()
-            if (data.size > 2 * 1024 * 1024) throw IllegalArgumentException("File is too big")
+            if (data.size > 8 * 1024 * 1024) throw IllegalArgumentException("File is too big")
             return data
         }
     }
@@ -81,6 +89,8 @@ class PluginsActivity : AppCompatActivity() {
                 val p = withContext(Dispatchers.IO) { work() }
                 message = "Installed ${p.name} ${p.version}"
                 messageOk = true
+            } catch (e: PluginStore.NativeConsent) {
+                consent = e
             } catch (e: Exception) {
                 message = e.message ?: "Install failed"
                 messageOk = false
@@ -117,7 +127,7 @@ class PluginsActivity : AppCompatActivity() {
                             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                 Text("Install a plugin", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                                 Text(
-                                    "Plugins are userscripts or bundles that run inside the YouTube page. Only install ones you trust.",
+                                    "Plugins are userscripts or bundles that run inside the YouTube page, or native .dex/.jar plugins that run inside the app. Only install ones you trust.",
                                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -146,7 +156,7 @@ class PluginsActivity : AppCompatActivity() {
                                     Column(Modifier.weight(1f)) {
                                         Text(p.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                                         Text(
-                                            listOf(p.version, p.author).filter { it.isNotBlank() }.joinToString(" • "),
+                                            listOf(p.version, p.author, if (p.kind == "native") "native" else "").filter { it.isNotBlank() }.joinToString(" • "),
                                             style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
                                     }
@@ -201,6 +211,20 @@ class PluginsActivity : AppCompatActivity() {
                     }) { Text("Install") }
                 },
                 dismissButton = { TextButton(onClick = { codeDialog = false }) { Text("Cancel") } },
+            )
+        }
+        consent?.let { c ->
+            AlertDialog(
+                onDismissRequest = { consent = null },
+                title = { Text("Native plugin") },
+                text = { Text("This plugin runs code inside SparkyTube with the same access as the app (files, network, your login). The permission list is not a sandbox. Install only if you trust where it came from.") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        consent = null
+                        runInstall { PluginStore.installAuto(this@PluginsActivity, c.bytes, c.name, allowNative = true) }
+                    }) { Text("Install") }
+                },
+                dismissButton = { TextButton(onClick = { consent = null }) { Text("Cancel") } },
             )
         }
         removing?.let { p ->
