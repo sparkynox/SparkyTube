@@ -1,0 +1,58 @@
+name: Build native plugin
+
+# builds a plugin folder from plugins-examples/ into an installable zip.
+# Actions tab > Build native plugin > Run workflow, type the folder name
+on:
+  workflow_dispatch:
+    inputs:
+      plugin:
+        description: Folder inside plugins-examples/
+        default: welcome-admin
+  push:
+    paths:
+      - 'plugins-examples/**'
+
+env:
+  PLUGIN: ${{ inputs.plugin || 'welcome-admin' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: plugins-examples/${{ inputs.plugin || 'welcome-admin' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Get kotlinc
+        run: |
+          curl -sL https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip -o kotlinc.zip
+          unzip -q kotlinc.zip
+
+      - name: Compile
+        run: |
+          ANDROID_JAR=$(ls -d $ANDROID_HOME/platforms/android-* | sort -V | tail -1)/android.jar
+          mkdir -p build/api build/plugin
+          # api classes are only for compiling, they are not shipped
+          kotlinc/bin/kotlinc api/SparkyPlugin.kt -cp "$ANDROID_JAR" -d build/api
+          kotlinc/bin/kotlinc SparkyPluginMain.kt -cp "build/api:$ANDROID_JAR" -d build/plugin
+          jar cf build/plugin.jar -C build/plugin .
+
+      - name: Dex and package
+        run: |
+          ANDROID_JAR=$(ls -d $ANDROID_HOME/platforms/android-* | sort -V | tail -1)/android.jar
+          D8=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)/d8
+          mkdir -p build/dex
+          # stdlib goes in the dex, the app's own copy is shrunk
+          $D8 --release --lib "$ANDROID_JAR" --classpath build/api --output build/dex build/plugin.jar kotlinc/lib/kotlin-stdlib.jar
+          cd build/dex && cp ../../plugin.json . && zip -q ../../$PLUGIN.zip classes*.dex plugin.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PLUGIN }}
+          path: plugins-examples/${{ env.PLUGIN }}/${{ env.PLUGIN }}.zip
