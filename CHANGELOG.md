@@ -8,6 +8,10 @@
 - **Audio FX (LunoFX)**: a native C++ audio engine inside the player. 10-band equalizer, bass boost, stereo width, reverb, **8D audio** (sound circles around your head), a **volume normalizer** that evens out loud and quiet videos, and a limiter so nothing clips. Presets: Bass Boost, Lofi Chill, Slowed + Reverb, Nightcore, 8D Audio, Vocal Boost, Loud + Even. Settings > App > Audio FX, or the ⋮ menu
 - **Media cache**: 256 MB disk cache for video, so replays and rewinds don't hit the network again
 
+## Bug Fixes
+
+- **Autoplay / queue after a video ends**: the app used to jump back to search (or wherever you opened the video from) instead of playing the next one. It now plays your queue first, then the playlist, then the first related video. Works in the mini-player, PiP and audio mode too, and a background video change no longer pops the watch page open
+
 ## Improvements
 
 - **Long videos start much faster**: googlevideo files are now requested in small range pieces instead of one open-ended request, which YouTube throttles
