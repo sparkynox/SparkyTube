@@ -332,7 +332,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                     override fun onPlaybackStateChanged(playbackState: Int) {
                         if (playbackState == Player.STATE_ENDED) {
                             emitPluginEvent("videoend", "{}")
-                            if (isMiniPlayerActive && extractVideoId(webView.url ?: "") != lastResolvedVideoId) {
+                            if (!composeNav() && isMiniPlayerActive && extractVideoId(webView.url ?: "") != lastResolvedVideoId) {
                                 // WebView is showing Home/Shorts/Subs/etc,
                                 // not this video's watch page anymore — the
                                 // related-videos DOM autoplay-next depends
@@ -1390,6 +1390,15 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         binding.suggestionsPanelInclude.root.visibility = View.GONE
     }
 
+    // plays the next video after one ended. if the watch page wasn't open (mini player, PiP,
+    // background, audio mode) it stays closed, only the video changes
+    private fun playNextFromEnd(next: dev.sparkynox.sparkytube.homefeed.HomeFeedItem) {
+        val id = next.videoId ?: return
+        val wasVisible = nav.watchVisible
+        openVideo(id, next.title, next.playlistId)
+        if (!wasVisible) nav.watchVisible = false
+    }
+
     /**
      * Called when ExoPlayer finishes the current video. Just unmuting the
      * WebView's own <video> (the old stopNativePlayback behavior) doesn't
@@ -1401,14 +1410,29 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
      */
     private fun advanceToNextVideo(attempt: Int = 0) {
         if (composeNav() && browseMode == BrowseMode.YOUTUBE) {
-            // Compose UI: "up next" is the first related video the Watch screen loaded
+            // Compose UI: queue first, then playlist, then the first related video
             val next = nav.nextVideo()
-            val nextId = next?.videoId
-            if (next != null && nextId != null) {
-                openVideo(nextId, next.title, next.playlistId)
-            } else {
+            if (next?.videoId != null) {
+                playNextFromEnd(next)
+                return
+            }
+            // related list wasn't loaded (or failed): ask YouTube again before giving up
+            val id = nav.watchId ?: lastResolvedVideoId
+            if (id == null) {
                 stopNativePlayback()
                 nav.closeWatch()
+                return
+            }
+            val playlistId = nav.watchPlaylistId
+            lifecycleScope.launch {
+                val info = dev.sparkynox.sparkytube.homefeed.InnerTubeClient.fetchWatch(id, playlistId)
+                val n = info.related.firstOrNull { it.videoId != null && it.videoId != id }
+                if (n != null) {
+                    playNextFromEnd(n)
+                } else {
+                    stopNativePlayback()
+                    nav.closeWatch()
+                }
             }
             return
         }
