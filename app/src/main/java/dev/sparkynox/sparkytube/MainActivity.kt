@@ -1643,6 +1643,23 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }
     }
 
+    private fun maybeWarnVpn() {
+        if (dev.sparkynox.sparkytube.net.VpnCheck.warned) return
+        if (!dev.sparkynox.sparkytube.net.VpnCheck.isActive(this)) return
+        if (dev.sparkynox.sparkytube.settings.SettingsPrefs.arePopupsBlocked(this)) return
+        if (prefs.getBoolean("vpn_warning_off", false)) return
+        dev.sparkynox.sparkytube.net.VpnCheck.warned = true
+        dev.sparkynox.sparkytube.ui.showMessagePopup(
+            this,
+            emote = dev.sparkynox.sparkytube.ui.Emote.VPN,
+            title = "VPN Detected",
+            message = "A VPN can affect SparkyTube's speed for a while.\nWe recommend not using a VPN.",
+            confirmText = "OK",
+            dismissText = "Don't remind me",
+            onDismiss = { prefs.edit().putBoolean("vpn_warning_off", true).apply() },
+        )
+    }
+
     // --- First launch welcome + About dialog ------------------------------------------
 
     private fun showFirstLaunchDialogIfNeeded() {
@@ -3658,6 +3675,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         super.onResume()
         webView.onResume()
         webView.resumeTimers()
+        window.decorView.postDelayed({ if (!isFinishing && !isDestroyed) maybeWarnVpn() }, 1500)
         // a plugin was installed/toggled in the plugin screen, load the page again so it applies
         // (not while a video is playing natively, that would cut it)
         if (dev.sparkynox.sparkytube.plugins.PluginStore.dirty) {
