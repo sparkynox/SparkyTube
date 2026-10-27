@@ -20,8 +20,8 @@ object CrashNotice {
 
         val lines = report.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }
         AlertDialog.Builder(activity)
-            .setTitle("Last crash")
-            .setMessage(lines.take(30).joinToString("\n").take(3500))
+            .setTitle("App crashed last time")
+            .setView(EmoteView.body(activity, dev.sparkynox.sparkytube.R.drawable.emote_crash, lines.take(30).joinToString("\n").take(3500)))
             .setPositiveButton("Copy") { _, _ ->
                 val cm = activity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 cm.setPrimaryClip(ClipData.newPlainText("SparkyTube crash", report.take(60_000)))

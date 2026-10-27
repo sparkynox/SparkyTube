@@ -30,7 +30,7 @@ class CrashReportActivity : AppCompatActivity() {
 
         AlertDialog.Builder(this)
             .setTitle("App Crashed")
-            .setMessage("SparkyTube ran into an error and had to restart.\n\n$detail")
+            .setView(EmoteView.body(this, R.drawable.emote_crash, "SparkyTube ran into an error and had to restart.\n\n$detail"))
             .setCancelable(false)
             .setPositiveButton("Check Logs") { _, _ ->
                 startActivity(Intent(this, LogsActivity::class.java))
