@@ -51,6 +51,7 @@ class PluginsActivity : AppCompatActivity() {
 
     private var busy by mutableStateOf(false)
     private var message by mutableStateOf("")
+    private var errorPopup by mutableStateOf<String?>(null)
     private var messageOk by mutableStateOf(true)
     private var tick by mutableIntStateOf(0)
     private var consent by mutableStateOf<PluginStore.NativeConsent?>(null)
@@ -94,6 +95,7 @@ class PluginsActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 message = e.message ?: "Install failed"
                 messageOk = false
+                errorPopup = message
             }
             busy = false
             tick++
@@ -211,6 +213,14 @@ class PluginsActivity : AppCompatActivity() {
                     }) { Text("Install") }
                 },
                 dismissButton = { TextButton(onClick = { codeDialog = false }) { Text("Cancel") } },
+            )
+        }
+        errorPopup?.let { text ->
+            dev.sparkynox.sparkytube.ui.MessagePopup(
+                emote = dev.sparkynox.sparkytube.ui.Emote.PLUGIN_ERROR,
+                title = "Plugin error",
+                message = text,
+                onConfirm = { errorPopup = null },
             )
         }
         consent?.let { c ->

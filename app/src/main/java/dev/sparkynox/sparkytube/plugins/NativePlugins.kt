@@ -5,6 +5,7 @@ import android.os.Handler
 import android.os.Looper
 import dalvik.system.DexClassLoader
 import dev.sparkynox.sparkytube.logs.LogRecorder
+import dev.sparkynox.sparkytube.ui.UiText
 import dev.sparkynox.sparkytube.plugins.api.PluginHost
 import dev.sparkynox.sparkytube.plugins.api.SparkyPlugin
 import org.json.JSONArray
@@ -158,6 +159,7 @@ object NativePlugins {
         override fun openUrl(url: String) { main.post { base.openUrl(url) } }
         override fun runOnUi(r: Runnable) { main.post(r) }
         override fun evaluateJs(js: String) { main.post { base.webView().evaluateJavascript(js, null) } }
+        override fun setUiText(key: String, value: String?) { main.post { UiText.set(key, value) } }
         override fun activity() = base.activity()
         override fun webView() = base.webView()
         override fun player() = base.controller()
@@ -191,6 +193,8 @@ object NativePlugins {
             try { it.plugin.onUnload() } catch (t: Throwable) { LogRecorder.w(TAG, "${it.id} onUnload failed", t) }
         }
         loaded.clear()
+        // text a plugin changed goes back to normal, plugins that are still on set it again in onLoad
+        UiText.clearAll()
     }
 
     fun emit(name: String, dataJson: String) {
