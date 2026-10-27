@@ -146,7 +146,7 @@ internal fun AccountHeader(name: String, photo: String, loggedIn: Boolean, onCli
     ) {
         Column(Modifier.weight(1f)) {
             Text(
-                if (loggedIn && name.isNotBlank()) "Hi, $name" else "Home",
+                UiText.get("home_greeting", if (loggedIn && name.isNotBlank()) "Hi, $name" else "Home"),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
