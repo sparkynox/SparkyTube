@@ -24,6 +24,9 @@ interface PluginHost {
     fun runOnUi(r: Runnable)
     fun evaluateJs(js: String)
 
+    // replaces a piece of app text, null puts the original back. keys: home_greeting
+    fun setUiText(key: String, value: String?)
+
     // the real objects, do whatever you want with them (call on the main thread).
     // MainActivity's own members can be reached with reflection
     fun activity(): android.app.Activity
