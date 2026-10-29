@@ -13,6 +13,7 @@ import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
 import dev.sparkynox.sparkytube.fx.LunoAudioProcessor
 import dev.sparkynox.sparkytube.fx.LunoFx
+import dev.sparkynox.sparkytube.fx.LunoVideoFx
 import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.MergingMediaSource
@@ -123,6 +124,8 @@ class PlaybackService : MediaSessionService() {
         })
 
         player = exoPlayer
+        LunoVideoFx.init(this)
+        LunoVideoFx.attach(exoPlayer)
         LunoFx.speedHook = { speed, pitch ->
             exoPlayer.playbackParameters = androidx.media3.common.PlaybackParameters(speed, pitch)
         }
@@ -241,6 +244,7 @@ class PlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         LunoFx.speedHook = null
+        LunoVideoFx.detach()
         mediaSession?.run {
             player.release()
             release()
