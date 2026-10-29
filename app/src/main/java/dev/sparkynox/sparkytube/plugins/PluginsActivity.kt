@@ -65,6 +65,7 @@ class PluginsActivity : AppCompatActivity() {
         setContentView(ComposeView(this).apply {
             setContent { SparkyTheme { PluginsScreen() } }
         })
+        dev.sparkynox.sparkytube.net.RemoteConfig.gate(this, "plugins") { finish() }
     }
 
     private fun nameOf(uri: Uri): String? = try {

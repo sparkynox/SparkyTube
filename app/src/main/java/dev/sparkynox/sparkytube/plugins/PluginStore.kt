@@ -222,6 +222,8 @@ object PluginStore {
         if (p.css.length > MAX_CSS) throw IllegalArgumentException("Plugin css is too big")
         val unknown = p.permissions.filter { it !in PERMISSIONS }
         if (unknown.isNotEmpty()) throw IllegalArgumentException("Unknown permission: ${unknown.joinToString()}")
+        val ads = dev.sparkynox.sparkytube.adblock.AdBlockEngine.getInstance(c).findBlockedHosts(p.code + "\n" + p.css)
+        if (ads.isNotEmpty()) throw IllegalArgumentException("Blocked: this plugin talks to ad or tracker domains (${ads.joinToString()}). SparkyTube doesn't allow ad plugins.")
 
         val d = dirOf(c, p.id)
         d.mkdirs()
@@ -249,9 +251,13 @@ object PluginStore {
     }
 
     fun installNative(c: Context, n: NativePlugins.Parsed): Plugin {
+        if (!dev.sparkynox.sparkytube.net.RemoteConfig.isEnabled("native_plugins")) throw IllegalArgumentException("Native plugins are disabled by the admin")
         if (!idRegex.matches(n.id)) throw IllegalArgumentException("Bad id \"${n.id}\", use 3 to 40 chars of a-z 0-9 . _ -")
         val unknown = n.permissions.filter { it !in PERMISSIONS }
         if (unknown.isNotEmpty()) throw IllegalArgumentException("Unknown permission: ${unknown.joinToString()}")
+
+        val ads = NativePlugins.adHosts(c, n.jar)
+        if (ads.isNotEmpty()) throw IllegalArgumentException("Blocked: this plugin talks to ad or tracker domains (${ads.joinToString()}). SparkyTube doesn't allow ad plugins.")
 
         val d = dirOf(c, n.id)
         d.mkdirs()

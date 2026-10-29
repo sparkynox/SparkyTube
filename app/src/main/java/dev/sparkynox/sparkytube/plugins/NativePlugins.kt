@@ -131,6 +131,27 @@ object NativePlugins {
         )
     }
 
+    // ad / tracker domains found inside a plugin file (dex, js, json), checked against the block lists
+    fun adHosts(c: Context, jar: ByteArray): List<String> {
+        val engine = dev.sparkynox.sparkytube.adblock.AdBlockEngine.getInstance(c)
+        val found = LinkedHashSet<String>()
+        var n = 0
+        ZipInputStream(ByteArrayInputStream(jar)).use { z ->
+            while (n++ < 5000 && found.size < 5) {
+                val e = z.nextEntry ?: break
+                if (e.isDirectory) continue
+                val name = e.name.lowercase()
+                val dex = name.endsWith(".dex")
+                val text = name.endsWith(".js") || name.endsWith(".json") || name.endsWith(".html") || name.endsWith(".txt")
+                if (!dex && !text) continue
+                val data = z.readBytes()
+                if (data.size > 32 * 1024 * 1024) continue
+                found.addAll(if (dex) engine.findBlockedHostsInBytes(data) else engine.findBlockedHosts(String(data, Charsets.UTF_8)))
+            }
+        }
+        return found.toList().take(5)
+    }
+
     // makes sure the main class exists and really extends SparkyPlugin before we keep anything
     fun validate(c: Context, jar: File, mainClass: String) {
         val cl = PluginClassLoader(jar.absolutePath, c.classLoader)
@@ -172,6 +193,9 @@ object NativePlugins {
     fun start(c: Context, base: PluginBridge.Host) {
         synchronized(lock) {
             unloadAll()
+            // the admin can switch plugins, or just native ones, off in remote_config.json
+            if (!dev.sparkynox.sparkytube.net.RemoteConfig.isEnabled("plugins") ||
+                !dev.sparkynox.sparkytube.net.RemoteConfig.isEnabled("native_plugins")) return
             PluginStore.list(c).filter { it.enabled && it.kind == "native" }.forEach { p ->
                 try {
                     val d = PluginStore.dirOf(c, p.id)
