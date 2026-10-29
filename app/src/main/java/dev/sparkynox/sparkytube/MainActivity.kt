@@ -14,6 +14,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
@@ -2300,6 +2301,21 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }
     }
 
+    private var lastWebViewRebuild = 0L
+
+    private fun rebuildWebView() {
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastWebViewRebuild < 5_000) return
+        lastWebViewRebuild = now
+        val url = webView.url?.takeIf { it.startsWith("http") }
+        bgHistory.stop(blank = false)
+        binding.webViewContainer.removeView(webView)
+        webView.destroy()
+        setupWebView()
+        webView.loadUrl(url ?: "about:blank")
+        dev.sparkynox.sparkytube.logs.LogRecorder.i("WebView", "rebuilt after the renderer died")
+    }
+
     private fun setupWebView() {
         webView = dev.sparkynox.sparkytube.webview.AlwaysVisibleWebView(this)
         binding.webViewContainer.addView(
@@ -2310,6 +2326,12 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 android.widget.FrameLayout.LayoutParams.MATCH_PARENT
             )
         )
+
+        // keep the page's renderer process alive while the app is in the background, otherwise Android
+        // can kill it and the hidden history player dies with it
+        if (android.os.Build.VERSION.SDK_INT >= 26) {
+            webView.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false)
+        }
 
         webView.settings.apply {
             javaScriptEnabled = true
@@ -2411,6 +2433,14 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
         webView.webViewClient = object : WebViewClient() {
 
+            // the renderer was killed (memory, or the system). the WebView is useless after that,
+            // so it gets rebuilt, otherwise the hidden history player never comes back
+            override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+                dev.sparkynox.sparkytube.logs.LogRecorder.w("WebView", "renderer gone, crashed=${detail.didCrash()}")
+                if (view === webView) runOnUiThread { rebuildWebView() }
+                return true
+            }
+
             override fun shouldInterceptRequest(
                 view: WebView,
                 request: WebResourceRequest
@@ -2425,7 +2455,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 assetLoader.shouldInterceptRequest(request.url)?.let { return it }
 
                 if (dev.sparkynox.sparkytube.settings.SettingsPrefs.isAdBlockEnabled(this@MainActivity) &&
-                    adBlockEngine.shouldBlock(url)
+                    adBlockEngine.shouldBlockRequest(url, request.requestHeaders?.get("Referer") ?: "https://m.youtube.com/", request.requestHeaders?.get("Accept"), request.isForMainFrame)
                 ) {
                     return WebResourceResponse(
                         "text/plain",
@@ -3675,7 +3705,13 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         super.onResume()
         webView.onResume()
         webView.resumeTimers()
-        window.decorView.postDelayed({ if (!isFinishing && !isDestroyed) maybeWarnVpn() }, 1500)
+        dev.sparkynox.sparkytube.net.RemoteConfig.refreshIfStale(this)
+        window.decorView.postDelayed({
+            if (!isFinishing && !isDestroyed) {
+                dev.sparkynox.sparkytube.net.RemoteConfig.checkBan(this)
+                maybeWarnVpn()
+            }
+        }, 1500)
         // a plugin was installed/toggled in the plugin screen, load the page again so it applies
         // (not while a video is playing natively, that would cut it)
         if (dev.sparkynox.sparkytube.plugins.PluginStore.dirty) {

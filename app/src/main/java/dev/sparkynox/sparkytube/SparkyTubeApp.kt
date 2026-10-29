@@ -13,9 +13,13 @@ class SparkyTubeApp : Application() {
         // Check Logs" screen instead of the bare system dialog. Both
         // need to happen before anything else below has a chance to
         // throw, so this is first.
+        // a native crash from last time gets turned into a normal crash report first
+        dev.sparkynox.sparkytube.logs.NativeCrash.consume(this)
         dev.sparkynox.sparkytube.logs.LogRecorder.init(this)
         Thread.setDefaultUncaughtExceptionHandler(dev.sparkynox.sparkytube.logs.CrashHandler(this))
+        dev.sparkynox.sparkytube.logs.NativeCrash.install(this)
 
+        dev.sparkynox.sparkytube.net.RemoteConfig.init(this)
         dev.sparkynox.sparkytube.net.NetCache.init(this)
         dev.sparkynox.sparkytube.fx.LunoFx.init(this)
 
