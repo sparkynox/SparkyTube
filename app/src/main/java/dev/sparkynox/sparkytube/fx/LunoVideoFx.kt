@@ -34,6 +34,7 @@ object LunoVideoFx {
     private var player: ExoPlayer? = null
     private var appContext: Context? = null
     private var lastKey = ""
+    private var effectsActive = false
     private val main = Handler(Looper.getMainLooper())
 
     fun init(c: Context) {
@@ -69,6 +70,7 @@ object LunoVideoFx {
                         Toast.makeText(c, "Anime upscaler turned off, this phone couldn't run it", Toast.LENGTH_LONG).show()
                     }
                     lastKey = ""
+                    effectsActive = false
                     exo.setVideoEffects(emptyList())
                     exo.prepare()
                 }
@@ -80,6 +82,7 @@ object LunoVideoFx {
     fun detach() {
         player = null
         lastKey = ""
+        effectsActive = false
     }
 
     private fun apply() {
@@ -91,7 +94,13 @@ object LunoVideoFx {
             val key = if (on) "${p.mode}/$h/${p.push}/${p.sharp}" else "off"
             if (key == lastKey) return@post
             lastKey = key
-            exo.setVideoEffects(effectsFor(p, h, on))
+            val list = effectsFor(p, h, on)
+            // even an empty list moves ExoPlayer onto its effects pipeline, and on some phones that means a black
+            // video or endless buffering. so with the upscaler off the player is never touched, an empty list is
+            // only sent to take effects off again after they were on
+            if (list.isEmpty() && !effectsActive) return@post
+            effectsActive = list.isNotEmpty()
+            exo.setVideoEffects(list)
         }
     }
 
