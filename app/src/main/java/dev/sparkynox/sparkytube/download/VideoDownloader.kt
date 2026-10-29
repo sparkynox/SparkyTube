@@ -254,17 +254,6 @@ object VideoDownloader {
 
     private const val MIN_BYTES_PER_CHUNK = 3 * 1024 * 1024L // don't split a chunk smaller than ~3MB
 
-    private fun chunkCountFor(totalSize: Long): Int {
-        // Scale to file size instead of always splitting into 5 --
-        // audio streams are usually much smaller than video (often
-        // under 10-15MB), so forcing 5 chunks on them was creating tiny
-        // slivers per connection, which added per-request overhead for
-        // no real speed benefit and made the audio download the slower
-        // of the two despite being the smaller file.
-        val ideal = (totalSize / MIN_BYTES_PER_CHUNK).toInt()
-        return ideal.coerceIn(1, 6)
-    }
-
     private fun downloadChunked(
         url: String,
         destination: java.io.File,
@@ -297,130 +286,10 @@ object VideoDownloader {
             return
         }
 
-        val chunkCount = chunkCountFor(totalSize)
-        val chunkSize = totalSize / chunkCount
-        val ranges = (0 until chunkCount).map { i ->
-            val start = i * chunkSize
-            val end = if (i == chunkCount - 1) totalSize - 1 else (start + chunkSize - 1)
-            start to end
-        }
-
-        // RandomAccessFile lets every chunk thread write directly to its
-        // own byte-offset in the final file concurrently -- no need to
-        // download to separate temp files and concatenate afterward.
-        val raf = java.io.RandomAccessFile(destination, "rw")
-        raf.setLength(totalSize)
-        raf.close()
-
-        val progressPerChunk = LongArray(chunkCount)
-        val progressLock = Any()
-        val failure = java.util.concurrent.atomic.AtomicReference<Exception?>(null)
-
-        fun reportCombined() {
-            val sum = synchronized(progressLock) { progressPerChunk.sum() }
-            onProgress(sum, totalSize)
-        }
-
-        val executor = java.util.concurrent.Executors.newFixedThreadPool(chunkCount)
-        val futures = ranges.mapIndexed { index, (start, end) ->
-            executor.submit {
-                // Each chunk gets its own retry -- a "Connection reset"
-                // hitting one chunk (often right near the end of a
-                // transfer, where a keep-alive connection is more likely
-                // to get closed by the CDN right as the last few bytes
-                // land) used to fail the ENTIRE file and force restarting
-                // every other already-finished chunk too. Now only the
-                // one flaky chunk retries.
-                var chunkError: Exception? = null
-                var resumeFrom = start
-                for (attempt in 0..2) {
-                    if (task.cancelled) return@submit
-                    try {
-                        downloadRangeChunk(url, destination, resumeFrom, end, task) { chunkDownloaded ->
-                            synchronized(progressLock) { progressPerChunk[index] = (resumeFrom - start) + chunkDownloaded }
-                            reportCombined()
-                        }
-                        chunkError = null
-                        break
-                    } catch (e: java.io.InterruptedIOException) {
-                        return@submit // cancelled -- don't retry
-                    } catch (e: Exception) {
-                        chunkError = e
-                        // Resume from wherever this attempt actually got
-                        // to instead of redownloading the whole chunk --
-                        // matters most for the "reset right at 100%" case,
-                        // where almost the entire chunk was already good.
-                        resumeFrom = start + synchronized(progressLock) { progressPerChunk[index] }
-                        Thread.sleep(500L * (attempt + 1))
-                    }
-                }
-                if (chunkError != null) {
-                    failure.compareAndSet(null, chunkError)
-                }
-            }
-        }
-        futures.forEach { it.get() }
-        executor.shutdown()
-
-        if (task.cancelled || failure.get() != null) {
-            executor.shutdownNow()
-        }
-
-        if (task.cancelled) throw java.io.InterruptedIOException("cancelled")
-        failure.get()?.let { throw it }
-
-        reportCombined()
-    }
-
-    /**
-     * Downloads one byte range [start, end] (inclusive) directly into its
-     * slice of the pre-sized destination file via RandomAccessFile.seek --
-     * runs on its own OkHttp call/connection from the shared pool, so
-     * CHUNK_COUNT of these running via the executor above is what gets
-     * multiple concurrent connections to the CDN.
-     */
-    private fun downloadRangeChunk(
-        url: String,
-        destination: java.io.File,
-        start: Long,
-        end: Long,
-        task: MuxTaskTracker.MuxTask,
-        onChunkProgress: (downloaded: Long) -> Unit
-    ) {
-        val request = okhttp3.Request.Builder()
-            .url(url)
-            .header("User-Agent", "Mozilla/5.0 (Linux; Android 13) SparkyTube")
-            .header("Range", "bytes=$start-$end")
-            .build()
-
-        httpClient.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) {
-                throw java.io.IOException("Chunk request failed: HTTP ${response.code}")
-            }
-            val body = response.body ?: throw java.io.IOException("Empty chunk response")
-
-            java.io.RandomAccessFile(destination, "rw").use { raf ->
-                raf.seek(start)
-                body.byteStream().use { input ->
-                    val buffer = ByteArray(65536)
-                    var chunkDownloaded = 0L
-                    var lastReportTime = 0L
-                    while (true) {
-                        if (task.cancelled) throw java.io.InterruptedIOException("cancelled")
-                        val read = input.read(buffer)
-                        if (read == -1) break
-                        raf.write(buffer, 0, read)
-                        chunkDownloaded += read
-                        val now = System.currentTimeMillis()
-                        if (now - lastReportTime > 250) {
-                            onChunkProgress(chunkDownloaded)
-                            lastReportTime = now
-                        }
-                    }
-                    onChunkProgress(chunkDownloaded)
-                }
-            }
-        }
+        // small segments pulled by a few workers, finished ones are remembered so a retry resumes
+        dev.sparkynox.sparkytube.net.SegmentedDownloader.download(
+            httpClient, url, destination, totalSize, { task.cancelled }, onProgress
+        )
     }
 
     /**
