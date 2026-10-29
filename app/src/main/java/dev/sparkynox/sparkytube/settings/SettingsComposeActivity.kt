@@ -288,6 +288,11 @@ class SettingsComposeActivity : AppCompatActivity() {
             Section("app", "App", "file", "Plugins, popups and logs", listOf(
                 toggle("popups", "Block all popups", "eyeoff", "Hides the contact-reminder, update, and welcome dialogs",
                         { p.arePopupsBlocked(this) }, { p.setPopupsBlocked(this, it) }),
+                toggle("cronet", "HTTP/3 network (Cronet)", "pulse", "Loads video through Chromium's network stack with QUIC. Needs Google Play services, restart the app to apply",
+                        { dev.sparkynox.sparkytube.net.NetCache.isCronetEnabled(this) }, { dev.sparkynox.sparkytube.net.NetCache.setCronetEnabled(this, it) }),
+                link("videofx", "Anime upscaler", "sliders", { "Sharper, cleaner anime from low-resolution video (GPU)" }) {
+                        open(dev.sparkynox.sparkytube.fx.VideoFxActivity::class.java)
+                    },
                 link("audiofx", "Audio FX", "sliders", { "Equalizer, reverb, 8D audio, bass boost, volume normalizer" }) {
                         open(dev.sparkynox.sparkytube.fx.AudioFxActivity::class.java)
                     },
