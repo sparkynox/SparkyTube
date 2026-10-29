@@ -48,6 +48,7 @@ class AudioFxActivity : AppCompatActivity() {
         setContentView(ComposeView(this).apply {
             setContent { SparkyTheme { Screen() } }
         })
+        dev.sparkynox.sparkytube.net.RemoteConfig.gate(this, "audio_fx") { finish() }
     }
 
     private fun set(n: LunoFx.Params) {

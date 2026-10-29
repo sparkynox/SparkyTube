@@ -52,12 +52,17 @@ object LunoFx {
         if (inited) return
         inited = true
         params = load(c)
-        NativeFx.setAll(params)
+        NativeFx.setAll(effective(params))
     }
+
+    // the admin can switch the engine off from remote_config.json
+    private fun effective(p: Params) = if (dev.sparkynox.sparkytube.net.RemoteConfig.isEnabled("audio_fx")) p else p.copy(on = false)
+
+    fun reapply() = NativeFx.setAll(effective(params))
 
     fun update(c: Context, p: Params) {
         params = p
-        NativeFx.setAll(p)
+        NativeFx.setAll(effective(p))
         save(c, p)
     }
 
