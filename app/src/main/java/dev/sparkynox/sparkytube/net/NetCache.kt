@@ -7,6 +7,8 @@ import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.HttpDataSource
+import androidx.media3.datasource.cronet.CronetDataSource
 import androidx.media3.datasource.TransferListener
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.cache.CacheWriter
@@ -16,6 +18,8 @@ import androidx.media3.datasource.okhttp.OkHttpDataSource
 import dev.sparkynox.sparkytube.extractor.StreamExtractor
 import dev.sparkynox.sparkytube.logs.LogRecorder
 import okhttp3.ConnectionPool
+import org.chromium.net.CronetEngine
+import org.chromium.net.CronetProvider
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import java.io.File
@@ -45,6 +49,40 @@ object NetCache {
     }
 
     private val worker = Executors.newFixedThreadPool(2)
+    private val cronetExecutor = Executors.newFixedThreadPool(4)
+
+    @Volatile private var cronet: CronetEngine? = null
+    private var cronetTried = false
+
+    fun isCronetEnabled(c: Context): Boolean = c.getSharedPreferences("sparky_net", Context.MODE_PRIVATE).getBoolean("cronet", true)
+    fun setCronetEnabled(c: Context, on: Boolean) = c.getSharedPreferences("sparky_net", Context.MODE_PRIVATE).edit().putBoolean("cronet", on).apply()
+
+    // Chromium's network stack (HTTP/2 and HTTP/3 over QUIC, which googlevideo speaks). it comes from
+    // Google Play services, so on phones without it this stays null and OkHttp is used instead
+    private fun cronetEngine(): CronetEngine? {
+        if (cronetTried) return cronet
+        synchronized(cacheLock) {
+            if (cronetTried) return cronet
+            cronetTried = true
+            val ctx = appContext ?: return null
+            if (!isCronetEnabled(ctx)) return null
+            cronet = try {
+                val real = CronetProvider.getAllProviders(ctx).any { it.isEnabled && it.name != CronetProvider.PROVIDER_NAME_FALLBACK }
+                if (!real) null else CronetEngine.Builder(ctx)
+                    .enableHttp2(true)
+                    .enableQuic(true)
+                    .enableBrotli(true)
+                    .setStoragePath(File(ctx.cacheDir, "cronet").apply { mkdirs() }.absolutePath)
+                    .enableHttpCache(CronetEngine.Builder.HTTP_CACHE_DISK_NO_HTTP, 10L * 1024 * 1024)
+                    .build()
+            } catch (t: Throwable) {
+                LogRecorder.w(TAG, "Cronet failed to start", t)
+                null
+            }
+            LogRecorder.i(TAG, if (cronet != null) "network: Cronet (HTTP/3 ready)" else "network: OkHttp")
+            return cronet
+        }
+    }
     private val warmedHosts = HashMap<String, Long>()
 
     // counts bytes in ~300ms windows and feeds the native estimator
@@ -112,9 +150,16 @@ object NetCache {
     }
 
     private fun networkFactory(context: Context): DataSource.Factory {
-        val http = OkHttpDataSource.Factory(client)
+        val okHttp = OkHttpDataSource.Factory(client)
             .setUserAgent(UA)
             .setTransferListener(meter)
+        val engine = cronetEngine()
+        val http: HttpDataSource.Factory = if (engine != null) {
+            CronetDataSource.Factory(engine, cronetExecutor)
+                .setUserAgent(UA)
+                .setTransferListener(meter)
+                .setFallbackFactory(okHttp)
+        } else okHttp
         return DefaultDataSource.Factory(context, http)
     }
 
