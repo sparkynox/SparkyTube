@@ -40,6 +40,9 @@ class BackgroundHistory(
     private var lastTick = 0L
     private var lastJs = ""
     private var lastRaw = ""
+    private var lastLoad = 0L
+    private var loadTries = 0
+    private var badSince = 0L
     private val handler = Handler(Looper.getMainLooper())
     private val keepAlive = object : Runnable {
         override fun run() {
@@ -77,6 +80,9 @@ class BackgroundHistory(
             lastJs = ""
             AdBlockEngine.historyPlayerActive = true
             LogRecorder.i("History", "playing, starting background player for $id")
+            lastLoad = now
+            loadTries = 1
+            badSince = 0L
             webView().loadUrl("https://m.youtube.com/watch?v=$id")
             handler.removeCallbacks(keepAlive)
             handler.postDelayed(keepAlive, 700)
@@ -102,6 +108,14 @@ class BackgroundHistory(
             if (debug == null) wv.visibility = View.INVISIBLE
             lastRaw = "waiting for the watch page"
             refreshDebug()
+            // the page never came (network blip, redirect, consent screen), ask again instead of giving up
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastLoad > 10_000 && loadTries < 4) {
+                loadTries++
+                lastLoad = now
+                LogRecorder.w("History", "watch page didn't load, try $loadTries")
+                wv.loadUrl("https://m.youtube.com/watch?v=$id")
+            }
             return
         }
         // a visible page keeps youtube from pausing the muted video; the compose screen covers it
@@ -121,6 +135,20 @@ class BackgroundHistory(
         ) { r ->
             lastRaw = r.orEmpty()
             refreshDebug()
+            // page is up but there's no video (or the script failed) for a while: reload it
+            val now = SystemClock.elapsedRealtime()
+            if (lastRaw.contains("nov") || lastRaw.contains("err")) {
+                if (badSince == 0L) badSince = now
+                else if (now - badSince > 12_000 && loadTries < 4) {
+                    loadTries++
+                    badSince = 0L
+                    lastLoad = now
+                    LogRecorder.w("History", "no video in the page, reloading (try $loadTries)")
+                    wv.loadUrl("https://m.youtube.com/watch?v=$id")
+                }
+            } else {
+                badSince = 0L
+            }
             // log only when the state changes, so the log stays readable
             val res = lastRaw.replace(Regex("\\d+s"), "Ns")
             if (res != lastJs) {
