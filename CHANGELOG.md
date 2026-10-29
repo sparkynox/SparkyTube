@@ -6,15 +6,25 @@
 
 - **Native plugins**: install `.dex` / `.jar` Kotlin plugins from Settings > Plugins. They get full access: the Activity, WebView and player objects, JS eval, saved data, events. The app asks before installing one. See `PLUGINS.md`
 - **Audio FX (LunoFX)**: a native C++ audio engine inside the player. 10-band equalizer, bass boost, stereo width, reverb, **8D audio** (sound circles around your head), a **volume normalizer** that evens out loud and quiet videos, and a limiter so nothing clips. Presets: Bass Boost, Lofi Chill, Slowed + Reverb, Nightcore, 8D Audio, Vocal Boost, Loud + Even. Settings > App > Audio FX, or the ⋮ menu
+- **Anime upscaler**: scales low-resolution anime up (1.5x or 2x, up to 1080p) and runs every frame through a GPU pass that keeps line art thin and crisp. Off / Light / Strong in Settings > App > Anime upscaler
+- **HTTP/3 (Cronet)**: video loads through Chromium's network stack with QUIC when Google Play services has it, OkHttp otherwise. Toggle in Settings
+- **Native ad filter engine**: EasyList / EasyPrivacy / Anti-Adblock *path and wildcard* rules (not just domains) matched in C++, about 15 microseconds per request
+- **Native crash reports**: C++ crashes (the kind the Kotlin handler never saw) now show up in "App crashed last time"
+- **Remote config**: admin switches for features and bans, signed with ed25519 and verified in C++. See `REMOTE_CONFIG.md`
+- **Artwork popups**: new artwork for No Internet, crash, plugin error, VPN and more. New VPN warning (once per run, can be turned off from the popup)
+- **Plugin UI text**: `setUiText` lets a plugin replace app text, first key is the Home greeting. Example plugin: Welcome Admin
+- **Bigger ad and tracker block lists**: ~52,000 domains from EasyList, EasyPrivacy and the Anti-Adblock Warning Removal list (one hash lookup per request). Plugins that talk to those domains are refused at install (JS and native)
 - **Media cache**: 256 MB disk cache for video, so replays and rewinds don't hit the network again
 
 ## Bug Fixes
 
+- **Background history**: watch history sometimes wasn't saved while the app was in the background. Android could kill the hidden player's page process and nothing brought it back. The renderer is now kept at high priority, rebuilt if it dies anyway, and the hidden watch page is retried (up to 3 times) when it doesn't load or has no video
 - **Autoplay / queue after a video ends**: the app used to jump back to search (or wherever you opened the video from) instead of playing the next one. It now plays your queue first, then the playlist, then the first related video. Works in the mini-player, PiP and audio mode too, and a background video change no longer pops the watch page open
 
 ## Improvements
 
 - **Long videos start much faster**: googlevideo files are now requested in small range pieces instead of one open-ended request, which YouTube throttles
+- Downloads: files are split into small segments that a few workers take one by one (no more waiting for the slowest piece), the space is reserved up front, and a retry resumes where it stopped
 - Player uses OkHttp (HTTP/2, kept-alive connections), 20s back buffer
 - Next video's first chunk is prefetched while the current one ends, sized to your measured speed
 - Small C++ library (`libsparkynet`) measures network speed and warms DNS for the stream host
