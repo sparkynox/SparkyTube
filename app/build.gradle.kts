@@ -165,7 +165,7 @@ dependencies {
     // transfer/EFT to Indian accounts (no PayPal needed) with a $50
     // threshold. Never auto-shown, never on a timer — only fires when the
     // user explicitly taps it. See support/SupportAdManager.kt.
-    implementation("com.inmobi.monetization:inmobi-ads-kotlin:11.3.0")
+    implementation("com.inmobi.monetization:inmobi-ads-kotlin:11.5.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     // background update/message checks
     implementation("androidx.work:work-runtime-ktx:2.9.1")
