@@ -1,0 +1,15 @@
+version: 2
+updates:
+  # 1. Track Gradle dependencies (build.gradle.kts & gradle-wrapper)
+  - package-ecosystem: "gradle"
+    directory: "/"
+    schedule:
+      interval: "weekly" # Options: daily, weekly, monthly
+    open-pull-requests-limit: 5
+
+  # 2. Track GitHub Actions workflows (.github/workflows)
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
