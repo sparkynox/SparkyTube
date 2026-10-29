@@ -47,7 +47,7 @@ jobs:
           ./gradlew assembleDebug --stacktrace 2>&1 | grep -v "D8: An error occurred when parsing kotlin metadata\|To find compatible kotlin versions"
 
       - name: Upload debug APKs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: SparkyTube-debug-apks
           path: app/build/outputs/apk/debug/*.apk
@@ -108,7 +108,7 @@ jobs:
           ./gradlew assembleRelease --stacktrace 2>&1 | grep -v "D8: An error occurred when parsing kotlin metadata\|To find compatible kotlin versions"
 
       - name: Upload release APKs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: SparkyTube-release-apks
           path: app/build/outputs/apk/release/*.apk
