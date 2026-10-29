@@ -160,6 +160,19 @@ object LogRecorder {
      * handler right before the process actually dies -- see
      * SparkyTubeApp.kt.
      */
+    fun recordNativeCrash(context: Context, nativeReport: String) {
+        try {
+            val report = buildString {
+                append("=== SparkyTube crash ${timeFormat.format(Date())} (native) ===\n\n")
+                append(nativeReport.take(30_000))
+                append("\n\n=== Session log leading up to crash ===\n")
+                append(getSessionLog(context).takeLast(20_000))
+            }
+            crashLogFile(context)?.writeText(report)
+        } catch (e: Exception) {
+        }
+    }
+
     fun recordCrash(context: Context, thread: Thread, throwable: Throwable) {
         try {
             val sw = StringWriter()
