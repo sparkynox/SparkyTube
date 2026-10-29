@@ -30,7 +30,9 @@ class AdBlockEngine private constructor(
     private val youtubeAdPaths: List<String>,
     private val youtubeAdParamHints: List<String>,
     private val trackingDomains: List<String>,
-    private val dataSaverPaths: List<String>
+    private val dataSaverPaths: List<String>,
+    // ~53k domains from EasyList, EasyPrivacy and the Anti-Adblock list, see assets/blocklist_hosts.txt
+    private val blockedHosts: Set<String> = emptySet()
 ) {
 
     // googlevideo.com is the CDN domain YouTube's own web player streams
@@ -67,6 +69,13 @@ class AdBlockEngine private constructor(
     fun shouldBlock(url: String): Boolean {
         val lower = url.lowercase()
 
+        // domain lists first: one hash lookup per host label, no scanning
+        val h = hostOf(lower)
+        if (h != null && isHostBlocked(h)) {
+            blockedCount.incrementAndGet()
+            return true
+        }
+
         for (d in adDomains) {
             if (lower.contains(d)) {
                 blockedCount.incrementAndGet()
@@ -97,6 +106,101 @@ class AdBlockEngine private constructor(
         return false
     }
 
+    // the request-aware entry point: domain list, then the EasyList rule engine, then the hand-written rules
+    fun shouldBlockRequest(url: String, pageUrl: String?, accept: String?, isMainFrame: Boolean): Boolean {
+        if (!isMainFrame && NativeFilter.ready) {
+            // the hidden history player's own stats calls must always get through
+            val historyPing = historyPlayerActive && url.contains("/api/stats/")
+            if (!historyPing) {
+                val lower = url.lowercase()
+                val host = hostOf(lower)
+                if (host != null && isHostBlocked(host)) {
+                    blockedCount.incrementAndGet()
+                    return true
+                }
+                val page = pageUrl?.let { hostOf(it.lowercase()) }
+                if (NativeFilter.match(url, page, NativeFilter.typeOf(url, accept)) == 1) {
+                    blockedCount.incrementAndGet()
+                    return true
+                }
+            }
+        }
+        return shouldBlock(url)
+    }
+
+    private fun hostOf(url: String): String? {
+        val s = url.indexOf("://")
+        if (s < 0) return null
+        val start = s + 3
+        var end = start
+        while (end < url.length) {
+            val c = url[end]
+            if (c == '/' || c == ':' || c == '?' || c == '#') break
+            end++
+        }
+        return if (end > start) url.substring(start, end) else null
+    }
+
+    // a.b.example.com is blocked if a.b.example.com, b.example.com or example.com is in the list
+    fun isHostBlocked(host: String): Boolean {
+        if (blockedHosts.isEmpty()) return false
+        var h = host
+        while (true) {
+            if (blockedHosts.contains(h)) return true
+            val i = h.indexOf('.')
+            if (i < 0) return false
+            h = h.substring(i + 1)
+        }
+    }
+
+    // hosts in a piece of text (a plugin's js/css) that are on the block lists
+    fun findBlockedHosts(text: String, limit: Int = 5): List<String> {
+        val found = LinkedHashSet<String>()
+        for (m in URL_HOST.findAll(text.lowercase())) {
+            val h = m.groupValues[1].trim('.', '-')
+            if (isHostBlocked(h)) {
+                found.add(h)
+                if (found.size >= limit) break
+            }
+        }
+        return found.toList()
+    }
+
+    // same for binary data (a dex file): looks at lowercase host-like strings
+    fun findBlockedHostsInBytes(b: ByteArray, limit: Int = 5): List<String> {
+        val found = LinkedHashSet<String>()
+        val sb = StringBuilder()
+        var runStart = -1
+        var dots = 0
+        fun flush(end: Int) {
+            if (runStart >= 0 && sb.length >= 4 && dots >= 1) {
+                val afterSlashes = runStart >= 2 && b[runStart - 1] == '/'.code.toByte() && b[runStart - 2] == '/'.code.toByte()
+                if (afterSlashes || (dots >= 2 && sb.length >= 8)) {
+                    val h = sb.toString().trim('.', '-')
+                    if (isHostBlocked(h)) found.add(h)
+                }
+            }
+            sb.setLength(0)
+            runStart = -1
+            dots = 0
+        }
+        var i = 0
+        while (i < b.size && found.size < limit) {
+            val c = b[i].toInt() and 0xff
+            val ok = (c in 'a'.code..'z'.code) || (c in '0'.code..'9'.code) || c == '.'.code || c == '-'.code
+            if (ok) {
+                if (runStart < 0) runStart = i
+                if (c == '.'.code) dots++
+                sb.append(c.toChar())
+            } else if (runStart >= 0) {
+                flush(i)
+            }
+            i++
+        }
+        flush(i)
+        return found.toList()
+    }
+
     /**
      * Separate from shouldBlock() above -- these aren't ads, they're
      * YouTube's own telemetry/prefetch/hover-preview requests (watch-time
@@ -122,6 +226,7 @@ class AdBlockEngine private constructor(
 
     companion object {
         private const val TAG = "AdBlockEngine"
+        private val URL_HOST = Regex("(?:https?:)?//([a-z0-9][a-z0-9.-]*[a-z0-9])")
 
         @Volatile
         var historyPlayerActive = false
@@ -141,12 +246,15 @@ class AdBlockEngine private constructor(
                     BufferedReader(InputStreamReader(stream)).readText()
                 }
                 val obj = JSONObject(json)
+                val hosts = loadHosts(context)
+                NativeFilter.init(context)
                 AdBlockEngine(
                     adDomains = obj.getJSONArray("adDomains").toStringList(),
                     youtubeAdPaths = obj.getJSONArray("youtubeAdPaths").toStringList(),
                     youtubeAdParamHints = obj.getJSONArray("youtubeAdParamHints").toStringList(),
                     trackingDomains = obj.getJSONArray("trackingDomains").toStringList(),
-                    dataSaverPaths = obj.optJSONArray("dataSaverPaths")?.toStringList() ?: emptyList()
+                    dataSaverPaths = obj.optJSONArray("dataSaverPaths")?.toStringList() ?: emptyList(),
+                    blockedHosts = hosts
                 )
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to load blocklist.json, falling back to minimal built-in list", e)
@@ -157,6 +265,20 @@ class AdBlockEngine private constructor(
                     trackingDomains = listOf("google-analytics.com"),
                     dataSaverPaths = listOf("/api/stats/watchtime", "/generate_204", "/log_event")
                 )
+            }
+        }
+
+        private fun loadHosts(context: Context): Set<String> {
+            return try {
+                val set = HashSet<String>(70_000)
+                context.assets.open("blocklist_hosts.txt").bufferedReader().useLines { lines ->
+                    for (l in lines) if (l.isNotEmpty()) set.add(l)
+                }
+                Log.i(TAG, "loaded ${set.size} blocked hosts")
+                set
+            } catch (e: Exception) {
+                Log.e(TAG, "couldn't load blocklist_hosts.txt", e)
+                emptySet()
             }
         }
 
