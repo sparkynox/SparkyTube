@@ -1,3 +1,6 @@
 
 # remote config signing key, never commit this
 tools/rc_private.key
+
+# any private key
+*.key

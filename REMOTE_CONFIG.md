@@ -4,23 +4,20 @@ Turn a feature off, or ban an install or an account, without releasing a new app
 
 Until you set a public key it is completely off.
 
-## Setup (once)
+## Setup
 
-```
-pip install pynacl
-python3 tools/rc_keys.py
-```
+The key pair is already made. The **public** key is in `app/src/main/cpp/rc_pubkey.h` (safe to commit, it's what the app checks signatures against). The **private** key is the hex text in `rc_private.key`, and that one must never go into the repo.
 
-- It saves the **private key** to `tools/rc_private.key` (git-ignored). Back it up somewhere safe. If you lose it you can't change the config any more, and if it leaks anyone can.
-- Paste the printed `#define RC_PUBKEY {...}` into `app/src/main/cpp/rc_pubkey.h` and build a new app version. Only apps built with that key trust the config.
+1. Open `rc_private.key`, copy the 64 characters.
+2. On GitHub: your repo > Settings > Secrets and variables > Actions > **New repository secret**. Name: `RC_PRIVATE_KEY`, value: the hex. Save.
+3. Keep one backup of the hex somewhere private (a password manager), then delete the file from your phone. If you lose the key you can't change the config any more, and if it leaks anyone can. In that case make a new pair with `python3 tools/rc_keys.py`, paste the new public key into `rc_pubkey.h` and release a new build.
 
-## Publishing a config
+## Changing the config (from your phone)
 
-1. Copy `tools/remote_config.example.json`, edit it.
-2. `python3 tools/rc_sign.py my_config.json` writes `remote_config.json` in the repo root.
-3. Commit and push that file. Apps pick it up on their next check.
+1. Edit `remote_config.src.json` on GitHub and **raise `seq`**.
+2. Commit. The **Sign remote config** action signs it into `remote_config.json` and commits that. The app picks it up on its next check.
 
-Every time you change it, **raise `seq`**. An app never accepts a config with a lower `seq` than one it already saw (so an old config can't be replayed to undo a ban).
+`seq` must go up every time. An app never accepts a config with a lower `seq` than one it already saw, so an old config can't be replayed to undo a ban (the signing step refuses to publish a stuck `seq`).
 
 ## Fields
 
@@ -47,3 +44,7 @@ Every time you change it, **raise `seq`**. An app never accepts a config with a 
 ## What it can and can't do
 
 It protects the *config*: nobody can switch features or bans on or off by tampering with the file or the phone's storage. It does not protect the app from someone who rebuilds the APK without the check, nothing client-side can.
+
+## Forks
+
+The project is MIT, so anyone can build their own version. A fork that keeps `rc_pubkey.h` as it is trusts configs signed by the original author, and the app downloads from `sparkynox/SparkyTube`. If you fork it, make your own key (`python3 tools/rc_keys.py`), replace the bytes in `rc_pubkey.h` and the `URL` in `RemoteConfig.kt`, or remove the feature.

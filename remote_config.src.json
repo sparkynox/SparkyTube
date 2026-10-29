@@ -1,0 +1,27 @@
+{
+  "seq": 1,
+  "exp": 0,
+  "features": {
+    "audio_fx": {
+      "enabled": true,
+      "message": ""
+    },
+    "video_fx": {
+      "enabled": true,
+      "message": ""
+    },
+    "plugins": {
+      "enabled": true,
+      "message": ""
+    },
+    "native_plugins": {
+      "enabled": true,
+      "message": ""
+    }
+  },
+  "banned": {
+    "message": "You have been banned from SparkyTube.",
+    "install_ids": [],
+    "handles": []
+  }
+}
