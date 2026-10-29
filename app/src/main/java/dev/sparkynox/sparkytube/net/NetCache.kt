@@ -89,6 +89,8 @@ object NetCache {
     private val meter = object : TransferListener {
         private var windowStart = 0L
         private var windowBytes = 0L
+        private var lastLog = 0L
+        private var logBytes = 0L
 
         override fun onTransferInitializing(source: DataSource, dataSpec: DataSpec, isNetwork: Boolean) {}
         override fun onTransferStart(source: DataSource, dataSpec: DataSpec, isNetwork: Boolean) {}
@@ -100,6 +102,15 @@ object NetCache {
             val now = System.nanoTime()
             if (windowStart == 0L) windowStart = now
             windowBytes += bytesTransferred
+            logBytes += bytesTransferred
+            if (now - lastLog > 5_000_000_000L) {
+                if (lastLog != 0L) {
+                    val kbs = logBytes * 1_000_000_000L / (now - lastLog) / 1024
+                    LogRecorder.i(TAG, "speed ${kbs} KB/s via ${if (cronet != null) "Cronet" else "OkHttp"}")
+                }
+                lastLog = now
+                logBytes = 0
+            }
             val elapsed = now - windowStart
             if (elapsed >= 300_000_000L) {
                 NativeNet.record(windowBytes, elapsed)
