@@ -1,0 +1,36 @@
+name: Sign remote config
+
+# edit remote_config.src.json (raise "seq"), push, and this signs it into remote_config.json.
+# needs the repo secret RC_PRIVATE_KEY (the hex from rc_private.key)
+on:
+  push:
+    paths:
+      - remote_config.src.json
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install pynacl
+
+      - name: Sign
+        env:
+          RC_PRIVATE_KEY: ${{ secrets.RC_PRIVATE_KEY }}
+        run: python3 tools/rc_sign.py remote_config.src.json
+
+      - name: Commit the signed file
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add remote_config.json
+          git diff --cached --quiet || (git commit -m "Sign remote config" && git push)
