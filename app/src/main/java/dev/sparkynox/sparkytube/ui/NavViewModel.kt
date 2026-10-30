@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import dev.sparkynox.sparkytube.homefeed.FeedState
 import dev.sparkynox.sparkytube.homefeed.HomeFeedItem
 import dev.sparkynox.sparkytube.homefeed.InnerTubeClient
+import dev.sparkynox.sparkytube.lunokit.channels.ChannelState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -33,6 +34,20 @@ class NavViewModel : ViewModel() {
     var searchVisible by mutableStateOf(false)
     val search = dev.sparkynox.sparkytube.search.SearchState(viewModelScope)
     val pages = mutableStateListOf<Page>()
+
+    // channel pages (LunoChannels), drawn above the tab / pages, under search and watch
+    val channels = mutableStateListOf<ChannelState>()
+
+    fun openChannel(id: String) {
+        if (channels.lastOrNull()?.channelId == id) return
+        channels.add(ChannelState(viewModelScope, id))
+    }
+
+    fun popChannel(): Boolean {
+        if (channels.isEmpty()) return false
+        channels.removeAt(channels.lastIndex)
+        return true
+    }
 
     val subs = FeedState(viewModelScope, FeedState.Source.Browse("FEsubscriptions"))
 
