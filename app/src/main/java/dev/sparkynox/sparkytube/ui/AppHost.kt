@@ -61,6 +61,7 @@ import dev.sparkynox.sparkytube.homefeed.HomeFeedItem
 import dev.sparkynox.sparkytube.homefeed.HiddenVideos
 import dev.sparkynox.sparkytube.homefeed.HomeFeedViewModel
 import dev.sparkynox.sparkytube.homefeed.InnerTubeClient
+import dev.sparkynox.sparkytube.lunokit.channels.ChannelScreen
 
 /** Cards and the watch screen call this to open a channel page. Provided by [AppHost]. */
 val LocalOpenChannel = staticCompositionLocalOf<(String) -> Unit> { {} }
@@ -122,6 +123,12 @@ fun AppHost(
             )
         }
 
+        nav.channels.lastOrNull()?.let { ch ->
+            ChannelScreen(
+                state = ch, subscribed = nav.subChannels, loggedIn = home.loggedIn,
+                onBack = { nav.popChannel() }, onOpen = onOpen, onMore = onMore, onLogin = onLogin,
+            )
+        }
         if (nav.searchVisible) SearchScreen(nav, onOpen = onOpen, onClose = { nav.searchVisible = false })
         if (nav.watchVisible) WatchScreen(nav, onOpen = onOpen, onMore = onMore)
         menuItem?.let { VideoMenuSheet(it, nav, onDownload, onDismiss = { menuItem = null }) }
