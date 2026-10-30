@@ -1524,6 +1524,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                         }
                         nav.watchVisible -> leaveWatch()
                         nav.searchVisible -> nav.searchVisible = false
+                        nav.popChannel() -> Unit
                         nav.pop() -> Unit
                         nav.tab != dev.sparkynox.sparkytube.ui.NavViewModel.Tab.HOME ->
                             nav.tab = dev.sparkynox.sparkytube.ui.NavViewModel.Tab.HOME
@@ -2627,6 +2628,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         nav.searchVisible = false
         leaveWatch()
         nav.pages.clear()
+        nav.channels.clear()
         nav.tab = tab
         if (tab == dev.sparkynox.sparkytube.ui.NavViewModel.Tab.SHORTS) {
             openWebPage("https://m.youtube.com/shorts")
@@ -2736,7 +2738,16 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         webView.loadUrl(url)
     }
 
-    private fun openChannel(channelId: String) = openWebPage("https://m.youtube.com/channel/$channelId")
+    private fun openChannel(channelId: String) {
+        if (composeNav() && browseMode == BrowseMode.YOUTUBE) {
+            nav.searchVisible = false
+            leaveWatch()
+            nav.openChannel(channelId)
+            showComposeHost()
+        } else {
+            openWebPage("https://m.youtube.com/channel/$channelId")
+        }
+    }
 
     private fun openFeedItem(item: dev.sparkynox.sparkytube.homefeed.HomeFeedItem) {
         val videoId = item.videoId
@@ -2878,6 +2889,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             cm.flush()
             dev.sparkynox.sparkytube.logs.LogRecorder.i("Login", "signed in, session saved (visitor data: ${visitor.isNotEmpty()})")
             nav.pages.clear()
+            nav.channels.clear()
             nav.tab = dev.sparkynox.sparkytube.ui.NavViewModel.Tab.HOME
             homeFeedVm.onLoggedIn()
             showComposeHost()
