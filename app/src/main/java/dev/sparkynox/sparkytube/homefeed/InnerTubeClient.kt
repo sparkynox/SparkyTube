@@ -337,6 +337,114 @@ object InnerTubeClient {
         }
     }
 
+    // ---------- channel pages (LunoKit / LunoChannels)
+
+    data class ChannelTab(val title: String, val params: String?)
+
+    data class ChannelHeader(
+        val id: String,
+        val name: String,
+        val handle: String?,
+        val avatar: String?,
+        val banner: String?,
+        val subscribers: String?,
+        val videoCount: String?,
+        val description: String?,
+        val subscribed: Boolean?,
+    )
+
+    data class ChannelPage(val header: ChannelHeader?, val tabs: List<ChannelTab>, val error: String? = null)
+
+    suspend fun fetchChannel(channelId: String): ChannelPage = withContext(Dispatchers.IO) {
+        try {
+            val root = post("browse", JSONObject().put("browseId", channelId))
+            val page = ChannelPage(parseChannelHeader(channelId, root), parseChannelTabs(root))
+            LogRecorder.d(TAG, "channel $channelId: header=${page.header != null}, tabs=${page.tabs.map { it.title }}")
+            page
+        } catch (e: Exception) {
+            LogRecorder.w(TAG, "channel $channelId failed: ${e.message}")
+            ChannelPage(null, emptyList(), e.message ?: "couldn't load the channel")
+        }
+    }
+
+    /** One tab of a channel (Videos, Live, Playlists, or Shorts when [shorts] is true). */
+    suspend fun fetchChannelTab(channelId: String, params: String?, shorts: Boolean = false): HomeFeedResult =
+        loadChannel(shorts) {
+            val body = JSONObject().put("browseId", channelId)
+            if (params != null) body.put("params", params)
+            post("browse", body)
+        }
+
+    suspend fun fetchChannelContinuation(token: String, shorts: Boolean = false): HomeFeedResult =
+        loadChannel(shorts) { post("browse", JSONObject().put("continuation", token)) }
+
+    private suspend fun loadChannel(shorts: Boolean, request: () -> JSONObject): HomeFeedResult = withContext(Dispatchers.IO) {
+        val loggedIn = Session.loggedIn
+        try {
+            val root = request()
+            val items = ArrayList<HomeFeedItem>()
+            if (shorts) collectShorts(root, items) else collect(root, items)
+            HomeFeedResult(items.distinctBy { it.videoId ?: it.playlistId }, loggedIn, findContinuationToken(root))
+        } catch (e: IOException) {
+            HomeFeedResult(emptyList(), loggedIn, error = e.message ?: "network error")
+        } catch (e: Exception) {
+            LogRecorder.e(TAG, "channel tab parse failed", e)
+            HomeFeedResult(emptyList(), loggedIn, error = "couldn't read this channel")
+        }
+    }
+
+    private fun parseChannelTabs(root: JSONObject): List<ChannelTab> {
+        val tabs = findFirst(root, "twoColumnBrowseResultsRenderer")?.optJSONArray("tabs") ?: return emptyList()
+        return tabs.objs().mapNotNull { t ->
+            val r = t.optJSONObject("tabRenderer") ?: return@mapNotNull null
+            val title = r.optString("title").takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            val params = r.optJSONObject("endpoint")?.optJSONObject("browseEndpoint")?.optString("params")?.takeIf { it.isNotBlank() }
+            ChannelTab(title, params)
+        }
+    }
+
+    // old pages use c4TabbedHeaderRenderer, newer ones pageHeaderViewModel, so both are read
+    private fun parseChannelHeader(id: String, root: JSONObject): ChannelHeader? {
+        val meta = root.optJSONObject("metadata")?.optJSONObject("channelMetadataRenderer")
+        val c4 = findFirst(root, "c4TabbedHeaderRenderer")
+        val vm = findFirst(root, "pageHeaderViewModel")
+
+        val name = meta?.optString("title")?.takeIf { it.isNotBlank() }
+            ?: text(c4?.optJSONObject("title"))
+            ?: findFirst(vm?.optJSONObject("title"), "dynamicTextViewModel")?.optJSONObject("text")?.optString("content")?.takeIf { it.isNotBlank() }
+            ?: return null
+
+        fun fix(u: String?) = u?.let { if (it.startsWith("//")) "https:$it" else it }
+        val avatar = fix(
+            lastThumb(meta?.optJSONObject("avatar")?.optJSONArray("thumbnails"))
+                ?: lastThumb(c4?.optJSONObject("avatar")?.optJSONArray("thumbnails"))
+                ?: lastThumb(findFirst(vm?.optJSONObject("image"), "avatarViewModel")?.optJSONObject("image")?.optJSONArray("sources"))
+        )
+        val banner = fix(
+            lastThumb(c4?.optJSONObject("banner")?.optJSONArray("thumbnails"))
+                ?: lastThumb(findFirst(vm?.optJSONObject("banner"), "imageBannerViewModel")?.optJSONObject("image")?.optJSONArray("sources"))
+        )
+
+        val parts = vm?.optJSONObject("metadata")?.optJSONObject("contentMetadataViewModel")?.optJSONArray("metadataRows")?.objs()
+            ?.flatMap { row ->
+                row.optJSONArray("metadataParts")?.objs()
+                    ?.mapNotNull { it.optJSONObject("text")?.optString("content")?.takeIf { s -> s.isNotBlank() } } ?: emptyList()
+            } ?: emptyList()
+
+        val subBtn = findFirst(root, "subscribeButtonRenderer")
+        return ChannelHeader(
+            id = id,
+            name = name,
+            handle = parts.firstOrNull { it.startsWith("@") } ?: text(c4?.optJSONObject("channelHandleText")),
+            avatar = avatar,
+            banner = banner,
+            subscribers = parts.firstOrNull { it.contains("subscriber", true) } ?: text(c4?.optJSONObject("subscriberCountText")),
+            videoCount = parts.firstOrNull { it.contains("video", true) } ?: text(c4?.optJSONObject("videosCountText")),
+            description = meta?.optString("description")?.takeIf { it.isNotBlank() },
+            subscribed = if (subBtn != null && subBtn.has("subscribed")) subBtn.optBoolean("subscribed") else null,
+        )
+    }
+
     // ---------- request
 
     private fun post(path: String, body: JSONObject): JSONObject {
@@ -405,7 +513,7 @@ object InnerTubeClient {
                 node.optJSONObject("compactVideoRenderer")?.let { parseVideoRenderer(it)?.let(out::add) }
                 node.optJSONObject("playlistVideoRenderer")?.let { parseVideoRenderer(it)?.let(out::add) }
                 node.optJSONObject("radioRenderer")?.let { parsePlaylistLike(it)?.let(out::add) }
-                (node.optJSONObject("playlistRenderer") ?: node.optJSONObject("compactPlaylistRenderer"))
+                (node.optJSONObject("playlistRenderer") ?: node.optJSONObject("compactPlaylistRenderer") ?: node.optJSONObject("gridPlaylistRenderer"))
                     ?.let { parsePlaylistLike(it)?.let(out::add) }
                 node.keys().forEach { collect(node.opt(it), out) }
             }
