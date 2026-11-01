@@ -126,4 +126,4 @@ Some parts keep their own terms (filter lists, the ed25519 code, the artwork): s
 
 SparkyTube is an independent project and is not affiliated with or endorsed by YouTube or Google. Use it for your own viewing and respect the content creators you watch.
 
-Made by **SparkyNox** · enjoy :3
+Made by **SparkyNox** · enjoy :3 Nya
