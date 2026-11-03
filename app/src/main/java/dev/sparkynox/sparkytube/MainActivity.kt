@@ -485,7 +485,22 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     }
 
     // music mode picture: transparent player + a copy inside the mini player, see ui/MusicModeArt.kt
+    private val lyricsUi = dev.sparkynox.sparkytube.lunokit.lyrics.LyricsUiState()
+
+    private fun setupLyricsLayer() {
+        binding.musicLyricsCompose.setContent {
+            dev.sparkynox.sparkytube.lunokit.lyrics.LyricsLayer(
+                ui = lyricsUi,
+                controller = { mediaController },
+                videoId = { lastResolvedVideoId },
+                title = { mediaController?.mediaMetadata?.title?.toString()?.takeIf { it.isNotBlank() } ?: nav.watchTitle },
+                channel = { nav.watchInfo?.channelName },
+            )
+        }
+    }
+
     private val musicArt by lazy {
+        setupLyricsLayer()
         dev.sparkynox.sparkytube.ui.MusicModeArt(
             big = binding.musicModeThumbnail,
             mini = binding.miniPlayerContainer,
@@ -494,6 +509,8 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             miniOn = { isMiniPlayerActive },
             nativeActive = { isNativePlaybackActive },
             videoId = { lastResolvedVideoId },
+            lyrics = binding.musicLyricsCompose,
+            lyricsUi = lyricsUi,
         )
     }
 
@@ -1128,6 +1145,14 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             applyVideoTransform()
         }
         binding.exoPlayerView.layoutParams = params
+
+        // music picture and lyrics follow the player size, lyrics switch to the wide layout
+        listOf<View>(binding.musicModeThumbnail, binding.musicLyricsCompose).forEach {
+            val lp = it.layoutParams
+            lp.height = params.height
+            it.layoutParams = lp
+        }
+        lyricsUi.fullscreen = isPlayerFullscreen
     }
 
     /**
@@ -3406,6 +3431,8 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         mediaController?.clearMediaItems()
         binding.exoPlayerView.visibility = View.GONE
         binding.musicModeThumbnail.visibility = View.GONE
+        binding.musicLyricsCompose.visibility = View.GONE
+        lyricsUi.active = false
         topQuality = false
         topAudio = false
         isNativePlaybackActive = false
