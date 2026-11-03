@@ -290,6 +290,8 @@ class SettingsComposeActivity : AppCompatActivity() {
                         { p.arePopupsBlocked(this) }, { p.setPopupsBlocked(this, it) }),
                 toggle("cronet", "HTTP/3 network (Cronet)", "pulse", "Loads video through Chromium's network stack with QUIC. Needs Google Play services, restart the app to apply",
                         { dev.sparkynox.sparkytube.net.NetCache.isCronetEnabled(this) }, { dev.sparkynox.sparkytube.net.NetCache.setCronetEnabled(this, it) }),
+                toggle("lyrics", "Lyrics in Music Mode", "file", "Synced lyrics over the music picture. Looks the song up on lrclib.net and lyrics-api.boidu.dev, so the title and channel name are sent",
+                        { p.isLyricsEnabled(this) }, { p.setLyricsEnabled(this, it) }),
                 link("videofx", "Anime upscaler", "sliders", { "Sharper, cleaner anime from low-resolution video (GPU)" }) {
                         open(dev.sparkynox.sparkytube.fx.VideoFxActivity::class.java)
                     },
