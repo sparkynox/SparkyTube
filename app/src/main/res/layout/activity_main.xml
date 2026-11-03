@@ -88,6 +88,16 @@
             android:focusable="false"
             android:contentDescription="Now playing thumbnail" />
 
+        <!-- LunoKit lyrics, drawn over the music mode picture (lunokit/lyrics) -->
+        <androidx.compose.ui.platform.ComposeView
+            android:id="@+id/musicLyricsCompose"
+            android:layout_width="match_parent"
+            android:layout_height="220dp"
+            android:layout_gravity="top"
+            android:visibility="gone"
+            android:clickable="false"
+            android:focusable="false" />
+
         <androidx.media3.ui.PlayerView
             android:id="@+id/exoPlayerView"
             android:layout_width="match_parent"
