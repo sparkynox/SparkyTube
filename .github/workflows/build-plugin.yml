@@ -52,7 +52,7 @@ jobs:
           $D8 --release --lib "$ANDROID_JAR" --classpath build/api --output build/dex build/plugin.jar kotlinc/lib/kotlin-stdlib.jar
           cd build/dex && cp ../../plugin.json . && zip -q ../../$PLUGIN.zip classes*.dex plugin.json
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ env.PLUGIN }}
           path: plugins-examples/${{ env.PLUGIN }}/${{ env.PLUGIN }}.zip
