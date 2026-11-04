@@ -213,6 +213,19 @@ object InnerTubeClient {
         }
     }
 
+    // first video of a playlist or mix, for when one was queued instead of a single video
+    suspend fun fetchPlaylistStart(playlistId: String): HomeFeedItem? = withContext(Dispatchers.IO) {
+        try {
+            val body = JSONObject().put("playlistId", playlistId)
+            // mixes are RD + the seed video id
+            if (playlistId.startsWith("RD") && playlistId.length == 13) body.put("videoId", playlistId.substring(2))
+            parseQueue(post("next", body), playlistId).firstOrNull()
+        } catch (e: Exception) {
+            LogRecorder.w(TAG, "playlist start failed for $playlistId", e)
+            null
+        }
+    }
+
     // the playlist / mix panel next to a watch page
     private fun parseQueue(root: JSONObject, playlistId: String): List<HomeFeedItem> {
         val out = ArrayList<HomeFeedItem>()
