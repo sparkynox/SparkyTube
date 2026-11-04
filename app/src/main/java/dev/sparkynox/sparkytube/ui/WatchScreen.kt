@@ -212,7 +212,7 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
                         style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
                     )
                 }
-                items(nav.userQueue.toList(), key = { "uq-" + it.videoId }) { q ->
+                items(nav.userQueue.toList(), key = { "uq-" + (it.videoId ?: it.playlistId) }) { q ->
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 12.dp).clip(RoundedCornerShape(14.dp))
                             .clickable { onOpen(q) }.padding(6.dp),

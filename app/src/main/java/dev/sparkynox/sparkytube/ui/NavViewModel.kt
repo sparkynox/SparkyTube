@@ -112,16 +112,30 @@ class NavViewModel : ViewModel() {
 
     // videos added from the ⋮ menu, they play before playlist / related
     val userQueue = androidx.compose.runtime.mutableStateListOf<HomeFeedItem>()
-    fun playNext(item: HomeFeedItem) { userQueue.removeAll { it.videoId == item.videoId }; userQueue.add(0, item) }
-    fun addToQueue(item: HomeFeedItem) { if (userQueue.none { it.videoId == item.videoId }) userQueue.add(item) }
+    // playlists and mixes can be queued too, they have no videoId
+    private fun key(i: HomeFeedItem) = i.videoId ?: i.playlistId
+    fun playNext(item: HomeFeedItem) { userQueue.removeAll { key(it) == key(item) }; userQueue.add(0, item) }
+    fun addToQueue(item: HomeFeedItem) { if (userQueue.none { key(it) == key(item) }) userQueue.add(item) }
+
+    // the playlist / mix that was playing when a queued video cut in, so it carries on afterwards
+    private class Resume(val playlistId: String, val items: List<HomeFeedItem>, val fromId: String?)
+    private var resume: Resume? = null
     val queue: List<HomeFeedItem> get() = watchInfo?.queue ?: emptyList()
 
-    fun openWatch(videoId: String, title: String, playlistId: String? = null) {
+    // auto = opened by autoplay (queue / playlist / related), false = the user picked it
+    fun openWatch(videoId: String, title: String, playlistId: String? = null, auto: Boolean = false) {
         if (videoId == watchId && watchInfo != null) {
             watchVisible = true
             return
         }
         userQueue.removeAll { it.videoId == videoId }
+        val pl = watchPlaylistId
+        resume = when {
+            !auto -> null
+            playlistId != null -> null
+            pl != null && queue.isNotEmpty() -> Resume(pl, queue, watchId)
+            else -> resume
+        }
         watchId = videoId
         watchPlaylistId = playlistId
         watchTitle = title
@@ -141,6 +155,7 @@ class NavViewModel : ViewModel() {
     }
 
     fun closeWatch() {
+        resume = null
         watchVisible = false
         watchId = null
         watchInfo = null
@@ -176,6 +191,10 @@ class NavViewModel : ViewModel() {
         if (q.isNotEmpty()) {
             val i = q.indexOfFirst { it.videoId == watchId }
             q.getOrNull(i + 1)?.let { return it }
+        }
+        resume?.let { r ->
+            val i = r.items.indexOfFirst { it.videoId == r.fromId }
+            if (i >= 0) r.items.getOrNull(i + 1)?.let { return it }
         }
         return nextRelated()
     }

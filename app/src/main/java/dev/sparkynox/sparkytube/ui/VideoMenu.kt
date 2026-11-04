@@ -85,9 +85,11 @@ fun VideoMenuSheet(
                 style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold,
                 maxLines = 2, overflow = TextOverflow.Ellipsis,
             )
-            if (id != null) {
+            if (id != null || item.playlistId != null) {
                 MenuRow(Icons.Filled.PlayArrow, "Play next") { nav.playNext(item); toast("Plays next"); onDismiss() }
                 MenuRow(Icons.AutoMirrored.Filled.List, "Add to queue") { nav.addToQueue(item); toast("Added to queue"); onDismiss() }
+            }
+            if (id != null) {
                 MenuRow(Icons.Filled.Add, "Save to playlist") { if (!needLogin()) picking = true }
                 MenuRow(Icons.Filled.Refresh, "Save to Watch later") {
                     if (!needLogin()) {

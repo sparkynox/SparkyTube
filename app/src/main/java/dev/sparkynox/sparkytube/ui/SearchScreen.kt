@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import dev.sparkynox.sparkytube.homefeed.HomeFeedItem
 import dev.sparkynox.sparkytube.search.NewPipeSearch
 import dev.sparkynox.sparkytube.search.SearchHit
+import dev.sparkynox.sparkytube.search.SearchState
 
 private val FILTERS = listOf("all" to "All", "videos" to "Videos", "channels" to "Channels", "playlists" to "Playlists")
 
@@ -132,7 +133,10 @@ fun SearchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onClose: () 
             }
             if (s.loading && s.hits.isEmpty()) LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp))
 
+            // results of what was just searched win over any suggestions that are still around
+            val showResults = s.submitted.isNotEmpty() && s.query.trim() == s.submitted
             when {
+                showResults -> ResultsList(s, list, openChannel, openMenu, onOpen)
                 // typing: suggestions
                 s.suggestions.isNotEmpty() -> LazyColumn(contentPadding = PaddingValues(vertical = 4.dp)) {
                     items(s.suggestions.toList()) { sug ->
@@ -151,7 +155,21 @@ fun SearchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onClose: () 
                         TextRow(r, onRemove = { NewPipeSearch.forget(ctx, r); recentTick++ }) { go(r) }
                     }
                 }
-                else -> Box(Modifier.fillMaxSize()) {
+                else -> ResultsList(s, list, openChannel, openMenu, onOpen)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ResultsList(
+    s: SearchState,
+    list: androidx.compose.foundation.lazy.LazyListState,
+    openChannel: (String) -> Unit,
+    openMenu: (HomeFeedItem) -> Unit,
+    onOpen: (HomeFeedItem) -> Unit,
+) {
+    Box(Modifier.fillMaxSize()) {
                     LazyColumn(
                         state = list,
                         contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
@@ -187,9 +205,6 @@ fun SearchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onClose: () 
                         )
                     }
                 }
-            }
-        }
-    }
 }
 
 @Composable
