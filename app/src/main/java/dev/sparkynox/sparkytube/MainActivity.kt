@@ -351,6 +351,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                             // failure on this same video still gets its
                             // own fresh set of retries.
                             consecutivePlayerErrorCount = 0
+                            advancePendingAt = 0L
                             if (isNativePlaybackActive) binding.exoPlayerView.visibility = View.VISIBLE
                         }
                     }
@@ -390,7 +391,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                             // failing) or we don't know which video it
                             // was -- move on instead of sitting frozen.
                             consecutivePlayerErrorCount = 0
-                            advanceToNextVideo()
+                            advanceToNextVideo(force = true)
                         }
                     }
                 })
@@ -1420,10 +1421,14 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     // background, audio mode) it stays closed, only the video changes
     private fun playNextFromEnd(next: dev.sparkynox.sparkytube.homefeed.HomeFeedItem) {
         val id = next.videoId ?: return
+        advancePendingAt = android.os.SystemClock.elapsedRealtime()
         val wasVisible = nav.watchVisible
-        openVideo(id, next.title, next.playlistId)
+        openVideo(id, next.title, next.playlistId, auto = true)
         if (!wasVisible) nav.watchVisible = false
     }
+
+    // set when autoplay picks a video, so a second "ended" for the old one can't override that pick
+    private var advancePendingAt = 0L
 
     /**
      * Called when ExoPlayer finishes the current video. Just unmuting the
@@ -1434,12 +1439,35 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
      * inside the WebView, which triggers a real navigation the URL poller
      * then picks up as a fresh video ID.
      */
-    private fun advanceToNextVideo(attempt: Int = 0) {
+    private fun advanceToNextVideo(attempt: Int = 0, force: Boolean = false) {
         if (composeNav() && browseMode == BrowseMode.YOUTUBE) {
+            if (!force && android.os.SystemClock.elapsedRealtime() - advancePendingAt < 15_000) {
+                dev.sparkynox.sparkytube.logs.LogRecorder.d("Queue", "advance ignored, the next video is already loading")
+                return
+            }
             // Compose UI: queue first, then playlist, then the first related video
             val next = nav.nextVideo()
+            dev.sparkynox.sparkytube.logs.LogRecorder.d(
+                "Queue",
+                "advance: queued=${nav.userQueue.size} playlist=${nav.queue.size} next=${next?.videoId ?: next?.playlistId}"
+            )
             if (next?.videoId != null) {
                 playNextFromEnd(next)
+                return
+            }
+            // a playlist or mix in the queue: start it from its first video
+            if (next?.playlistId != null) {
+                advancePendingAt = android.os.SystemClock.elapsedRealtime()
+                nav.userQueue.remove(next)
+                lifecycleScope.launch {
+                    val first = dev.sparkynox.sparkytube.homefeed.InnerTubeClient.fetchPlaylistStart(next.playlistId)
+                    if (first != null) {
+                        playNextFromEnd(first)
+                    } else {
+                        advancePendingAt = 0L
+                        advanceToNextVideo(force = true)
+                    }
+                }
                 return
             }
             // related list wasn't loaded (or failed): ask YouTube again before giving up
@@ -2791,8 +2819,8 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }
     }
 
-    private fun openVideo(videoId: String, title: String, playlistId: String? = null) {
-        nav.openWatch(videoId, title, playlistId)
+    private fun openVideo(videoId: String, title: String, playlistId: String? = null, auto: Boolean = false) {
+        nav.openWatch(videoId, title, playlistId, auto)
         if (videoId == lastResolvedVideoId && isNativePlaybackActive) {
             // already playing (e.g. from the mini-player), just bring it back up
             if (isMiniPlayerActive) exitMiniPlayerMode()
