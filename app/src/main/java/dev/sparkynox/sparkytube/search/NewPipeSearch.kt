@@ -161,6 +161,8 @@ class SearchState(private val scope: CoroutineScope) {
         suggestJob = scope.launch {
             delay(250)
             val r = NewPipeSearch.suggestions(text.trim())
+            // the user may have hit search or kept typing while this was in flight
+            if (query != text) return@launch
             suggestions.clear()
             suggestions.addAll(r)
         }
@@ -169,6 +171,7 @@ class SearchState(private val scope: CoroutineScope) {
     fun submit(text: String = query) {
         val q = text.trim()
         if (q.isEmpty()) return
+        suggestJob?.cancel()
         query = q
         submitted = q
         suggestions.clear()
@@ -188,6 +191,7 @@ class SearchState(private val scope: CoroutineScope) {
 
     fun clear() {
         job?.cancel()
+        suggestJob?.cancel()
         query = ""; submitted = ""; hits.clear(); suggestions.clear(); next = null; error = null; loading = false
     }
 
