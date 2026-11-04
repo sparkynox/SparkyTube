@@ -333,6 +333,10 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                     override fun onPlaybackStateChanged(playbackState: Int) {
                         if (playbackState == Player.STATE_ENDED) {
                             emitPluginEvent("videoend", "{}")
+                            if (handledBogusEnd()) return
+                            // watched to the end, nothing left to resume
+                            lastResolvedVideoId?.let { dev.sparkynox.sparkytube.history.WatchHistoryStore.clearPosition(this@MainActivity, it) }
+                            bogusEndRetryFor = null
                             if (!composeNav() && isMiniPlayerActive && extractVideoId(webView.url ?: "") != lastResolvedVideoId) {
                                 // WebView is showing Home/Shorts/Subs/etc,
                                 // not this video's watch page anymore — the
@@ -369,6 +373,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                     // playWhenReady (which the notification reflects)
                     // never got corrected either.
                     override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                        dev.sparkynox.sparkytube.logs.LogRecorder.w("Player", "error ${error.errorCodeName}: ${error.message}")
                         val failedVideoId = lastResolvedVideoId
                         if (failedVideoId != null && failedVideoId == lastErroredVideoId) {
                             consecutivePlayerErrorCount++
@@ -1429,6 +1434,27 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
     // set when autoplay picks a video, so a second "ended" for the old one can't override that pick
     private var advancePendingAt = 0L
+
+    // "ended" far from the end of the file means the stream died, not that the video finished.
+    // that used to skip a video after a second, now it is reloaded once instead
+    private var bogusEndRetryFor: String? = null
+
+    private fun handledBogusEnd(): Boolean {
+        val c = mediaController ?: return false
+        val id = lastResolvedVideoId
+        val dur = c.duration
+        val pos = c.currentPosition
+        dev.sparkynox.sparkytube.logs.LogRecorder.d("Queue", "ended: video=$id pos=$pos dur=$dur")
+        if (id == null || dur <= 0 || pos >= dur - 5_000 || c.isCurrentMediaItemLive) return false
+        if (bogusEndRetryFor == id) return false // already tried once, move on
+        bogusEndRetryFor = id
+        dev.sparkynox.sparkytube.logs.LogRecorder.w("Queue", "ended $pos ms into a $dur ms video, reloading it instead of skipping")
+        dev.sparkynox.sparkytube.extractor.StreamExtractor.invalidate(id)
+        lastResolvedVideoId = null
+        resolveAndPlayNative(id, fallbackTitle = "")
+        lastResolvedVideoId = id
+        return true
+    }
 
     /**
      * Called when ExoPlayer finishes the current video. Just unmuting the
@@ -3378,7 +3404,10 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 null
             )
 
-            val savedPosition = dev.sparkynox.sparkytube.history.WatchHistoryStore.getPosition(this@MainActivity, videoId) ?: 0L
+            // a saved spot too close to the end would just end the video again a second after it starts
+            val durMs = resolved.durationSeconds * 1000
+            val savedPosition = dev.sparkynox.sparkytube.history.WatchHistoryStore.getPosition(this@MainActivity, videoId)
+                ?.takeIf { durMs <= 0 || it < durMs - 20_000 } ?: 0L
             playOnController(
                 streamUrl = dataSaverQuality?.url ?: resolved.url,
                 title = resolved.title.ifBlank { fallbackTitle },
