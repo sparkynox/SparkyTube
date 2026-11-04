@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Setup Python 3.11 for Chaquopy debug compilation
       - name: Set up Python 3.11
@@ -62,7 +62,7 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Setup Python 3.11 for Chaquopy release compilation
       - name: Set up Python 3.11
