@@ -201,6 +201,17 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         if (ticksSinceLastPositionSave < 8) return
         ticksSinceLastPositionSave = 0
 
+        // local stats: time actually played since the last save tick
+        val statsNow = android.os.SystemClock.elapsedRealtime()
+        val statsGap = statsNow - lastStatsAt
+        lastStatsAt = statsNow
+        val statsVideo = lastResolvedVideoId
+        if (statsVideo != null && mediaController?.isPlaying == true && statsGap in 1..12_000) {
+            dev.sparkynox.sparkytube.lunokit.stats.StatsStore.add(
+                this, statsVideo, nav.watchTitle, nav.watchInfo?.channelName.orEmpty(), statsGap, isMusicModeActive
+            )
+        }
+
         // isResolving guards the window where lastResolvedVideoId has
         // already flipped to the NEW video (checkCurrentUrlForVideo sets
         // it as soon as the URL changes, before the async resolve/network
@@ -315,12 +326,14 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                             // until the user explicitly pauses.
                             val controller = mediaController
                             if (!userInitiatedPause && controller != null &&
+                                controller.currentMediaItem != null &&
                                 controller.playWhenReady &&
                                 controller.playbackState != Player.STATE_ENDED &&
                                 controller.playbackState != Player.STATE_IDLE
                             ) {
                                 pollHandler.postDelayed({
                                     if (!userInitiatedPause && mediaController?.isPlaying == false &&
+                                        mediaController?.currentMediaItem != null &&
                                         mediaController?.playbackState != Player.STATE_ENDED
                                     ) {
                                         mediaController?.play()
@@ -332,6 +345,12 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
                     override fun onPlaybackStateChanged(playbackState: Int) {
                         if (playbackState == Player.STATE_ENDED) {
+                            // an empty player reports "ended" too (that is what skipped the next video after a second)
+                            val c = mediaController
+                            if (c == null || c.currentMediaItem == null || c.duration <= 0) {
+                                dev.sparkynox.sparkytube.logs.LogRecorder.d("Queue", "ended ignored, nothing is loaded")
+                                return
+                            }
                             emitPluginEvent("videoend", "{}")
                             if (handledBogusEnd()) return
                             // watched to the end, nothing left to resume
@@ -1435,6 +1454,25 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     // set when autoplay picks a video, so a second "ended" for the old one can't override that pick
     private var advancePendingAt = 0L
 
+    private var lastStatsAt = 0L
+
+    // notification / lock screen Previous: restart the video, or go back to the one before it
+    private fun skipPrevious() {
+        val c = mediaController
+        if (c != null && c.currentPosition > 5_000) {
+            c.seekTo(0)
+            return
+        }
+        val prev = nav.previousVideo()
+        if (prev == null) {
+            c?.seekTo(0)
+            return
+        }
+        val wasVisible = nav.watchVisible
+        openVideo(prev.id, prev.title, prev.playlistId, auto = true, back = true)
+        if (!wasVisible) nav.watchVisible = false
+    }
+
     // "ended" far from the end of the file means the stream died, not that the video finished.
     // that used to skip a video after a second, now it is reloaded once instead
     private var bogusEndRetryFor: String? = null
@@ -1548,6 +1586,10 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         setContentView(binding.root)
 
         prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+        nav.attachContext(applicationContext)
+        dev.sparkynox.sparkytube.player.PlaybackService.onSkipNext = { runOnUiThread { advanceToNextVideo(force = true) } }
+        dev.sparkynox.sparkytube.player.PlaybackService.onSkipPrevious = { runOnUiThread { skipPrevious() } }
 
         // Always-on native ad/tracker engine — loaded once, lives for the
         // whole app session. No toggle: active from the very first request.
@@ -1912,6 +1954,9 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }
         items += Shortcut("Downloads", R.drawable.ic_download) {
             startActivity(Intent(this, dev.sparkynox.sparkytube.download.DownloadsActivity::class.java))
+        }
+        items += Shortcut("Stats", android.R.drawable.ic_menu_recent_history) {
+            startActivity(Intent(this, dev.sparkynox.sparkytube.lunokit.stats.StatsActivity::class.java))
         }
         items += Shortcut("Offline", R.drawable.ic_library) {
             startActivity(Intent(this, dev.sparkynox.sparkytube.download.OfflineLibraryActivity::class.java))
@@ -2845,8 +2890,8 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }
     }
 
-    private fun openVideo(videoId: String, title: String, playlistId: String? = null, auto: Boolean = false) {
-        nav.openWatch(videoId, title, playlistId, auto)
+    private fun openVideo(videoId: String, title: String, playlistId: String? = null, auto: Boolean = false, back: Boolean = false) {
+        nav.openWatch(videoId, title, playlistId, auto, back)
         if (videoId == lastResolvedVideoId && isNativePlaybackActive) {
             // already playing (e.g. from the mini-player), just bring it back up
             if (isMiniPlayerActive) exitMiniPlayerMode()
