@@ -146,10 +146,16 @@ fun SearchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onClose: () 
                 // nothing searched yet: recent searches
                 s.submitted.isEmpty() -> LazyColumn {
                     if (recent.isNotEmpty()) item {
-                        Text(
-                            "Recent", Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold,
-                        )
+                        androidx.compose.foundation.layout.Row(
+                            Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp),
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "Recent", Modifier.weight(1f),
+                                style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold,
+                            )
+                            androidx.compose.material3.TextButton(onClick = { NewPipeSearch.forgetAll(ctx); recentTick++ }) { Text("Clear all") }
+                        }
                     }
                     items(recent) { r ->
                         TextRow(r, onRemove = { NewPipeSearch.forget(ctx, r); recentTick++ }) { go(r) }

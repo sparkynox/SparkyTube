@@ -1,5 +1,6 @@
 package dev.sparkynox.sparkytube.ui
 
+import dev.sparkynox.sparkytube.lunokit.ambient.ambientGlow
 import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -82,7 +83,7 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
         LazyColumn(
             state = list,
             // the first 220dp belong to the ExoPlayer view that MainActivity draws above this
-            modifier = Modifier.fillMaxSize().padding(top = 220.dp),
+            modifier = Modifier.fillMaxSize().ambientGlow(nav.watchId).padding(top = 220.dp),
             contentPadding = PaddingValues(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
@@ -206,11 +207,14 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
 
             if (nav.userQueue.isNotEmpty()) {
                 item(key = "uq-title") {
-                    Text(
-                        "Your queue (${nav.userQueue.size})",
-                        Modifier.padding(horizontal = 16.dp),
-                        style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
-                    )
+                    Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "Your queue (${nav.userQueue.size})",
+                            Modifier.weight(1f),
+                            style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+                        )
+                        TextButton(onClick = { nav.clearQueue() }) { Text("Clear all") }
+                    }
                 }
                 items(nav.userQueue.toList(), key = { "uq-" + (it.videoId ?: it.playlistId) }) { q ->
                     Row(
@@ -231,7 +235,11 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
                                 color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
                             )
                         }
-                        TextButton(onClick = { nav.userQueue.remove(q) }) { Text("Remove") }
+                        Row {
+                            Text("\u25B2", Modifier.clickable { nav.moveInQueue(nav.userQueue.indexOf(q), -1) }.padding(8.dp))
+                            Text("\u25BC", Modifier.clickable { nav.moveInQueue(nav.userQueue.indexOf(q), 1) }.padding(8.dp))
+                            Text("\u2715", Modifier.clickable { nav.userQueue.remove(q) }.padding(8.dp))
+                        }
                     }
                 }
             }

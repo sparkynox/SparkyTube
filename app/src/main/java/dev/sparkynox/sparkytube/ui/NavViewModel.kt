@@ -114,6 +114,64 @@ class NavViewModel : ViewModel() {
     val userQueue = androidx.compose.runtime.mutableStateListOf<HomeFeedItem>()
     // playlists and mixes can be queued too, they have no videoId
     private fun key(i: HomeFeedItem) = i.videoId ?: i.playlistId
+
+    fun clearQueue() = userQueue.clear()
+
+    fun moveInQueue(index: Int, delta: Int) {
+        val to = index + delta
+        if (index !in userQueue.indices || to !in userQueue.indices) return
+        val item = userQueue.removeAt(index)
+        userQueue.add(to, item)
+    }
+
+    // the queue survives app restarts
+    private var queuePrefs: android.content.SharedPreferences? = null
+
+    fun attachContext(ctx: android.content.Context) {
+        if (queuePrefs != null) return
+        val sp = ctx.applicationContext.getSharedPreferences("sparkytube_queue", android.content.Context.MODE_PRIVATE)
+        queuePrefs = sp
+        runCatching {
+            val arr = org.json.JSONArray(sp.getString("items", "[]"))
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                userQueue.add(
+                    HomeFeedItem(
+                        videoId = o.optString("v").ifEmpty { null },
+                        playlistId = o.optString("p").ifEmpty { null },
+                        title = o.optString("t"),
+                        channelName = o.optString("c"),
+                        thumbnailUrl = o.optString("th"),
+                        durationText = o.optString("d"),
+                        viewCountText = "",
+                        itemCountText = o.optString("n").ifEmpty { null },
+                        channelId = o.optString("ci").ifEmpty { null },
+                    )
+                )
+            }
+        }
+        var first = true
+        viewModelScope.launch {
+            androidx.compose.runtime.snapshotFlow { userQueue.toList() }.collect { list ->
+                if (first) { first = false; return@collect }
+                val arr = org.json.JSONArray()
+                list.forEach {
+                    arr.put(
+                        org.json.JSONObject()
+                            .put("v", it.videoId ?: "").put("p", it.playlistId ?: "")
+                            .put("t", it.title).put("c", it.channelName).put("th", it.thumbnailUrl)
+                            .put("d", it.durationText).put("n", it.itemCountText ?: "").put("ci", it.channelId ?: "")
+                    )
+                }
+                sp.edit().putString("items", arr.toString()).apply()
+            }
+        }
+    }
+
+    // what was played before, for the Previous button
+    class Played(val id: String, val title: String, val playlistId: String?)
+    private val played = ArrayList<Played>()
+    fun previousVideo(): Played? = if (played.isEmpty()) null else played.removeAt(played.lastIndex)
     fun playNext(item: HomeFeedItem) { userQueue.removeAll { key(it) == key(item) }; userQueue.add(0, item) }
     fun addToQueue(item: HomeFeedItem) { if (userQueue.none { key(it) == key(item) }) userQueue.add(item) }
 
@@ -123,10 +181,15 @@ class NavViewModel : ViewModel() {
     val queue: List<HomeFeedItem> get() = watchInfo?.queue ?: emptyList()
 
     // auto = opened by autoplay (queue / playlist / related), false = the user picked it
-    fun openWatch(videoId: String, title: String, playlistId: String? = null, auto: Boolean = false) {
+    fun openWatch(videoId: String, title: String, playlistId: String? = null, auto: Boolean = false, back: Boolean = false) {
         if (videoId == watchId && watchInfo != null) {
             watchVisible = true
             return
+        }
+        val cur = watchId
+        if (!back && cur != null && cur != videoId) {
+            played.add(Played(cur, watchTitle, watchPlaylistId))
+            if (played.size > 40) played.removeAt(0)
         }
         userQueue.removeAll { it.videoId == videoId }
         val pl = watchPlaylistId

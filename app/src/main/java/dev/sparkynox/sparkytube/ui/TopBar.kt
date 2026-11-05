@@ -1,5 +1,6 @@
 package dev.sparkynox.sparkytube.ui
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -31,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import dev.sparkynox.sparkytube.R
 
@@ -71,7 +73,12 @@ fun TopBar(
         )
         val tint = MaterialTheme.colorScheme.onSurface
         if (showAudio) IconButton(onClick = onAudio) { ResIcon(R.drawable.ic_audio_track, tint) }
-        if (showQuality) IconButton(onClick = onQuality) { ResIcon(R.drawable.ic_quality, tint) }
+        if (showQuality) IconButton(onClick = onQuality) {
+            androidx.compose.foundation.layout.Box(
+                Modifier.size(24.dp).border(1.5.dp, tint, RoundedCornerShape(5.dp)),
+                contentAlignment = Alignment.Center,
+            ) { Text("HD", fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = tint) }
+        }
         IconButton(onClick = onSearch) { Icon(Icons.Filled.Search, "Search") }
         IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, "Settings") }
         IconButton(onClick = onOverflow) { Icon(Icons.Filled.MoreVert, "More options") }
