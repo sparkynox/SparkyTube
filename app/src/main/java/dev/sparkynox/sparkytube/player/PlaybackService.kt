@@ -49,6 +49,10 @@ class PlaybackService : MediaSessionService() {
          * carry a MediaItem (not a raw MediaSource) across the session
          * boundary. See buildMediaSourceFactory() below for the other half. */
         const val EXTRA_AUDIO_URL = "sparkytube_audio_url"
+
+        // set by MainActivity, the notification / lock screen Next and Previous buttons end up here
+        var onSkipNext: (() -> Unit)? = null
+        var onSkipPrevious: (() -> Unit)? = null
     }
 
     private var player: ExoPlayer? = null
@@ -143,7 +147,27 @@ class PlaybackService : MediaSessionService() {
         val piFlags = android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
         val sessionActivityPendingIntent = android.app.PendingIntent.getActivity(this, 0, openAppIntent, piFlags)
 
-        mediaSession = MediaSession.Builder(this, exoPlayer)
+        // single-video playback has no real queue inside ExoPlayer, so the skip buttons are handed to the app
+        val skipPlayer = object : androidx.media3.common.ForwardingPlayer(exoPlayer) {
+            private val skipCommands = setOf(
+                Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_TO_PREVIOUS,
+                Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM, Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
+            )
+
+            override fun getAvailableCommands(): Player.Commands {
+                val b = super.getAvailableCommands().buildUpon()
+                skipCommands.forEach { b.add(it) }
+                return b.build()
+            }
+
+            override fun isCommandAvailable(command: Int) = command in skipCommands || super.isCommandAvailable(command)
+            override fun seekToNext() { onSkipNext?.invoke() }
+            override fun seekToNextMediaItem() { onSkipNext?.invoke() }
+            override fun seekToPrevious() { onSkipPrevious?.invoke() }
+            override fun seekToPreviousMediaItem() { onSkipPrevious?.invoke() }
+        }
+
+        mediaSession = MediaSession.Builder(this, skipPlayer)
             .setSessionActivity(sessionActivityPendingIntent)
             .build()
 
