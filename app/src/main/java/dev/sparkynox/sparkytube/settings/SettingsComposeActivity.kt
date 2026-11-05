@@ -292,6 +292,8 @@ class SettingsComposeActivity : AppCompatActivity() {
                         { dev.sparkynox.sparkytube.net.NetCache.isCronetEnabled(this) }, { dev.sparkynox.sparkytube.net.NetCache.setCronetEnabled(this, it) }),
                 toggle("lyrics", "Lyrics in Music Mode", "file", "Synced lyrics over the music picture. Looks the song up on lrclib.net and lyrics-api.boidu.dev, so the title and channel name are sent",
                         { p.isLyricsEnabled(this) }, { p.setLyricsEnabled(this, it) }),
+                toggle("ambient", "Ambient glow", "layers", "A soft glow in the video's colours behind the watch page",
+                        { p.isAmbientEnabled(this) }, { p.setAmbientEnabled(this, it) }),
                 link("videofx", "Anime upscaler", "sliders", { "Sharper, cleaner anime from low-resolution video (GPU)" }) {
                         open(dev.sparkynox.sparkytube.fx.VideoFxActivity::class.java)
                     },
