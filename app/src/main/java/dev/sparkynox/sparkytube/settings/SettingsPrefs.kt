@@ -22,6 +22,7 @@ object SettingsPrefs {
     private const val KEY_POPUPS_BLOCKED = "popups_blocked"
     private const val KEY_UPDATER_ENABLED = "updater_enabled"
     private const val KEY_LYRICS_ENABLED = "lyrics_enabled"
+    private const val KEY_AMBIENT_ENABLED = "ambient_enabled"
     private const val KEY_UPDATE_NOTIFICATIONS = "update_notifications"
     private const val KEY_EXPERIMENTAL_FEATURES = "experimental_features"
     private const val KEY_ANIME_STREAMING_ENABLED = "anime_streaming_enabled"
@@ -114,6 +115,13 @@ object SettingsPrefs {
 
     fun setUpdaterEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_UPDATER_ENABLED, enabled).apply()
+    }
+
+    fun isAmbientEnabled(context: Context) =
+        prefs(context).getBoolean(KEY_AMBIENT_ENABLED, true)
+
+    fun setAmbientEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_AMBIENT_ENABLED, enabled).apply()
     }
 
     fun isLyricsEnabled(context: Context) =
