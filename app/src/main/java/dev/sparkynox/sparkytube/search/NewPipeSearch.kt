@@ -121,6 +121,10 @@ object NewPipeSearch {
     private fun views(n: Long): String = if (n >= 0) "${count(n)} views" else ""
 
     // ---- recent searches
+    fun forgetAll(ctx: Context) {
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove("recent").apply()
+    }
+
     private const val PREFS = "sparkytube_search"
 
     fun recent(ctx: Context): List<String> =
