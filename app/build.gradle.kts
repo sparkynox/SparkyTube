@@ -118,7 +118,10 @@ chaquopy {
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
-    implementation("androidx.activity:activity-ktx:1.9.1")
+    
+    // Replaced activity-ktx with activity-compose to provide setContent
+    implementation("androidx.activity:activity-compose")
+
     implementation("androidx.recyclerview:recyclerview:1.3.2")
     implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
