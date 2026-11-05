@@ -35,6 +35,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.sparkynox.sparkytube.ui.SparkyTheme
@@ -42,7 +43,11 @@ import dev.sparkynox.sparkytube.ui.SparkyTheme
 class StatsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { SparkyTheme { StatsScreen(onBack = { finish() }) } }
+        setContent {
+            SparkyTheme {
+                StatsScreen(onBack = { finish() })
+            }
+        }
     }
 }
 
@@ -63,7 +68,11 @@ private fun StatsScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("\u2190", Modifier.clickable(onClick = onBack).padding(end = 16.dp, top = 4.dp, bottom = 4.dp), style = MaterialTheme.typography.headlineSmall)
+                Text(
+                    "\u2190",
+                    Modifier.clickable(onClick = onBack).padding(end = 16.dp, top = 4.dp, bottom = 4.dp),
+                    style = MaterialTheme.typography.headlineSmall
+                )
                 Text("Stats", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             }
 
@@ -134,7 +143,13 @@ private fun WeekChart(week: List<StatsStore.Day>) {
         }
         Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
             week.forEach {
-                Text(it.label, Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                Text(
+                    it.label,
+                    Modifier.weight(1f),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
             }
         }
     }
