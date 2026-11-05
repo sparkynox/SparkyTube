@@ -292,7 +292,7 @@ private fun Modifier.edgeFade(): Modifier = this
         )
     }
 
-private suspend fun coverColor(ctx: Context, url: String): Color? = withContext(Dispatchers.Default) {
+internal suspend fun coverColor(ctx: Context, url: String): Color? = withContext(Dispatchers.Default) {
     try {
         val res = ctx.imageLoader.execute(ImageRequest.Builder(ctx).data(url).allowHardware(false).build())
         val d = (res as? SuccessResult)?.drawable ?: return@withContext null
