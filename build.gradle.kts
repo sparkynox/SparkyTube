@@ -1,6 +1,6 @@
 // Top-level build file
 plugins {
-    id("com.android.application") version "8.13.0" apply false
+    id("com.android.application") version "9.5.0" apply false
     id("org.jetbrains.kotlin.android") version "2.2.20" apply false
     id("org.jetbrains.kotlin.plugin.compose") version "2.2.20" apply false
     id("com.chaquo.python") version "17.0.0" apply false
