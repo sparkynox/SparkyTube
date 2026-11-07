@@ -148,7 +148,7 @@ dependencies {
 
     // Stream extraction — actively maintained against YouTube's cipher/n-param
     // changes, published via JitPack (see settings.gradle.kts repositories).
-    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
+    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.27.0")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
     implementation("io.coil-kt:coil:2.7.0")
