@@ -2654,7 +2654,8 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 binding.loadingSpinner.visibility = View.VISIBLE
                 hideConnectionErrorScreen()
 
-                if (browseMode == BrowseMode.YOUTUBE && url != null && extractVideoId(url) == null && !isMiniPlayerActive) {
+                // about:blank is the hidden history player being cleared, it must not stop the video that just started
+                if (browseMode == BrowseMode.YOUTUBE && url != null && !url.startsWith("about:") && extractVideoId(url) == null && !isMiniPlayerActive) {
                     stopNativePlayback()
                 }
             }
