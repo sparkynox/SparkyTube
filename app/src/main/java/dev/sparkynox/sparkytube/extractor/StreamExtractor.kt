@@ -324,9 +324,44 @@ object StreamExtractor {
         return match?.groupValues?.get(1)
     }
 
+    // A stage that keeps failing gets skipped for a while, otherwise every single video pays for
+    // its failed retries (about 16s in the logs) before the stage that works even starts.
+    private class Breaker(private val name: String, private val limit: Int = 3, private val pauseMs: Long = 10 * 60_000L) {
+        private var fails = 0
+        private var until = 0L
+        val open: Boolean get() = System.currentTimeMillis() < until
+        val streak: Int get() = fails
+        fun ok() { fails = 0 }
+        fun fail() {
+            fails++
+            if (fails >= limit) {
+                until = System.currentTimeMillis() + pauseMs
+                fails = limit - 1 // one more miss after the pause and it closes again right away
+                xlog("$name failed $limit times in a row, skipping it for ${pauseMs / 60_000} min")
+            }
+        }
+    }
+
+    private val newPipeBreaker = Breaker("NewPipe")
+    private val pipedBreaker = Breaker("Piped")
+
+    @Volatile private var lastNewPipeError: String? = null
+
+    private fun xlog(msg: String) = dev.sparkynox.sparkytube.logs.LogRecorder.i("Extract", msg)
+
     private suspend fun doResolve(videoId: String): ResolvedStream? {
-        val newPipeResult = tryNewPipe(videoId)
-        if (newPipeResult != null) return newPipeResult
+        val t0 = System.currentTimeMillis()
+        if (!newPipeBreaker.open) {
+            // after a miss one try is enough, the 5 tries are for network blips
+            val newPipeResult = tryNewPipe(videoId, if (newPipeBreaker.streak == 0) 5 else 1)
+            if (newPipeResult != null) {
+                newPipeBreaker.ok()
+                xlog("NewPipe ok in ${System.currentTimeMillis() - t0} ms")
+                return newPipeResult
+            }
+            xlog("NewPipe failed after ${System.currentTimeMillis() - t0} ms: $lastNewPipeError")
+            newPipeBreaker.fail()
+        }
 
         // NewPipeExtractor failed -- most commonly because it scrapes
         // YouTube anonymously (no auth cookies), which is exactly what
@@ -337,12 +372,17 @@ object StreamExtractor {
         // yt-dlp (youtubedl-android) as the last resort since it's the
         // slowest/heaviest. Each stage is a no-op miss (not a crash) if
         // unavailable/unconfigured, so this chain degrades gracefully.
-        if (dev.sparkynox.sparkytube.settings.SettingsPrefs.isPipedFallbackEnabled(appContextRef)) {
+        if (dev.sparkynox.sparkytube.settings.SettingsPrefs.isPipedFallbackEnabled(appContextRef) && !pipedBreaker.open) {
+            val t1 = System.currentTimeMillis()
             val pipedResult = PipedResolver.resolve(videoId)
             if (pipedResult != null) {
+                pipedBreaker.ok()
+                xlog("Piped ok in ${System.currentTimeMillis() - t1} ms")
                 cacheResolved(videoId, pipedResult)
                 return pipedResult
             }
+            xlog("Piped failed after ${System.currentTimeMillis() - t1} ms")
+            pipedBreaker.fail()
         }
 
         val serverFallback = ServerFallbackResolver.resolve(videoId)
@@ -355,6 +395,7 @@ object StreamExtractor {
             PyYtDlp.init(appContextRef)
             val ytDlpResult = PyYtDlp.resolve(videoId)
             if (ytDlpResult != null) {
+                xlog("yt-dlp ok, ${System.currentTimeMillis() - t0} ms since the start")
                 cacheResolved(videoId, ytDlpResult)
                 return ytDlpResult
             }
@@ -390,9 +431,8 @@ object StreamExtractor {
             360
         }
 
-    private suspend fun tryNewPipe(videoId: String): ResolvedStream? {
+    private suspend fun tryNewPipe(videoId: String, maxAttempts: Int = 5): ResolvedStream? {
         init()
-        val maxAttempts = 5
         repeat(maxAttempts) { attempt ->
             try {
                 val url = "https://www.youtube.com/watch?v=$videoId"
@@ -558,6 +598,7 @@ object StreamExtractor {
                 // all — rare, and retrying won't change that.
                 return null
             } catch (e: Exception) {
+                lastNewPipeError = "${e.javaClass.simpleName}: ${e.message?.take(120)}"
                 // Exponential backoff across up to 5 attempts — covers
                 // transient mobile-network hiccups (timeout, connection
                 // reset, brief connectivity loss) that a single short retry
