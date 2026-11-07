@@ -375,6 +375,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                             // own fresh set of retries.
                             consecutivePlayerErrorCount = 0
                             advancePendingAt = 0L
+                            nav.playerReady = true
                             if (isNativePlaybackActive) binding.exoPlayerView.visibility = View.VISIBLE
                         }
                     }
@@ -3637,7 +3638,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         if (duration <= 0) return
 
         val remaining = duration - position
-        if (remaining > 20_000) return // not close enough to the end yet
+        if (remaining > 45_000) return // not close enough to the end yet (yt-dlp needs ~20s, so start early)
 
         if (composeNav() && browseMode == BrowseMode.YOUTUBE) {
             val nextId = nav.nextVideo()?.videoId
