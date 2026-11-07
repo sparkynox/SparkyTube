@@ -101,6 +101,9 @@ class NavViewModel : ViewModel() {
     var watchVisible by mutableStateOf(false)
     var watchId by mutableStateOf<String?>(null); private set
     var watchTitle by mutableStateOf(""); private set
+
+    // false from the moment a video is opened until the native player actually has it, the watch page shows a loading picture meanwhile
+    var playerReady by mutableStateOf(false)
     var watchInfo by mutableStateOf<InnerTubeClient.WatchInfo?>(null); private set
     var related by mutableStateOf<List<HomeFeedItem>>(emptyList()); private set
     var relatedLoading by mutableStateOf(false); private set
@@ -186,6 +189,7 @@ class NavViewModel : ViewModel() {
             watchVisible = true
             return
         }
+        playerReady = false
         val cur = watchId
         if (!back && cur != null && cur != videoId) {
             played.add(Played(cur, watchTitle, watchPlaylistId))
@@ -219,6 +223,7 @@ class NavViewModel : ViewModel() {
 
     fun closeWatch() {
         resume = null
+        playerReady = false
         watchVisible = false
         watchId = null
         watchInfo = null

@@ -1,5 +1,7 @@
 package dev.sparkynox.sparkytube.ui
 
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.layout.height
 import dev.sparkynox.sparkytube.lunokit.ambient.ambientGlow
 import android.content.Intent
 import android.widget.Toast
@@ -80,6 +82,22 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
     LaunchedEffect(nearEnd, nav.related.size) { if (nearEnd && nav.related.isNotEmpty()) nav.loadMoreRelated() }
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+        // the real player is a native view drawn over the top 220dp, this only shows while the next video is still loading
+        if (!nav.playerReady && nav.watchId != null) {
+            androidx.compose.foundation.layout.Box(
+                Modifier.fillMaxWidth().height(220.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                AsyncImage(
+                    model = "https://i.ytimg.com/vi/${nav.watchId}/mqdefault.jpg",
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                CircularProgressIndicator(color = androidx.compose.ui.graphics.Color.White)
+            }
+        }
         LazyColumn(
             state = list,
             // the first 220dp belong to the ExoPlayer view that MainActivity draws above this
@@ -292,6 +310,7 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
             if (nav.relatedLoading) item(key = "more") {
                 LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp))
             }
+        }
         }
     }
 }
