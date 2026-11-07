@@ -1,5 +1,25 @@
 # SparkyTube Changelog
 
+# v2.4
+
+## New Features
+
+- **Channel pages**: tapping a channel now opens a native page instead of the website. Banner, subscribers, description, Subscribe, and tabs for Videos, Shorts, Live, Playlists and About. Pull to refresh, loads more as you scroll
+- **Lyrics in Music Mode**: synced lyrics over the music picture, with a glow on the line being sung, blurred lines further away and a background in the cover's colours. Word by word when the source has per-word timing, line by line otherwise. In fullscreen / landscape the cover sits on the left and the lyrics on the right. Settings > App > Lyrics in Music Mode (the title and channel name are sent to lrclib.net and lyrics-api.boidu.dev to find the song)
+- **Ambient glow**: a soft glow in the video's colours behind the watch page. Settings > App > Ambient glow
+- **Stats**: ⋮ menu > Stats. Watch time, music mode time, videos watched, the last 7 days, top channels and most watched. Everything stays on the phone, with a Reset button
+- **Queue**: Clear all, move items up and down, and the queue is kept after you close the app. Playlists and mixes can be queued too
+- **Notification Next / Previous** now follow your queue, then the playlist, then related. Previous restarts the video, or goes back to the one before it
+- The Video Quality shortcut in the top bar is an HD badge now, so it is no longer a second gear
+
+## Fixes
+
+- Pressing Enter in search could still show the old suggestions instead of the results
+- A video could be skipped about a second after it started, because an empty player reported "ended"
+- A playlist or mix now carries on after a queued video, instead of jumping to Up next
+- A saved resume spot too close to the end no longer ends the video right away
+- Player errors and queue decisions now show in Settings > Logs (tags Player and Queue)
+
 # v2.3
 
 ## New Features

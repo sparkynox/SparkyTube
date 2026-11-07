@@ -55,7 +55,7 @@ Scales low-resolution anime up (1.5x or 2x, never above 1080p) and runs a GPU pa
 
 Grab the latest APK from the [Releases](https://github.com/sparkynox/SparkyTube/releases) page, or from the artifact of a CI run in the [Actions](https://github.com/sparkynox/SparkyTube/actions) tab. Android 7.0 (API 24) or newer.
 
-What's new: [`RELEASE_NOTES_v2.3.md`](RELEASE_NOTES_v2.3.md) · full history: [`CHANGELOG.md`](CHANGELOG.md)
+What's new: [`RELEASE_NOTES_v2.4.md`](RELEASE_NOTES_v2.4.md) · full history: [`CHANGELOG.md`](CHANGELOG.md)
 
 ---
 
@@ -126,4 +126,4 @@ Some parts keep their own terms (filter lists, the ed25519 code, the artwork): s
 
 SparkyTube is an independent project and is not affiliated with or endorsed by YouTube or Google. Use it for your own viewing and respect the content creators you watch.
 
-Made by **SparkyNox** · enjoy :3 Nya
+Made by **SparkyNox** · enjoy :3
