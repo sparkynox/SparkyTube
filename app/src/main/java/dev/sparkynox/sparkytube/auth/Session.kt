@@ -95,6 +95,27 @@ object Session {
         }
     }
 
+    /**
+     * Deletes only the youtube.com cookies. Google's own cookies stay, so the account chooser still
+     * lists the accounts on this phone, but YouTube starts with an empty session. One account's
+     * cookies mixed with another's makes YouTube answer 400.
+     */
+    fun clearYoutubeCookies() {
+        runCatching {
+            val cm = CookieManager.getInstance()
+            val names = listOf("https://www.youtube.com", "https://m.youtube.com")
+                .flatMap { u -> cm.getCookie(u).orEmpty().split(";").map { it.trim().substringBefore("=") } }
+                .filter { it.isNotEmpty() }.toSet()
+            for (n in names) {
+                for (u in listOf("https://www.youtube.com", "https://m.youtube.com")) {
+                    cm.setCookie(u, "$n=; Max-Age=0; Domain=.youtube.com; Path=/")
+                    cm.setCookie(u, "$n=; Max-Age=0; Path=/")
+                }
+            }
+            cm.flush()
+        }
+    }
+
     /** True when the WebView jar has a YouTube login. */
     fun jarLoggedIn(): Boolean = runCatching {
         CookieManager.getInstance().getCookie(ORIGIN)?.let { cookieValue(it, "SAPISID") != null } == true

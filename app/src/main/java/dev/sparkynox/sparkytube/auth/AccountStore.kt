@@ -135,12 +135,13 @@ object AccountStore {
     // dataSyncId of the account that was active when "Add account" was pressed
     var previousSync: String? = null; private set
 
-    /** Saves the current account; the login then runs through Google's own account chooser. */
+    /** Saves the current account and empties the YouTube cookies; the login then runs through Google's account chooser. */
     fun beginAdd() {
         syncActive()
         previousSync = Session.dataSyncId?.takeIf { it.isNotBlank() }
         pendingAdd = true
         addStarted = true
+        Session.clearYoutubeCookies()
     }
 
     // stays true until finishAdd, because the login watcher cancels (pendingAdd = false) just before saving
@@ -156,8 +157,14 @@ object AccountStore {
         syncActive()
     }
 
-    /** Add flow ended without a new account. The old one was never touched, nothing to restore. */
-    fun cancelAdd() { pendingAdd = false }
+    /** Add flow ended. If no new login happened, the active account's cookies go back into the jar. */
+    fun cancelAdd() {
+        if (!pendingAdd) return
+        pendingAdd = false
+        if (!Session.jarLoggedIn()) {
+            accounts.firstOrNull { it.id == activeId }?.let { Session.restore(it.toSnapshot()) }
+        }
+    }
 
     val adding: Boolean get() = pendingAdd
 }
