@@ -2979,13 +2979,11 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     // Google knows is a single tap, and "Use another account" handles the rest.
     private val accountChooserUrl =
         "https://accounts.google.com/AccountChooser?service=youtube&continue=https%3A%2F%2Fm.youtube.com%2F"
-    private var sawChooser = false
 
     /** Accounts sheet > Add account: the current account stays as it is, login starts at the chooser. */
     private fun startAddAccount() {
         if (browseMode != BrowseMode.YOUTUBE) return
         dev.sparkynox.sparkytube.auth.AccountStore.beginAdd()
-        sawChooser = false
         startWebViewLogin(accountChooserUrl)
     }
 
@@ -3009,11 +3007,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }
         // wait until Google has sent us back to YouTube so ytcfg (visitor data etc.) exists
         val url = webView.url ?: return
-        if (dev.sparkynox.sparkytube.auth.AccountStore.adding) {
-            // the jar already has a login here, so only start looking after the chooser was really shown
-            val onYt = url.startsWith("https://m.youtube.com") || url.startsWith("https://www.youtube.com")
-            if (!onYt) sawChooser = true else if (!sawChooser) return
-        }
+
         if (!url.startsWith("https://m.youtube.com") && !url.startsWith("https://www.youtube.com")) return
 
         loginTicks++
