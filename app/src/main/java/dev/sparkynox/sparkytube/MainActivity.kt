@@ -2832,6 +2832,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                     onOpen = { openFeedItem(it) },
                     onDownload = { showFeedDownloadDialog(it) },
                     onLogin = { startWebViewLogin() },
+                    onAddAccount = { startAddAccount() },
                     onChannel = { openChannel(it) },
                     onOpenDownloads = {
                         startActivity(Intent(this, dev.sparkynox.sparkytube.download.OfflineLibraryActivity::class.java))
@@ -2971,6 +2972,18 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     private fun cancelWebViewLogin() {
         loginInProgress = false
         loginHandler.removeCallbacks(loginWatcher)
+        // an abandoned "add account" login puts the previous account back
+        if (dev.sparkynox.sparkytube.auth.AccountStore.adding && !dev.sparkynox.sparkytube.auth.Session.loggedIn) {
+            dev.sparkynox.sparkytube.auth.AccountStore.cancelAddIfNeeded()
+            homeFeedVm.onAccountChanged()
+        }
+    }
+
+    /** Accounts sheet > Add account: keeps the current account saved and starts a clean login. */
+    private fun startAddAccount() {
+        if (browseMode != BrowseMode.YOUTUBE) return
+        dev.sparkynox.sparkytube.auth.AccountStore.beginAdd()
+        startWebViewLogin()
     }
 
     private var loginNavTries = 0
@@ -3013,10 +3026,9 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 clientVersion = cfg?.optString("c").orEmpty(),
             )
             cm.flush()
+            dev.sparkynox.sparkytube.auth.AccountStore.finishAdd()
             dev.sparkynox.sparkytube.logs.LogRecorder.i("Login", "signed in, session saved (visitor data: ${visitor.isNotEmpty()})")
-            nav.pages.clear()
-            nav.channels.clear()
-            nav.tab = dev.sparkynox.sparkytube.ui.NavViewModel.Tab.HOME
+            nav.resetForAccountChange()
             homeFeedVm.onLoggedIn()
             showComposeHost()
         }
@@ -3811,6 +3823,8 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
     override fun onPause() {
         super.onPause()
+        // YouTube rotates cookies, keep the saved copy of the active account fresh
+        runCatching { dev.sparkynox.sparkytube.auth.AccountStore.syncActive() }
 
         // CRITICAL: do NOT let the WebView throttle/pause its JS timers here.
         // Android's default WebView behavior pauses JS execution when the
