@@ -63,6 +63,14 @@ class NavViewModel : ViewModel() {
         }
     }
 
+    /** Another account is active now: drop everything that belonged to the old one. */
+    fun resetForAccountChange() {
+        pages.clear(); channels.clear(); tab = Tab.HOME
+        subs.reset()
+        subChannels = emptyList(); subChannelsLoaded = false
+        shorts = emptyList()
+    }
+
     fun push(title: String, source: FeedState.Source) {
         pages.add(Page(title, FeedState(viewModelScope, source)))
     }

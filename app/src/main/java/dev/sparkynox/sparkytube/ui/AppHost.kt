@@ -79,6 +79,7 @@ fun AppHost(
     onLogin: () -> Unit,
     onOpenDownloads: () -> Unit,
     onChannel: (String) -> Unit = {},
+    onAddAccount: () -> Unit = onLogin,
 ) {
     var menuItem by remember { mutableStateOf<HomeFeedItem?>(null) }
     val onMore: (HomeFeedItem) -> Unit = { menuItem = it }
@@ -95,7 +96,7 @@ fun AppHost(
         } else when (nav.tab) {
             NavViewModel.Tab.HOME -> {
                 LaunchedEffect(Unit) { home.onShown() }
-                HomeFeedScreen(home, onOpen = onOpen, onMore = onMore, onLogin = onLogin)
+                HomeFeedScreen(home, onOpen = onOpen, onMore = onMore, onLogin = onLogin, nav = nav, onAddAccount = onAddAccount)
             }
             NavViewModel.Tab.SHORTS -> {
                 LaunchedEffect(Unit) { nav.loadShorts() }

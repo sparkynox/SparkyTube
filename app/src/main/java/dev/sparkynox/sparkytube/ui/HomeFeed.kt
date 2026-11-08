@@ -66,9 +66,11 @@ fun HomeFeedScreen(
     onOpen: (HomeFeedItem) -> Unit,
     onMore: (HomeFeedItem) -> Unit,
     onLogin: () -> Unit,
+    nav: dev.sparkynox.sparkytube.ui.NavViewModel,
+    onAddAccount: () -> Unit,
 ) {
     val state = rememberLazyListState()
-    var confirmLogout by remember { mutableStateOf(false) }
+    var showAccounts by remember { mutableStateOf(false) }
 
     // infinite scroll, same trigger as Luno: a few rows before the end
     val nearEnd by remember {
@@ -91,7 +93,7 @@ fun HomeFeedScreen(
                     name = vm.accountName,
                     photo = vm.accountPhoto,
                     loggedIn = vm.loggedIn,
-                    onClick = { if (vm.loggedIn) confirmLogout = true else onLogin() },
+                    onClick = { if (vm.loggedIn) showAccounts = true else onLogin() },
                 )
             }
 
@@ -126,14 +128,8 @@ fun HomeFeedScreen(
         }
     }
 
-    if (confirmLogout) {
-        AlertDialog(
-            onDismissRequest = { confirmLogout = false },
-            title = { Text("Log out?") },
-            text = { Text("You'll go back to the generic feed until you sign in again.") },
-            confirmButton = { TextButton(onClick = { confirmLogout = false; vm.logout() }) { Text("Log out") } },
-            dismissButton = { TextButton(onClick = { confirmLogout = false }) { Text("Cancel") } },
-        )
+    if (showAccounts) {
+        AccountsSheet(vm, nav, onAddAccount = onAddAccount, onDismiss = { showAccounts = false })
     }
 }
 
