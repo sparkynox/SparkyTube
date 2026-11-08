@@ -1,5 +1,11 @@
 # SparkyTube Changelog
 
+# v2.5
+
+## New Features
+
+- **Multiple accounts**: tap your picture on Home to open the Accounts sheet. Add as many YouTube accounts as you want, tap one to switch (Home, Subscriptions, Library and history follow the account you pick), or remove one with the X. Cancelling "Add account" brings your previous account back
+
 # v2.4
 
 ## New Features
