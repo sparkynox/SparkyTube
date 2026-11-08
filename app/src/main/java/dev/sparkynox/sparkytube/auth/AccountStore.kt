@@ -39,7 +39,6 @@ object AccountStore {
 
     // set while the "add account" login is running, so a cancelled login can put the old account back
     private var pendingAdd = false
-    private var previousId: String? = null
 
     fun init(ctx: Context) {
         sp = ctx.applicationContext.getSharedPreferences("sparky_accounts", Context.MODE_PRIVATE)
@@ -133,29 +132,32 @@ object AccountStore {
 
     // ---------- add account
 
-    /** Saves the current account, then empties the session so Google asks for a new one. */
+    // dataSyncId of the account that was active when "Add account" was pressed
+    var previousSync: String? = null; private set
+
+    /** Saves the current account; the login then runs through Google's own account chooser. */
     fun beginAdd() {
         syncActive()
-        previousId = activeId
+        previousSync = Session.dataSyncId?.takeIf { it.isNotBlank() }
         pendingAdd = true
-        Session.logout()
+        addStarted = true
     }
 
+    // stays true until finishAdd, because the login watcher cancels (pendingAdd = false) just before saving
+    private var addStarted = false
+
     fun finishAdd() {
-        if (!pendingAdd) { syncActive(); return }
         pendingAdd = false
+        if (addStarted) {
+            addStarted = false
+            // Session still shows the old account's profile, the new one is filled in by the feed
+            Session.accountName = ""; Session.accountHandle = ""; Session.accountPhoto = ""
+        }
         syncActive()
     }
 
-    /** Login was abandoned: bring the previous account back instead of leaving the user signed out. */
-    fun cancelAddIfNeeded() {
-        if (!pendingAdd || Session.loggedIn) return
-        pendingAdd = false
-        val prev = accounts.firstOrNull { it.id == previousId } ?: return
-        Session.restore(prev.toSnapshot())
-        activeId = prev.id
-        save()
-    }
+    /** Add flow ended without a new account. The old one was never touched, nothing to restore. */
+    fun cancelAdd() { pendingAdd = false }
 
     val adding: Boolean get() = pendingAdd
 }
