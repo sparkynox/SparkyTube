@@ -56,6 +56,50 @@ object Session {
             .apply()
     }
 
+    /** Everything about the signed-in account as it is right now (null when signed out). */
+    class Snapshot(
+        val cookie: String, val visitor: String, val sync: String, val clientVersion: String,
+        val name: String, val handle: String, val photo: String,
+    )
+
+    fun snapshot(): Snapshot? {
+        val c = cookie ?: return null
+        if (cookieValue(c, "SAPISID") == null && cookieValue(c, "__Secure-3PAPISID") == null) return null
+        return Snapshot(
+            c, visitorData.orEmpty(), dataSyncId.orEmpty(), clientVersion.orEmpty(),
+            accountName, accountHandle, accountPhoto,
+        )
+    }
+
+    /** Makes [a] the signed-in account: stored fields plus the WebView cookie jar. */
+    fun restore(a: Snapshot) {
+        sp.edit().clear()
+            .putString("cookie", a.cookie)
+            .putString("visitor", a.visitor)
+            .putString("sync", a.sync)
+            .putString("client_version", a.clientVersion)
+            .putString("account_name", a.name)
+            .putString("account_handle", a.handle)
+            .putString("account_photo", a.photo)
+            .apply()
+        runCatching {
+            val cm = CookieManager.getInstance()
+            cm.removeAllCookies {
+                a.cookie.split(";").map { it.trim() }.filter { it.contains("=") }.forEach { pair ->
+                    val name = pair.substringBefore("=")
+                    val domain = if (name.startsWith("__Host-")) "" else "; Domain=.youtube.com"
+                    cm.setCookie(ORIGIN, "$pair$domain; Path=/; Secure; Max-Age=31536000")
+                }
+                cm.flush()
+            }
+        }
+    }
+
+    /** True when the WebView jar has a YouTube login. */
+    fun jarLoggedIn(): Boolean = runCatching {
+        CookieManager.getInstance().getCookie(ORIGIN)?.let { cookieValue(it, "SAPISID") != null } == true
+    }.getOrDefault(false)
+
     fun logout() {
         sp.edit().clear().apply()
         // the WebView shares this cookie jar, so it is logged out as well
