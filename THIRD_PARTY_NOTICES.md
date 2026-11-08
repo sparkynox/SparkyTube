@@ -1,8 +1,8 @@
 # Third-party notices
 
-SparkyTube's own code is MIT (see `LICENSE`). Some things inside the repo and the app are not, and keep their own terms.
+SparkyTube's own code is GPL-3.0 (see `LICENSE`). Some things inside the repo and the app are not, and keep their own terms.
 
-## Filter lists (not MIT)
+## Filter lists (own terms)
 
 `app/src/main/assets/blocklist_hosts.txt` and `app/src/main/assets/filters_network.txt` are generated from:
 
@@ -17,6 +17,6 @@ These lists are dual licensed under **CC BY-SA 3.0** and **GPL v3 or later**. Th
 - **OkHttp**, Apache License 2.0
 - **Cronet** comes from Google Play services and is under its terms, it is not bundled in the APK
 
-## Artwork (not MIT)
+## Artwork (own terms)
 
-The expression images in `app/src/main/res/drawable-nodpi/emote_*.webp` are cut from third-party anime artwork and screenshots. The MIT license does **not** cover them and the repo owner doesn't hold their copyright. Before you publish or distribute builds widely, replace them with original or properly licensed art, or get permission.
+The expression images in `app/src/main/res/drawable-nodpi/emote_*.webp` are cut from third-party anime artwork and screenshots. The GPL does **not** cover them and the repo owner doesn't hold their copyright. Before you publish or distribute builds widely, replace them with original or properly licensed art, or get permission.

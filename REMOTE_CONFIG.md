@@ -47,4 +47,4 @@ It protects the *config*: nobody can switch features or bans on or off by tamper
 
 ## Forks
 
-The project is MIT, so anyone can build their own version. A fork that keeps `rc_pubkey.h` as it is trusts configs signed by the original author, and the app downloads from `sparkynox/SparkyTube`. If you fork it, make your own key (`python3 tools/rc_keys.py`), replace the bytes in `rc_pubkey.h` and the `URL` in `RemoteConfig.kt`, or remove the feature.
+The project is GPL-3.0, so anyone can build their own version (under the same license). A fork that keeps `rc_pubkey.h` as it is trusts configs signed by the original author, and the app downloads from `sparkynox/SparkyTube`. If you fork it, make your own key (`python3 tools/rc_keys.py`), replace the bytes in `rc_pubkey.h` and the `URL` in `RemoteConfig.kt`, or remove the feature.

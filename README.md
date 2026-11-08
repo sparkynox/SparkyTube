@@ -7,7 +7,7 @@ Native player, a C++ audio engine, an anime upscaler, and plugins you can write 
 
 [![CI Build](https://github.com/sparkynox/SparkyTube/actions/workflows/android-build.yml/badge.svg)](https://github.com/sparkynox/SparkyTube/actions/workflows/android-build.yml)
 ![Android 7.0+](https://img.shields.io/badge/Android-7.0%2B-3DDC84)
-![License MIT](https://img.shields.io/badge/license-MIT-blue)
+![License GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)
 
 </div>
 
@@ -120,7 +120,7 @@ If you fork it and use the remote config, make your own signing key first, see [
 
 ## 📄 License and credits
 
-SparkyTube is released under the **MIT License**, see [`LICENSE`](LICENSE).
+SparkyTube is released under the **GNU General Public License v3.0**, see [`LICENSE`](LICENSE).
 
 Some parts keep their own terms (filter lists, the ed25519 code, the artwork): see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
