@@ -63,9 +63,12 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
     val openMenu = LocalOpenMenu.current
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
-    // 0 none, 1 liked, 2 disliked. YouTube's current state isn't read, so it starts neutral
-    var reaction by remember(nav.watchId) { mutableStateOf(0) }
-    var subscribed by remember(nav.watchId, info?.subscribed) { mutableStateOf(info?.subscribed ?: false) }
+    // 0 none, 1 liked, 2 disliked, read from the watch page once it has loaded
+    var reaction by remember(nav.watchId, info?.likeStatus) { mutableStateOf(info?.likeStatus ?: 0) }
+    // the subscriptions list is the fallback when the watch page doesn't say
+    LaunchedEffect(nav.watchId) { if (Session.loggedIn) nav.loadSubChannels() }
+    val inSubList = info?.channelId?.let { id -> nav.subChannels.any { it.id == id } } ?: false
+    var subscribed by remember(nav.watchId, info?.subscribed, inSubList) { mutableStateOf((info?.subscribed ?: false) || inSubList) }
     fun needLogin(): Boolean {
         if (Session.loggedIn) return false
         Toast.makeText(ctx, "Sign in first (Home tab)", Toast.LENGTH_SHORT).show()
