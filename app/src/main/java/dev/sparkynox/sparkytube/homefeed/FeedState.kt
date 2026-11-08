@@ -30,6 +30,13 @@ class FeedState(private val scope: CoroutineScope, private val source: Source) {
     private var continuation: String? = null
     private var job: Job? = null
 
+    /** Account changed: forget everything so the next onShown loads the new account's data. */
+    fun reset() {
+        job?.cancel()
+        items = emptyList(); continuation = null; error = null
+        loading = false; refreshing = false; loadingMore = false
+    }
+
     fun onShown() {
         if (items.isEmpty() && !loading && error == null) refresh()
     }

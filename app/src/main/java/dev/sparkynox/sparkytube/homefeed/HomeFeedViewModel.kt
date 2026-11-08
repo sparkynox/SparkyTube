@@ -95,18 +95,20 @@ class HomeFeedViewModel : ViewModel() {
     fun onLoggedIn() {
         LogRecorder.i("Home", "logged in, reloading feed")
         syncLoginState()
+        accountName = Session.accountName; accountPhoto = Session.accountPhoto
         selectedChip = null; chips = emptyList(); items = emptyList(); continuation = null
         refresh()
         loadAccount()
     }
 
-    fun logout() {
-        Session.logout()
-        LogRecorder.i("Home", "logged out")
-        syncLoginState()
-        accountName = ""; accountPhoto = ""
+    /** Another saved account became active (switch, or the active one was removed). */
+    fun onAccountChanged() {
+        LogRecorder.i("Home", "account changed, reloading feed")
+        loggedIn = Session.loggedIn
+        accountName = Session.accountName; accountPhoto = Session.accountPhoto
         selectedChip = null; chips = emptyList(); items = emptyList(); continuation = null
         refresh()
+        if (loggedIn && accountName.isEmpty()) loadAccount()
     }
 
     private fun syncLoginState() {
@@ -119,6 +121,7 @@ class HomeFeedViewModel : ViewModel() {
             val a = InnerTubeClient.fetchAccount() ?: return@launch
             Session.accountName = a.name; Session.accountHandle = a.handle ?: ""; Session.accountPhoto = a.photo ?: ""
             accountName = a.name; accountPhoto = a.photo ?: ""
+            dev.sparkynox.sparkytube.auth.AccountStore.updateProfile(a.name, a.handle ?: "", a.photo ?: "")
         }
     }
 }
