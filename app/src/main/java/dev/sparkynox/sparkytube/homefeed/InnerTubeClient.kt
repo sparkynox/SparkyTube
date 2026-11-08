@@ -170,6 +170,7 @@ object InnerTubeClient {
         val subscribed: Boolean = false,
         val queue: List<HomeFeedItem> = emptyList(),
         val queueTitle: String? = null,
+        val likeStatus: Int = 0, // 0 none, 1 liked, 2 disliked
     )
 
     /** Everything under the player on a watch page: title, channel, description and the related list. */
@@ -201,7 +202,8 @@ object InnerTubeClient {
                 related = related.filter { it.videoId != videoId }.distinctBy { it.videoId ?: it.playlistId },
                 continuation = findContinuationToken(results),
                 channelId = owner?.let { findChannelId(it) },
-                subscribed = owner?.let { findFirst(it, "subscribeButtonRenderer") }?.optBoolean("subscribed", false) ?: false,
+                subscribed = owner?.let { isSubscribed(it) } ?: false,
+                likeStatus = likeStatusOf(root),
                 queue = if (playlistId != null) parseQueue(root, playlistId) else emptyList(),
                 queueTitle = if (playlistId != null) findFirst(root, "playlist")?.optJSONObject("playlist")?.optString("title")?.takeIf { it.isNotBlank() } else null,
             )
@@ -211,6 +213,38 @@ object InnerTubeClient {
             LogRecorder.w(TAG, "watch info failed for $videoId", e)
             WatchInfo(null, null, null, null, null, null, emptyList(), null, e.message ?: "couldn't load")
         }
+    }
+
+    // YouTube has moved the like state around over the years, so look in all the known places
+    private fun likeStatusOf(root: JSONObject): Int {
+        when (findString(root, "likeStatus")) {
+            "LIKE" -> return 1
+            "DISLIKE" -> return 2
+            "INDIFFERENT" -> return 0
+        }
+        val seg = findFirst(root, "segmentedLikeDislikeButtonRenderer")
+        if (seg?.optJSONObject("likeButton")?.optJSONObject("toggleButtonRenderer")?.optBoolean("isToggled") == true) return 1
+        if (seg?.optJSONObject("dislikeButton")?.optJSONObject("toggleButtonRenderer")?.optBoolean("isToggled") == true) return 2
+        return 0
+    }
+
+    private fun isSubscribed(owner: JSONObject): Boolean {
+        if (findFirst(owner, "subscribeButtonRenderer")?.optBoolean("subscribed", false) == true) return true
+        // the bell only exists once you are subscribed
+        if (findFirst(owner, "subscriptionNotificationToggleButtonRenderer") != null) return true
+        val raw = owner.toString()
+        return raw.contains("\"subscribed\":true") || raw.contains("\"isSubscribed\":true")
+    }
+
+    private fun findString(node: Any?, key: String): String? {
+        when (node) {
+            is JSONObject -> {
+                node.optString(key).takeIf { node.opt(key) is String && it.isNotEmpty() }?.let { return it }
+                node.keys().forEach { k -> findString(node.opt(k), key)?.let { return it } }
+            }
+            is JSONArray -> for (i in 0 until node.length()) findString(node.opt(i), key)?.let { return it }
+        }
+        return null
     }
 
     // first video of a playlist or mix, for when one was queued instead of a single video
