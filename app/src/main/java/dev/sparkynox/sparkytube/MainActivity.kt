@@ -2955,14 +2955,14 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }
     }
 
-    private fun startWebViewLogin() {
+    private fun startWebViewLogin(url: String = loginUrl) {
         if (browseMode != BrowseMode.YOUTUBE) return
         leaveWatch()
         loginInProgress = true
         loginTicks = 0
         loginNavTries = 0
         hideNativeHomeFeed() // shows the WebView
-        webView.loadUrl(loginUrl)
+        webView.loadUrl(url)
         dev.sparkynox.sparkytube.logs.LogRecorder.i("Login", "login started in the main WebView")
         android.widget.Toast.makeText(this, "Sign in to YouTube. You'll come back here automatically.", android.widget.Toast.LENGTH_LONG).show()
         loginHandler.removeCallbacks(loginWatcher)
@@ -2972,18 +2972,21 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     private fun cancelWebViewLogin() {
         loginInProgress = false
         loginHandler.removeCallbacks(loginWatcher)
-        // an abandoned "add account" login puts the previous account back
-        if (dev.sparkynox.sparkytube.auth.AccountStore.adding && !dev.sparkynox.sparkytube.auth.Session.loggedIn) {
-            dev.sparkynox.sparkytube.auth.AccountStore.cancelAddIfNeeded()
-            homeFeedVm.onAccountChanged()
-        }
+        dev.sparkynox.sparkytube.auth.AccountStore.cancelAdd()
     }
 
-    /** Accounts sheet > Add account: keeps the current account saved and starts a clean login. */
+    // Google's own account chooser: lists the accounts already on this phone, so adding one that
+    // Google knows is a single tap, and "Use another account" handles the rest.
+    private val accountChooserUrl =
+        "https://accounts.google.com/AccountChooser?service=youtube&continue=https%3A%2F%2Fm.youtube.com%2F"
+    private var sawChooser = false
+
+    /** Accounts sheet > Add account: the current account stays as it is, login starts at the chooser. */
     private fun startAddAccount() {
         if (browseMode != BrowseMode.YOUTUBE) return
         dev.sparkynox.sparkytube.auth.AccountStore.beginAdd()
-        startWebViewLogin()
+        sawChooser = false
+        startWebViewLogin(accountChooserUrl)
     }
 
     private var loginNavTries = 0
@@ -3006,6 +3009,11 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }
         // wait until Google has sent us back to YouTube so ytcfg (visitor data etc.) exists
         val url = webView.url ?: return
+        if (dev.sparkynox.sparkytube.auth.AccountStore.adding) {
+            // the jar already has a login here, so only start looking after the chooser was really shown
+            val onYt = url.startsWith("https://m.youtube.com") || url.startsWith("https://www.youtube.com")
+            if (!onYt) sawChooser = true else if (!sawChooser) return
+        }
         if (!url.startsWith("https://m.youtube.com") && !url.startsWith("https://www.youtube.com")) return
 
         loginTicks++
@@ -3017,6 +3025,16 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             val visitor = cfg?.optString("v").orEmpty()
             // ytcfg can lag a moment behind the page; after ~6s go on without it (it is optional)
             if (visitor.isEmpty() && loginTicks < 8) return@evaluateJavascript
+
+            // picked the account that was already active: nothing to add
+            val newSync = cfg?.optString("d").orEmpty().substringBefore("||")
+            val oldSync = dev.sparkynox.sparkytube.auth.AccountStore.previousSync
+            if (dev.sparkynox.sparkytube.auth.AccountStore.adding && newSync.isNotEmpty() && newSync == oldSync) {
+                cancelWebViewLogin()
+                android.widget.Toast.makeText(this, "That account is already active.", android.widget.Toast.LENGTH_SHORT).show()
+                showComposeHost()
+                return@evaluateJavascript
+            }
 
             cancelWebViewLogin()
             dev.sparkynox.sparkytube.auth.Session.save(
