@@ -48,7 +48,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import dev.sparkynox.sparkytube.homefeed.HomeFeedItem
 import dev.sparkynox.sparkytube.homefeed.HomeFeedViewModel
 
@@ -107,18 +109,15 @@ fun HomeFeedScreen(
                 }
             }
 
-            if (vm.loading && vm.items.isEmpty()) item(key = "loading") {
-                Box(Modifier.fillMaxWidth().height(240.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            }
+            // shimmer placeholders shaped like the real cards instead of a lone spinner
+            if (vm.loading && vm.items.isEmpty()) items(3, key = { "skeleton$it" }) { SkeletonVideoCard() }
 
             vm.error?.let { msg ->
                 if (vm.items.isEmpty()) item(key = "error") { ErrorCard(msg) { vm.refresh() } }
             }
 
             items(dev.sparkynox.sparkytube.homefeed.HiddenVideos.visible(vm.items), key = { it.videoId ?: it.playlistId ?: it.title }) { item ->
-                VideoCard(item, onOpen = { onOpen(item) }, onMore = { onMore(item) })
+                VideoCard(item, onOpen = { onOpen(item) }, onMore = { onMore(item) }, modifier = Modifier.animateItem())
             }
 
             if (vm.loadingMore) item(key = "more") {
@@ -216,13 +215,13 @@ internal fun ErrorCard(msg: String, onRetry: () -> Unit) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun VideoCard(item: HomeFeedItem, onOpen: () -> Unit, onMore: () -> Unit) {
+internal fun VideoCard(item: HomeFeedItem, onOpen: () -> Unit, onMore: () -> Unit, modifier: Modifier = Modifier) {
     val openChannel = LocalOpenChannel.current
     val chId = item.channelId
     val chTap = if (chId != null) Modifier.clickable { openChannel(chId) } else Modifier
     val openMenu = LocalOpenMenu.current
     Column(
-        Modifier.fillMaxWidth().combinedClickable(onClick = onOpen, onLongClick = onMore).padding(horizontal = 12.dp),
+        modifier.fillMaxWidth().combinedClickable(onClick = onOpen, onLongClick = onMore).padding(horizontal = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Box(
@@ -230,7 +229,13 @@ internal fun VideoCard(item: HomeFeedItem, onOpen: () -> Unit, onMore: () -> Uni
                 .clip(RoundedCornerShape(20.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh),
         ) {
-            AsyncImage(item.thumbnailUrl, item.title, Modifier.fillMaxWidth().aspectRatio(16f / 9f), contentScale = ContentScale.Crop)
+            // fade the thumbnail in instead of popping, the grey box behind it acts as the placeholder
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current).data(item.thumbnailUrl).crossfade(250).build(),
+                contentDescription = item.title,
+                modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
+                contentScale = ContentScale.Crop,
+            )
             val badge = item.durationText.ifBlank { item.itemCountText.orEmpty() }
             if (badge.isNotBlank()) {
                 Text(
