@@ -35,13 +35,42 @@ object NativeFilter {
         if (ready || !libOk) return
         try {
             val file = File(c.filesDir, "filters_network.txt")
+            val backup = File(c.filesDir, "filters_network.bak")
             val code = c.packageManager.getPackageInfo(c.packageName, 0).longVersionCode
             val prefs = c.getSharedPreferences("sparky_filters", Context.MODE_PRIVATE)
+
+            // the last start died while loading a freshly downloaded list: go back to the previous one
+            if (prefs.getBoolean("loading_new", false)) {
+                if (backup.exists()) backup.copyTo(file, overwrite = true)
+                prefs.edit().putBoolean("loading_new", false).commit()
+                LogRecorder.w("AdBlock", "downloaded filter list crashed the engine, restored the previous list")
+            }
+
+            var promoted = false
             if (!file.exists() || prefs.getLong("code", -1) != code) {
                 c.assets.open("filters_network.txt").use { i -> file.outputStream().use { o -> i.copyTo(o) } }
                 prefs.edit().putLong("code", code).apply()
+            } else {
+                // BlocklistUpdater staged a newer list: keep the old one as backup, then try the new one.
+                // commit() (not apply) so the flag is on disk before native code touches the file.
+                BlocklistUpdater.stagedFilters(c)?.let { staged ->
+                    file.copyTo(backup, overwrite = true)
+                    staged.copyTo(file, overwrite = true)
+                    staged.delete()
+                    prefs.edit().putBoolean("loading_new", true).commit()
+                    promoted = true
+                }
             }
-            val n = nativeLoad(file.absolutePath)
+
+            var n = nativeLoad(file.absolutePath)
+            if (promoted) {
+                if (n <= 0 && backup.exists()) {
+                    backup.copyTo(file, overwrite = true)
+                    n = nativeLoad(file.absolutePath)
+                    LogRecorder.w("AdBlock", "downloaded filter list was rejected, kept the previous list")
+                }
+                prefs.edit().putBoolean("loading_new", false).commit()
+            }
             ready = n > 0
             LogRecorder.i("AdBlock", "native filter engine: $n rules")
         } catch (t: Throwable) {

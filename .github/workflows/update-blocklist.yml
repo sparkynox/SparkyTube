@@ -1,0 +1,40 @@
+name: Update block lists
+
+# Rebuilds blocklist_hosts.txt and filters_network.txt from EasyList / EasyPrivacy / Anti-Adblock
+# and commits them. Installed apps fetch these two files from main (see BlocklistUpdater.kt),
+# so a merged list reaches users the next time they open the app, no new APK needed.
+on:
+  schedule:
+    - cron: '0 3 * * 1'   # every Monday, 03:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Rebuild lists
+        run: python3 tools/update_blocklist.py
+
+      # guard against a broken download wiping the lists (the app also checks this on-device)
+      - name: Sanity check
+        run: |
+          hosts=$(wc -l < app/src/main/assets/blocklist_hosts.txt)
+          rules=$(wc -l < app/src/main/assets/filters_network.txt)
+          echo "hosts=$hosts rules=$rules"
+          [ "$hosts" -ge 20000 ] && [ "$rules" -ge 1000 ]
+
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add app/src/main/assets/blocklist_hosts.txt app/src/main/assets/filters_network.txt
+          git diff --cached --quiet || (git commit -m "Update block lists" && git push)

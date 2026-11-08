@@ -32,6 +32,9 @@ class SparkyTubeApp : Application() {
         // background check for new versions + developer messages (every ~6h, only on network)
         dev.sparkynox.sparkytube.update.UpdateManager.schedule(this)
 
+        // refresh the ad/tracker lists in the background on every app start (ETag check, tiny when unchanged)
+        dev.sparkynox.sparkytube.adblock.BlocklistUpdater.schedule(this)
+
         // Nothing else heavy here on purpose — AdBlockEngine loads its JSON
         // lazily the first time MainActivity spins up the WebView.
 

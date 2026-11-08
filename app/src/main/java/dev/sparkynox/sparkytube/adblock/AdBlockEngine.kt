@@ -32,7 +32,8 @@ class AdBlockEngine private constructor(
     private val trackingDomains: List<String>,
     private val dataSaverPaths: List<String>,
     // ~53k domains from EasyList, EasyPrivacy and the Anti-Adblock list, see assets/blocklist_hosts.txt
-    private val blockedHosts: Set<String> = emptySet()
+    // swapped as a whole by BlocklistUpdater when a fresh list arrives, readers always see a complete set
+    @Volatile private var blockedHosts: Set<String> = emptySet()
 ) {
 
     // googlevideo.com is the CDN domain YouTube's own web player streams
@@ -268,7 +269,25 @@ class AdBlockEngine private constructor(
             }
         }
 
+        /** Live swap after BlocklistUpdater downloaded a newer host list. No-op until the engine exists. */
+        internal fun applyHosts(hosts: Set<String>) {
+            instance?.blockedHosts = hosts
+        }
+
         private fun loadHosts(context: Context): Set<String> {
+            // a list downloaded for this app version wins, the bundled one is the fallback
+            BlocklistUpdater.downloadedHosts(context)?.let { f ->
+                try {
+                    val set = HashSet<String>(70_000)
+                    f.bufferedReader().useLines { lines -> for (l in lines) if (l.isNotEmpty()) set.add(l) }
+                    if (set.size >= 20_000) {
+                        Log.i(TAG, "loaded ${set.size} blocked hosts (downloaded)")
+                        return set
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "downloaded host list unreadable, using the bundled one", e)
+                }
+            }
             return try {
                 val set = HashSet<String>(70_000)
                 context.assets.open("blocklist_hosts.txt").bufferedReader().useLines { lines ->
