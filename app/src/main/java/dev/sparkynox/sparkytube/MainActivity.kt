@@ -1205,12 +1205,20 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         (binding.exoPlayerView.parent as? ViewGroup)?.removeView(binding.exoPlayerView)
         binding.miniPlayerContainer.addView(
             binding.exoPlayerView,
-            0, // index 0 so it stays BEHIND the close button already in this container
-            android.widget.FrameLayout.LayoutParams(
-                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
-                android.widget.FrameLayout.LayoutParams.MATCH_PARENT
-            )
+            0, // index 0 so it stays BEHIND the buttons already in this container
+            android.widget.FrameLayout.LayoutParams((96 * resources.displayMetrics.density).toInt(), (54 * resources.displayMetrics.density).toInt()).apply {
+                gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
+                marginStart = (6 * resources.displayMetrics.density).toInt()
+            }
         )
+        // rounded video corners to match the glass bar
+        binding.exoPlayerView.outlineProvider = object : android.view.ViewOutlineProvider() {
+            override fun getOutline(v: View, o: android.graphics.Outline) {
+                o.setRoundRect(0, 0, v.width, v.height, 12 * resources.displayMetrics.density)
+            }
+        }
+        binding.exoPlayerView.clipToOutline = true
+        bindMiniBar()
         // Controller UI (seek bar, quality gear, etc.) doesn't fit a
         // 160x90dp box — tapping the mini-player re-expands it instead.
         binding.exoPlayerView.useController = false
@@ -1240,6 +1248,8 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         isMiniPlayerActive = false
 
         binding.miniPlayerContainer.setOnClickListener(null)
+        unbindMiniBar()
+        binding.exoPlayerView.clipToOutline = false
         (binding.exoPlayerView.parent as? ViewGroup)?.removeView(binding.exoPlayerView)
         binding.miniPlayerContainer.visibility = View.GONE
 
@@ -1253,50 +1263,55 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         musicArt.sync()
     }
 
+    private var miniListener: androidx.media3.common.Player.Listener? = null
+
+    // title + play/pause on the glass bar, kept in sync with the player while it is shown
+    private fun bindMiniBar() {
+        val player = binding.exoPlayerView.player
+        fun title() {
+            val t = player?.mediaMetadata?.title?.toString()?.takeIf { it.isNotBlank() } ?: nav.watchTitle
+            binding.miniPlayerTitle.text = t
+        }
+        fun icon() {
+            binding.miniPlayerPlayPause.setImageResource(if (player?.isPlaying == true) R.drawable.ic_pause else R.drawable.ic_play)
+        }
+        title(); icon()
+        binding.miniPlayerPlayPause.setOnClickListener {
+            val c = mediaController ?: return@setOnClickListener
+            if (c.isPlaying) { userInitiatedPause = true; c.pause() } else { userInitiatedPause = false; c.play() }
+        }
+        val l = object : androidx.media3.common.Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) = icon()
+            override fun onMediaMetadataChanged(mediaMetadata: androidx.media3.common.MediaMetadata) = title()
+        }
+        miniListener = l
+        player?.addListener(l)
+    }
+
+    private fun unbindMiniBar() {
+        miniListener?.let { binding.exoPlayerView.player?.removeListener(it) }
+        miniListener = null
+        binding.miniPlayerPlayPause.setOnClickListener(null)
+    }
+
     /**
-     * Lets the user drag the mini-player box anywhere on screen. Simple
-     * ACTION_MOVE-based approach updating layout margins directly — no
-     * drag library needed for a single free-floating view. A tap (touch
-     * up with negligible movement) still falls through to the container's
-     * OnClickListener set in enterMiniPlayerMode, since ACTION_UP returns
-     * false here for a non-drag.
+     * The mini player is a bar docked above the bottom navigation. Tap it, or swipe it up, and
+     * the full player comes back. Anything else falls through to the normal click handling.
      */
     private fun setupMiniPlayerDragging() {
         binding.miniPlayerContainer.setOnTouchListener { view, event ->
-            val params = view.layoutParams as androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
             when (event.action) {
                 android.view.MotionEvent.ACTION_DOWN -> {
                     miniPlayerTouchDownX = event.rawX
                     miniPlayerTouchDownY = event.rawY
-                    miniPlayerDragStartX = event.rawX
-                    miniPlayerDragStartY = event.rawY
-                    miniPlayerDragStartMarginEnd = params.rightMargin
-                    miniPlayerDragStartMarginBottom = params.bottomMargin
-                    false // let the click listener still see ACTION_DOWN
-                }
-                android.view.MotionEvent.ACTION_MOVE -> {
-                    val dx = event.rawX - miniPlayerDragStartX
-                    val dy = event.rawY - miniPlayerDragStartY
-                    // rightMargin grows as the box moves LEFT (dx negative),
-                    // bottomMargin grows as the box moves UP (dy negative) --
-                    // both anchors are end/bottom, so signs are inverted.
-                    params.rightMargin = (miniPlayerDragStartMarginEnd - dx).toInt().coerceIn(0, screenWidthPx() - view.width)
-                    params.bottomMargin = (miniPlayerDragStartMarginBottom - dy).toInt().coerceIn(0, screenHeightPx() - view.height)
-                    view.layoutParams = params
-                    true
+                    false
                 }
                 android.view.MotionEvent.ACTION_UP -> {
-                    val totalMove = kotlin.math.hypot(
-                        (event.rawX - miniPlayerTouchDownX).toDouble(),
-                        (event.rawY - miniPlayerTouchDownY).toDouble()
-                    )
-                    // Treat anything under ~8dp of total movement as a tap,
-                    // not a drag, so the re-expand click still works.
-                    val tapThresholdPx = 8 * resources.displayMetrics.density
-                    if (totalMove < tapThresholdPx) {
+                    val up = miniPlayerTouchDownY - event.rawY
+                    if (up > 24 * resources.displayMetrics.density) {
                         view.performClick()
-                    }
-                    false
+                        true
+                    } else false
                 }
                 else -> false
             }
@@ -1964,6 +1979,12 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }
         items += Shortcut("Audio FX", R.drawable.ic_volume_up) {
             startActivity(Intent(this, dev.sparkynox.sparkytube.fx.AudioFxActivity::class.java))
+        }
+        items += Shortcut("Sleep timer", android.R.drawable.ic_lock_idle_alarm) {
+            dev.sparkynox.sparkytube.sleep.SleepTimer.showDialog(this, { mediaController }) {
+                userInitiatedPause = true
+                mediaController?.pause()
+            }
         }
         items += Shortcut("Appearance", android.R.drawable.ic_menu_gallery, settingsAt("appearance"))
         items += Shortcut("Player", R.drawable.ic_play, settingsAt("player"))
