@@ -259,25 +259,51 @@
          special drag library needed for a single free-floating box. -->
     <FrameLayout
         android:id="@+id/miniPlayerContainer"
-        android:layout_width="160dp"
-        android:layout_height="90dp"
-        android:background="#000000"
+        android:layout_width="0dp"
+        android:layout_height="64dp"
+        android:background="@drawable/bg_mini_glass"
         android:elevation="12dp"
         android:visibility="gone"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginEnd="8dp"
-        android:layout_marginBottom="64dp">
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginStart="10dp"
+        android:layout_marginEnd="10dp"
+        android:layout_marginBottom="72dp">
+
+        <TextView
+            android:id="@+id/miniPlayerTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            android:layout_marginStart="118dp"
+            android:layout_marginEnd="92dp"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp" />
+
+        <ImageButton
+            android:id="@+id/miniPlayerPlayPause"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_gravity="center_vertical|end"
+            android:layout_marginEnd="46dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="Play or pause"
+            android:src="@drawable/ic_pause"
+            app:tint="#FFFFFF" />
 
         <ImageButton
             android:id="@+id/miniPlayerCloseBtn"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
-            android:layout_gravity="top|end"
-            android:background="#80000000"
-            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_gravity="center_vertical|end"
+            android:layout_marginEnd="4dp"
+            android:background="@android:color/transparent"
             android:contentDescription="Close mini player"
-            app:tint="@color/text_primary" />
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            app:tint="#FFFFFF" />
     </FrameLayout>
 
     <include
