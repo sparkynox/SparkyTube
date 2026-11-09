@@ -260,6 +260,24 @@ object InnerTubeClient {
         }
     }
 
+    /**
+     * The "Mix" YouTube's own site shows under a plain video. Asking for next with the RD + video id
+     * playlist gives the same list. Empty when YouTube has no mix for the video.
+     */
+    suspend fun fetchMix(videoId: String): Pair<List<HomeFeedItem>, String?> = withContext(Dispatchers.IO) {
+        try {
+            val pl = "RD$videoId"
+            val root = post("next", JSONObject().put("videoId", videoId).put("playlistId", pl))
+            val items = parseQueue(root, pl)
+            val title = findFirst(root, "playlist")?.optJSONObject("playlist")?.optString("title")?.takeIf { it.isNotBlank() }
+            LogRecorder.d(TAG, "mix for $videoId: ${items.size} items")
+            items to title
+        } catch (e: Exception) {
+            LogRecorder.w(TAG, "mix failed for $videoId", e)
+            emptyList<HomeFeedItem>() to null
+        }
+    }
+
     // the playlist / mix panel next to a watch page
     private fun parseQueue(root: JSONObject, playlistId: String): List<HomeFeedItem> {
         val out = ArrayList<HomeFeedItem>()
