@@ -51,6 +51,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.sparkynox.sparkytube.homefeed.HomeFeedItem
+import androidx.compose.animation.togetherWith // <--- Added missing import
 
 /**
  * Everything under the player while a video is open: title, channel, description, up next.
