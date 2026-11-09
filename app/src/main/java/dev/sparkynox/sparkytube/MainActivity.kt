@@ -650,6 +650,18 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 onAudio = { showAudioTrackPicker() },
                 onMusic = { toggleMusicMode() },
                 onSpeed = { cyclePlaybackSpeed(speedLabelHolder) },
+                qualityLabel = { currentQualityLabel.ifBlank { "Auto" } },
+                qualities = { currentQualities.map { it.label } },
+                onPickQuality = { applyQuality(it) },
+                speed = { currentPlaybackSpeed },
+                speeds = PLAYBACK_SPEEDS.toList(),
+                setSpeed = { f ->
+                    currentPlaybackSpeed = f
+                    speedLabelHolder.text = formatSpeedLabel(f)
+                    mediaController?.setPlaybackSpeed(f)
+                },
+                sleepPause = { userInitiatedPause = true; mediaController?.pause() },
+                onAudioFx = { startActivity(Intent(this, dev.sparkynox.sparkytube.fx.AudioFxActivity::class.java)) },
                 onPlayPause = {
                     mediaController?.let { c ->
                         userInitiatedPause = c.isPlaying
@@ -1233,7 +1245,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         (binding.exoPlayerView.parent as? ViewGroup)?.removeView(binding.exoPlayerView)
         binding.miniPlayerContainer.addView(
             binding.exoPlayerView,
-            0, // index 0 so it stays BEHIND the buttons already in this container
+            1, // index 1: above the blurred backdrop, still BEHIND the buttons
             android.widget.FrameLayout.LayoutParams((96 * resources.displayMetrics.density).toInt(), (54 * resources.displayMetrics.density).toInt()).apply {
                 gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
                 marginStart = (6 * resources.displayMetrics.density).toInt()
@@ -1246,6 +1258,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             }
         }
         binding.exoPlayerView.clipToOutline = true
+        binding.miniPlayerContainer.clipToOutline = true // rounds the blurred backdrop
         bindMiniBar()
         // Controller UI (seek bar, quality gear, etc.) doesn't fit a
         // 160x90dp box — tapping the mini-player re-expands it instead.
@@ -1304,13 +1317,17 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             binding.miniPlayerPlayPause.setImageResource(if (player?.isPlaying == true) R.drawable.ic_pause else R.drawable.ic_play)
         }
         title(); icon()
+        dev.sparkynox.sparkytube.lunokit.blur.GlassBackdrop.load(binding.miniPlayerBackdrop, lastResolvedVideoId)
         binding.miniPlayerPlayPause.setOnClickListener {
             val c = mediaController ?: return@setOnClickListener
             if (c.isPlaying) { userInitiatedPause = true; c.pause() } else { userInitiatedPause = false; c.play() }
         }
         val l = object : androidx.media3.common.Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) = icon()
-            override fun onMediaMetadataChanged(mediaMetadata: androidx.media3.common.MediaMetadata) = title()
+            override fun onMediaMetadataChanged(mediaMetadata: androidx.media3.common.MediaMetadata) {
+                title()
+                dev.sparkynox.sparkytube.lunokit.blur.GlassBackdrop.load(binding.miniPlayerBackdrop, lastResolvedVideoId)
+            }
         }
         miniListener = l
         player?.addListener(l)
@@ -1959,7 +1976,6 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
     private var topAudio by androidx.compose.runtime.mutableStateOf(false)
     private var topQuality by androidx.compose.runtime.mutableStateOf(false)
-    private var sleepSheet by androidx.compose.runtime.mutableStateOf(false)
     private var overflowItems by androidx.compose.runtime.mutableStateOf<List<dev.sparkynox.sparkytube.ui.OverflowItem>?>(null)
 
     private fun setupTopBar() {
@@ -1977,13 +1993,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                     onOverflow = { showOverflowMenu() },
                 )
                 overflowItems?.let { dev.sparkynox.sparkytube.ui.OverflowSheet(it) { overflowItems = null } }
-                if (sleepSheet) {
-                    dev.sparkynox.sparkytube.ui.SleepTimerSheet(
-                        player = { mediaController },
-                        pause = { userInitiatedPause = true; mediaController?.pause() },
-                        onDismiss = { sleepSheet = false },
-                    )
-                }
+
             }
         }
     }
@@ -2012,12 +2022,6 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }
         items += Shortcut("Offline", R.drawable.ic_library) {
             startActivity(Intent(this, dev.sparkynox.sparkytube.download.OfflineLibraryActivity::class.java))
-        }
-        items += Shortcut("Audio FX", R.drawable.ic_volume_up) {
-            startActivity(Intent(this, dev.sparkynox.sparkytube.fx.AudioFxActivity::class.java))
-        }
-        items += Shortcut("Sleep timer", android.R.drawable.ic_lock_idle_alarm) {
-            sleepSheet = true
         }
         items += Shortcut("Appearance", android.R.drawable.ic_menu_gallery, settingsAt("appearance"))
         items += Shortcut("Player", R.drawable.ic_play, settingsAt("player"))
@@ -2228,6 +2232,15 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         input.requestFocus()
     }
 
+    // shared by the old dialog and the player settings sheet
+    private fun applyQuality(which: Int) {
+        val chosen = currentQualities.getOrNull(which) ?: return
+        currentQualityLabel = chosen.label
+        val currentTitle = mediaController?.mediaMetadata?.title?.toString() ?: ""
+        val resumePosition = mediaController?.currentPosition ?: 0L
+        playOnController(streamUrl = chosen.url, title = currentTitle, isHls = false, startPositionMs = resumePosition, audioUrl = chosen.audioUrl, videoId = lastResolvedVideoId)
+    }
+
     private fun showQualityPicker() {
         if (currentQualities.isEmpty()) {
             AlertDialog.Builder(this)
@@ -2244,11 +2257,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         AlertDialog.Builder(this)
             .setTitle("Video quality")
             .setSingleChoiceItems(labels, currentIndex) { dialog, which ->
-                val chosen = currentQualities[which]
-                currentQualityLabel = chosen.label
-                val currentTitle = mediaController?.mediaMetadata?.title?.toString() ?: ""
-                val resumePosition = mediaController?.currentPosition ?: 0L
-                playOnController(streamUrl = chosen.url, title = currentTitle, isHls = false, startPositionMs = resumePosition, audioUrl = chosen.audioUrl, videoId = lastResolvedVideoId)
+                applyQuality(which)
                 dialog.dismiss()
             }
             .setNegativeButton("Cancel", null)
