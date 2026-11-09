@@ -11,6 +11,7 @@ add_library(sparkynet SHARED
     netfilter.cpp      # ad filter engine
     nativecrash.cpp    # native crash catcher
     fastio.cpp         # downloader file io
+    lunoblur.cpp       # bitmap blur for the glass mini player
     rcverify.cpp       # remote config signature check
     ed25519/fe.c
     ed25519/ge.c
@@ -18,10 +19,11 @@ add_library(sparkynet SHARED
     ed25519/sha512.c
     ed25519/verify.c)
 find_library(log-lib log)
+find_library(jnigraphics-lib jnigraphics)
 
 target_compile_options(sparkynet PRIVATE -O3 -Wall
     $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>
     $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>)
 # 16 KB page size, needed for newer devices
 target_link_options(sparkynet PRIVATE -Wl,-z,max-page-size=16384)
-target_link_libraries(sparkynet ${log-lib})
+target_link_libraries(sparkynet ${log-lib} ${jnigraphics-lib})
