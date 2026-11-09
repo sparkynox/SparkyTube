@@ -94,7 +94,8 @@ fun VideoMenuSheet(
                 MenuRow(Icons.Filled.Refresh, "Save to Watch later") {
                     if (!needLogin()) {
                         onDismiss()
-                        scope.launch {
+                        // the sheet is gone right after this, so its own scope would cancel the request
+                        AppScope.scope.launch {
                             val ok = InnerTubeClient.addToPlaylist("WL", id)
                             toast(if (ok) "Saved to Watch later" else "Couldn't save")
                         }
@@ -118,7 +119,7 @@ fun VideoMenuSheet(
                 MenuRow(Icons.Filled.Clear, "Not interested") {
                     HiddenVideos.ids.add(id)
                     val token = item.feedbackToken
-                    if (token != null && Session.loggedIn) scope.launch { InnerTubeClient.notInterested(token) }
+                    if (token != null && Session.loggedIn) AppScope.scope.launch { InnerTubeClient.notInterested(token) }
                     toast("Okay, hidden")
                     onDismiss()
                 }
@@ -144,6 +145,7 @@ private fun PlaylistPicker(videoId: String, onDone: () -> Unit, onCancel: () -> 
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var lists by remember { mutableStateOf<List<InnerTubeClient.PlaylistOption>?>(null) }
+    var busy by remember { mutableStateOf(false) }
     LaunchedEffect(videoId) { lists = InnerTubeClient.fetchPlaylistsFor(videoId) }
 
     AlertDialog(
@@ -157,12 +159,14 @@ private fun PlaylistPicker(videoId: String, onDone: () -> Unit, onCancel: () -> 
                 else -> LazyColumn(contentPadding = PaddingValues(vertical = 4.dp)) {
                     items(l, key = { it.id }) { p ->
                         Row(
-                            Modifier.fillMaxWidth().clickable {
+                            Modifier.fillMaxWidth().clickable(enabled = !busy) {
+                                busy = true
+                                // wait for YouTube's answer before closing, otherwise the scope dies with the dialog
                                 scope.launch {
                                     val ok = InnerTubeClient.addToPlaylist(p.id, videoId)
                                     Toast.makeText(ctx, if (ok) "Added to ${p.title}" else "Couldn't add", Toast.LENGTH_SHORT).show()
+                                    onDone()
                                 }
-                                onDone()
                             }.padding(vertical = 12.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                         ) {

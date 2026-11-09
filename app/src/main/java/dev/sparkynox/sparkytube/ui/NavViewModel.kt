@@ -279,6 +279,11 @@ class NavViewModel : ViewModel() {
             val i = q.indexOfFirst { it.videoId == watchId }
             q.getOrNull(i + 1)?.let { return it }
         }
+        // plain video with a Mix under it: carry on inside the Mix, like the YouTube site does
+        if (q.isEmpty() && autoMix.isNotEmpty()) {
+            val i = autoMix.indexOfFirst { it.videoId == watchId }
+            if (i >= 0) autoMix.getOrNull(i + 1)?.let { return it }
+        }
         resume?.let { r ->
             val i = r.items.indexOfFirst { it.videoId == r.fromId }
             if (i >= 0) r.items.getOrNull(i + 1)?.let { return it }
