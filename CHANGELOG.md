@@ -4,7 +4,14 @@
 
 ## New Features
 
-- **Multiple accounts**: tap your picture on Home to open the Accounts sheet. Add as many YouTube accounts as you want, tap one to switch (Home, Subscriptions, Library and history follow the account you pick), or remove one with the X. Cancelling "Add account" brings your previous account back
+- **Glassy mini-player**: the mini player is now a rounded glass bar docked above the bottom bar, with the video, title, play/pause and close. Tap it or swipe it up to open the full player
+- **Sleep timer**: menu (⋮) > Sleep timer. Slide to pick 5 to 120 minutes and press Start, or choose end of the video. It shows the time left and can be turned off from the same sheet
+- **Mix panel on normal videos**: when YouTube has a Mix for the video you are watching, the Mix list now shows under the player, just like on the YouTube site. Tap an item to carry on inside that Mix
+- **Multiple accounts**: tap your picture on Home to open the Accounts sheet. Add as many YouTube accounts as you want, tap one to switch (Home, Subscriptions, Library and history follow the account you pick), or remove one with the X. Add account opens Google's own account chooser, so an account already on the phone is one tap, and "Use another account" adds a new one. Backing out keeps your current account
+
+## Fixes
+
+- Videos you already liked now show as Liked, and channels you already subscribed to show as Subscribed on the watch page
 
 # v2.4
 
@@ -44,6 +51,8 @@
 
 ## Bug Fixes
 
+- Save to playlist and Save to Watch later now really save (the request was cancelled when the menu closed). It also waits for YouTube's answer before showing Added
+- Videos with a Mix under them now carry on inside the Mix when they end, instead of jumping to Up next
 - **Background history**: watch history sometimes wasn't saved while the app was in the background. Android could kill the hidden player's page process and nothing brought it back. The renderer is now kept at high priority, rebuilt if it dies anyway, and the hidden watch page is retried (up to 3 times) when it doesn't load or has no video
 - **Autoplay / queue after a video ends**: the app used to jump back to search (or wherever you opened the video from) instead of playing the next one. It now plays your queue first, then the playlist, then the first related video. Works in the mini-player, PiP and audio mode too, and a background video change no longer pops the watch page open
 
