@@ -1931,6 +1931,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
     private var topAudio by androidx.compose.runtime.mutableStateOf(false)
     private var topQuality by androidx.compose.runtime.mutableStateOf(false)
+    private var sleepSheet by androidx.compose.runtime.mutableStateOf(false)
     private var overflowItems by androidx.compose.runtime.mutableStateOf<List<dev.sparkynox.sparkytube.ui.OverflowItem>?>(null)
 
     private fun setupTopBar() {
@@ -1948,6 +1949,13 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                     onOverflow = { showOverflowMenu() },
                 )
                 overflowItems?.let { dev.sparkynox.sparkytube.ui.OverflowSheet(it) { overflowItems = null } }
+                if (sleepSheet) {
+                    dev.sparkynox.sparkytube.ui.SleepTimerSheet(
+                        player = { mediaController },
+                        pause = { userInitiatedPause = true; mediaController?.pause() },
+                        onDismiss = { sleepSheet = false },
+                    )
+                }
             }
         }
     }
@@ -1981,10 +1989,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             startActivity(Intent(this, dev.sparkynox.sparkytube.fx.AudioFxActivity::class.java))
         }
         items += Shortcut("Sleep timer", android.R.drawable.ic_lock_idle_alarm) {
-            dev.sparkynox.sparkytube.sleep.SleepTimer.showDialog(this, { mediaController }) {
-                userInitiatedPause = true
-                mediaController?.pause()
-            }
+            sleepSheet = true
         }
         items += Shortcut("Appearance", android.R.drawable.ic_menu_gallery, settingsAt("appearance"))
         items += Shortcut("Player", R.drawable.ic_play, settingsAt("player"))
