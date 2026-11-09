@@ -43,7 +43,20 @@ class MusicModeArt(
 
         if (inMini) {
             big.visibility = View.GONE
-            if (miniImage.parent == null) mini.addView(miniImage, 0, FrameLayout.LayoutParams(-1, -1))
+            if (miniImage.parent == null) {
+                // same spot and size as the video in the glass bar, not the whole bar
+                val d = mini.resources.displayMetrics.density
+                mini.addView(miniImage, 0, FrameLayout.LayoutParams((96 * d).toInt(), (54 * d).toInt()).apply {
+                    gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
+                    marginStart = (6 * d).toInt()
+                })
+                miniImage.outlineProvider = object : android.view.ViewOutlineProvider() {
+                    override fun getOutline(v: View, o: android.graphics.Outline) {
+                        o.setRoundRect(0, 0, v.width, v.height, 12 * d)
+                    }
+                }
+                miniImage.clipToOutline = true
+            }
             miniImage.visibility = View.VISIBLE
             val url = videoId()?.let { "https://i.ytimg.com/vi/$it/hqdefault.jpg" }
             if (url != null) {
