@@ -201,7 +201,7 @@ private fun ResultsList(
                             }
                         }
                         if (s.loading) item {
-                            Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                            Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { LunoLoader() }
                         }
                     }
                     s.error?.let {

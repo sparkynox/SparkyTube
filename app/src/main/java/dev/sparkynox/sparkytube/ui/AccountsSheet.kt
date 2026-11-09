@@ -111,10 +111,9 @@ fun AccountsSheet(
                     .padding(horizontal = 20.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(
-                    Modifier.size(44.dp).background(MaterialTheme.colorScheme.secondaryContainer, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) { Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onSecondaryContainer) }
+                ShapedIconBox(44.dp, MaterialTheme.colorScheme.secondaryContainer) {
+                    Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                }
                 Spacer(Modifier.width(14.dp))
                 Text("Add account", style = MaterialTheme.typography.titleMedium)
             }

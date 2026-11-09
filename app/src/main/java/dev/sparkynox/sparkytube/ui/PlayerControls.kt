@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -64,6 +65,15 @@ class PlayerControlsHost(
     val onMusic: () -> Unit,
     val onSpeed: () -> Unit,
     val onPlayPause: () -> Unit,
+    // the settings sheet (gear on the player)
+    val qualityLabel: () -> String,
+    val qualities: () -> List<String>,
+    val onPickQuality: (Int) -> Unit,
+    val speed: () -> Float,
+    val speeds: List<Float>,
+    val setSpeed: (Float) -> Unit,
+    val sleepPause: () -> Unit,
+    val onAudioFx: () -> Unit,
 )
 
 // The native controller stays in the PlayerView but is invisible (see exo_player_controls.xml),
@@ -110,6 +120,8 @@ fun PlayerControls(h: PlayerControlsHost) {
     val duration = (c?.duration ?: 0L).let { if (it == C.TIME_UNSET || it < 0) 0L else it }
     val position = (c?.currentPosition ?: 0L).coerceAtLeast(0L)
 
+    var showSettings by remember { mutableStateOf(false) }
+    var showSleep by remember { mutableStateOf(false) }
     var dragging by remember { mutableStateOf(false) }
     var dragValue by remember { mutableStateOf(0f) }
     val shown = if (dragging) dragValue else position.toFloat()
@@ -144,14 +156,14 @@ fun PlayerControls(h: PlayerControlsHost) {
             if (h.downloadEnabled()) RoundButton(onClick = poke(h.onDownload), onLongClick = h.onDownloadsList) { ResIcon(R.drawable.ic_download, Color.White, 22.dp) }
             if (h.audioTracks() > 1) RoundButton(onClick = poke(h.onAudio)) { ResIcon(R.drawable.ic_audio_track, Color.White, 22.dp) }
             RoundButton(onClick = poke(h.onMusic), highlight = h.musicOn()) { ResIcon(R.drawable.ic_music_note, Color.White, 22.dp) }
-            RoundButton(onClick = poke(h.onQuality)) { ResIcon(R.drawable.ic_quality, Color.White, 22.dp) }
+            RoundButton(onClick = poke { showSettings = true }) { Icon(Icons.Filled.Settings, "Player settings", tint = Color.White) }
         }
       }
 
         // centre: spinner while loading (always), play/pause only while the controls are shown
         Box(Modifier.align(Alignment.Center)) {
             if (buffering) {
-                CircularProgressIndicator(Modifier.size(56.dp), color = Color.White, strokeWidth = 4.dp)
+                LunoLoader(size = 56.dp, color = Color.White)
             } else if (vis.visible) {
                 RoundButton(onClick = poke(h.onPlayPause), size = 64.dp, highlight = true) {
                     ResIcon(if (playing) R.drawable.ic_pause else R.drawable.ic_play, Color.White, 34.dp)
@@ -183,6 +195,9 @@ fun PlayerControls(h: PlayerControlsHost) {
                 ResIcon(R.drawable.ic_fullscreen, Color.White, 22.dp)
             }
         }
+
+        if (showSettings) PlayerSettingsSheet(h, onDismiss = { showSettings = false }, onSleep = { showSettings = false; showSleep = true })
+        if (showSleep) SleepTimerSheet(player = { h.controller() }, pause = h.sleepPause, onDismiss = { showSleep = false })
     }
 }
 

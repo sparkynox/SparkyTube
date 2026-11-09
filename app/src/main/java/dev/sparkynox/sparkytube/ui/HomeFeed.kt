@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package dev.sparkynox.sparkytube.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -41,6 +43,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
@@ -81,7 +84,15 @@ fun HomeFeedScreen(
     }
     LaunchedEffect(nearEnd, vm.items.size) { if (nearEnd && vm.items.isNotEmpty()) vm.loadMore() }
 
-    PullToRefreshBox(isRefreshing = vm.refreshing, onRefresh = { vm.refresh(pull = true) }) {
+    val pullState = androidx.compose.material3.pulltorefresh.rememberPullToRefreshState()
+    PullToRefreshBox(
+        isRefreshing = vm.refreshing, onRefresh = { vm.refresh(pull = true) }, state = pullState,
+        indicator = {
+            androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.LoadingIndicator(
+                state = pullState, isRefreshing = vm.refreshing, modifier = Modifier.align(Alignment.TopCenter),
+            )
+        },
+    ) {
         LazyColumn(
             state = state,
             modifier = Modifier.fillMaxWidth(),
@@ -216,8 +227,13 @@ internal fun VideoCard(item: HomeFeedItem, onOpen: () -> Unit, onMore: () -> Uni
     val chId = item.channelId
     val chTap = if (chId != null) Modifier.clickable { openChannel(chId) } else Modifier
     val openMenu = LocalOpenMenu.current
+    // every card fades in and rises a little the first time it shows up
+    val enter = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(Unit) { enter.animateTo(1f, androidx.compose.animation.core.tween(320, easing = androidx.compose.animation.core.FastOutSlowInEasing)) }
     Column(
-        modifier.fillMaxWidth().combinedClickable(onClick = onOpen, onLongClick = onMore).padding(horizontal = 12.dp),
+        modifier.fillMaxWidth()
+            .graphicsLayer { alpha = enter.value; translationY = (1f - enter.value) * 48f }
+            .combinedClickable(onClick = onOpen, onLongClick = onMore).padding(horizontal = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Box(

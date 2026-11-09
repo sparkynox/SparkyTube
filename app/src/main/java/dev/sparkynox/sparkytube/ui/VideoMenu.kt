@@ -154,7 +154,7 @@ private fun PlaylistPicker(videoId: String, onDone: () -> Unit, onCancel: () -> 
         text = {
             val l = lists
             when {
-                l == null -> CircularProgressIndicator()
+                l == null -> LunoLoader()
                 l.isEmpty() -> Text("No playlists found.")
                 else -> LazyColumn(contentPadding = PaddingValues(vertical = 4.dp)) {
                     items(l, key = { it.id }) { p ->

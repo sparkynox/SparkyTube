@@ -79,9 +79,10 @@ fun TopBar(
                 contentAlignment = Alignment.Center,
             ) { Text("HD", fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = tint) }
         }
-        IconButton(onClick = onSearch) { Icon(Icons.Filled.Search, "Search") }
-        IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, "Settings") }
-        IconButton(onClick = onOverflow) { Icon(Icons.Filled.MoreVert, "More options") }
+        val tile = MaterialTheme.colorScheme.surfaceContainerHigh
+        IconButton(onClick = onSearch) { ShapedIconBox(38.dp, tile) { Icon(Icons.Filled.Search, "Search", Modifier.size(20.dp)) } }
+        IconButton(onClick = onSettings) { ShapedIconBox(38.dp, tile) { Icon(Icons.Filled.Settings, "Settings", Modifier.size(20.dp)) } }
+        IconButton(onClick = onOverflow) { ShapedIconBox(38.dp, tile) { Icon(Icons.Filled.MoreVert, "More options", Modifier.size(20.dp)) } }
     }
 }
 
@@ -100,7 +101,9 @@ fun OverflowSheet(items: List<OverflowItem>, onDismiss: () -> Unit) {
                     Modifier.clip(RoundedCornerShape(16.dp)).clickable { onDismiss(); sc.run() }.padding(vertical = 12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    ResIcon(sc.icon, MaterialTheme.colorScheme.primary, 26.dp)
+                    ShapedIconBox(52.dp, MaterialTheme.colorScheme.secondaryContainer) {
+                        ResIcon(sc.icon, MaterialTheme.colorScheme.onSecondaryContainer, 26.dp)
+                    }
                     Text(
                         sc.label, Modifier.padding(top = 8.dp, start = 2.dp, end = 2.dp),
                         style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center,

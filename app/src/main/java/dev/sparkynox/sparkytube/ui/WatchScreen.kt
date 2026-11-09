@@ -98,7 +98,7 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
-                CircularProgressIndicator(color = androidx.compose.ui.graphics.Color.White)
+                LunoLoader(color = androidx.compose.ui.graphics.Color.White)
             }
         }
         LazyColumn(
@@ -152,8 +152,18 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
                                 }
                             }
                         }
-                        if (subscribed) OutlinedButton(onClick = onSub) { Text("Subscribed") }
-                        else Button(onClick = onSub) { Text("Subscribe") }
+                        androidx.compose.animation.AnimatedContent(
+                            targetState = subscribed,
+                            transitionSpec = {
+                                (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220)) +
+                                    androidx.compose.animation.scaleIn(initialScale = 0.85f)) togetherWith
+                                    androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(120))
+                            },
+                            label = "subscribe",
+                        ) { sub ->
+                            if (sub) OutlinedButton(onClick = onSub) { Text("Subscribed") }
+                            else Button(onClick = onSub) { Text("Subscribe") }
+                        }
                     }
                 }
             }
@@ -165,7 +175,17 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
                 ) {
                     val vid = nav.watchId
                     val likeBtn: @Composable (String, Boolean, () -> Unit) -> Unit = { label, on, click ->
-                        if (on) Button(onClick = click) { Text(label) } else FilledTonalButton(onClick = click) { Text(label) }
+                        androidx.compose.animation.AnimatedContent(
+                            targetState = on,
+                            transitionSpec = {
+                                (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(200)) +
+                                    androidx.compose.animation.scaleIn(initialScale = 0.8f)) togetherWith
+                                    androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(100))
+                            },
+                            label = "react-$label",
+                        ) { isOn ->
+                            if (isOn) Button(onClick = click) { Text(label) } else FilledTonalButton(onClick = click) { Text(label) }
+                        }
                     }
                     likeBtn("Like", reaction == 1) {
                         if (vid != null && !needLogin()) {

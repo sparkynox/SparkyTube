@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package dev.sparkynox.sparkytube.ui
 
 import androidx.compose.foundation.background
@@ -49,6 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -130,8 +133,18 @@ fun AppHost(
                 onBack = { nav.popChannel() }, onOpen = onOpen, onMore = onMore, onLogin = onLogin,
             )
         }
-        if (nav.searchVisible) SearchScreen(nav, onOpen = onOpen, onClose = { nav.searchVisible = false })
-        if (nav.watchVisible) WatchScreen(nav, onOpen = onOpen, onMore = onMore)
+        androidx.compose.animation.AnimatedVisibility(
+            visible = nav.searchVisible,
+            enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180)) +
+                androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(240)) { it / 12 },
+            exit = androidx.compose.animation.ExitTransition.None,
+        ) { SearchScreen(nav, onOpen = onOpen, onClose = { nav.searchVisible = false }) }
+        androidx.compose.animation.AnimatedVisibility(
+            visible = nav.watchVisible,
+            enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(200)) +
+                androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(280)) { it / 5 },
+            exit = androidx.compose.animation.ExitTransition.None,
+        ) { WatchScreen(nav, onOpen = onOpen, onMore = onMore) }
         menuItem?.let { VideoMenuSheet(it, nav, onDownload, onDismiss = { menuItem = null }) }
     }
     }
@@ -167,7 +180,15 @@ fun FeedScreen(
     val nearEnd = rememberNearEnd(list)
     LaunchedEffect(nearEnd, state.items.size) { if (nearEnd && state.items.isNotEmpty()) state.loadMore() }
 
-    PullToRefreshBox(isRefreshing = state.refreshing, onRefresh = { state.refresh(pull = true) }) {
+    val pullState = androidx.compose.material3.pulltorefresh.rememberPullToRefreshState()
+    PullToRefreshBox(
+        isRefreshing = state.refreshing, onRefresh = { state.refresh(pull = true) }, state = pullState,
+        indicator = {
+            androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.LoadingIndicator(
+                state = pullState, isRefreshing = state.refreshing, modifier = Modifier.align(Alignment.TopCenter),
+            )
+        },
+    ) {
         LazyColumn(
             state = list,
             modifier = Modifier.fillMaxSize(),
@@ -196,7 +217,7 @@ fun FeedScreen(
                 item(key = "login") { LoginCard(onLogin) }
             } else {
                 if (state.loading && state.items.isEmpty()) item(key = "loading") {
-                    Box(Modifier.fillMaxWidth().height(240.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                    Box(Modifier.fillMaxWidth().height(240.dp), contentAlignment = Alignment.Center) { LunoLoader() }
                 }
                 state.error?.let { msg ->
                     if (state.items.isEmpty()) item(key = "error") { ErrorCard(msg) { state.refresh() } }
@@ -236,7 +257,7 @@ fun ShortsScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit) {
                 )
             }
             if (nav.shortsLoading && nav.shorts.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
-                Box(Modifier.fillMaxWidth().height(240.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                Box(Modifier.fillMaxWidth().height(240.dp), contentAlignment = Alignment.Center) { LunoLoader() }
             }
             if (!nav.shortsLoading && nav.shorts.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
                 Text(
@@ -333,7 +354,21 @@ fun AppNavBar(selected: NavViewModel.Tab, onSelect: (NavViewModel.Tab) -> Unit) 
             NavigationBarItem(
                 selected = selected == tab,
                 onClick = { onSelect(tab) },
-                icon = { Icon(painterResource(icon), contentDescription = label) },
+                icon = {
+                    val pop by androidx.compose.animation.core.animateFloatAsState(
+                        if (selected == tab) 1.18f else 1f,
+                        androidx.compose.animation.core.spring(dampingRatio = 0.45f, stiffness = 380f),
+                        label = "navPop",
+                    )
+                    androidx.compose.foundation.layout.Box(Modifier.graphicsLayer { scaleX = pop; scaleY = pop }) {
+                        if (selected == tab) {
+                            ShapedIconBox(44.dp, MaterialTheme.colorScheme.primaryContainer) {
+                                Icon(painterResource(icon), label, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                            }
+                        } else Icon(painterResource(icon), contentDescription = label)
+                    }
+                },
+                colors = androidx.compose.material3.NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent),
                 label = { Text(label) },
             )
         }
