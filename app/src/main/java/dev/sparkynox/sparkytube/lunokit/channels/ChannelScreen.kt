@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import dev.sparkynox.sparkytube.ui.LunoLoader
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
@@ -103,7 +104,7 @@ fun ChannelScreen(
 
                 if (state.loading && state.header == null) {
                     item(key = "spin", span = FULL) {
-                        Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                        Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) { LunoLoader() }
                     }
                 }
                 state.error?.let { msg ->
@@ -129,7 +130,7 @@ fun ChannelScreen(
                     item(key = "about", span = FULL) { About(state) }
                 } else if (tab != null && feed != null) {
                     if (feed.loading && feed.items.isEmpty()) item(key = "feedspin", span = FULL) {
-                        Box(Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                        Box(Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) { LunoLoader() }
                     }
                     feed.error?.let { msg ->
                         if (feed.items.isEmpty()) item(key = "feederr", span = FULL) { ErrorCard(msg) { state.refresh() } }
