@@ -191,6 +191,10 @@ class NavViewModel : ViewModel() {
     private var resume: Resume? = null
     val queue: List<HomeFeedItem> get() = watchInfo?.queue ?: emptyList()
 
+    // the Mix YouTube offers under a plain video. Kept apart from [queue] so autoplay is untouched
+    var autoMix by mutableStateOf<List<HomeFeedItem>>(emptyList()); private set
+    var autoMixTitle by mutableStateOf<String?>(null); private set
+
     // auto = opened by autoplay (queue / playlist / related), false = the user picked it
     fun openWatch(videoId: String, title: String, playlistId: String? = null, auto: Boolean = false, back: Boolean = false) {
         if (videoId == watchId && watchInfo != null) {
@@ -215,6 +219,7 @@ class NavViewModel : ViewModel() {
         watchPlaylistId = playlistId
         watchTitle = title
         watchInfo = null
+        autoMix = emptyList(); autoMixTitle = null
         related = emptyList()
         relatedToken = null
         watchVisible = true
@@ -226,6 +231,11 @@ class NavViewModel : ViewModel() {
             watchInfo = info
             related = info.related
             relatedToken = info.continuation
+            // plain video: show the Mix YouTube would, after the page itself is already up
+            if (playlistId == null && info.queue.isEmpty() && info.error == null) {
+                val (items, title) = InnerTubeClient.fetchMix(videoId)
+                if (watchId == videoId && items.size > 1) { autoMix = items; autoMixTitle = title }
+            }
         }
     }
 
@@ -235,6 +245,7 @@ class NavViewModel : ViewModel() {
         watchVisible = false
         watchId = null
         watchInfo = null
+        autoMix = emptyList(); autoMixTitle = null
         related = emptyList()
         relatedToken = null
         watchJob?.cancel()

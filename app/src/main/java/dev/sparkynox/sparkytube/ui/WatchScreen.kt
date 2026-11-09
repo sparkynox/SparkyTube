@@ -265,17 +265,20 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
                 }
             }
 
-            if (nav.queue.isNotEmpty()) {
+            // a real playlist if one is playing, otherwise the Mix YouTube offers for this video
+            val panel = if (nav.queue.isNotEmpty()) nav.queue else nav.autoMix
+            if (panel.isNotEmpty()) {
                 item(key = "queue-title") {
-                    val idx = nav.queue.indexOfFirst { it.videoId == nav.watchId } + 1
+                    val idx = panel.indexOfFirst { it.videoId == nav.watchId } + 1
+                    val kind = if (nav.queue.isNotEmpty()) "Playlist" else "Mix"
                     Text(
-                        "Playlist \u2022 " + (info?.queueTitle ?: "Mix") + if (idx > 0) "  ($idx/${nav.queue.size})" else "",
+                        kind + " \u2022 " + ((if (nav.queue.isNotEmpty()) info?.queueTitle else nav.autoMixTitle) ?: "Mix") + if (idx > 0) "  ($idx/${panel.size})" else "",
                         Modifier.padding(horizontal = 16.dp),
                         style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
                         maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
                 }
-                items(nav.queue, key = { "q-" + it.videoId }) { q ->
+                items(panel, key = { "q-" + it.videoId }) { q ->
                     val current = q.videoId == nav.watchId
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 12.dp).clip(RoundedCornerShape(14.dp))
