@@ -398,10 +398,7 @@ class SettingsComposeActivity : AppCompatActivity() {
 
     @Composable
     private fun RoundIcon(name: String) {
-        Box(
-            Modifier.size(44.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center,
-        ) {
+        dev.sparkynox.sparkytube.ui.ShapedIconBox(44.dp, MaterialTheme.colorScheme.primaryContainer) {
             Icon(iconFor(name), null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
         }
     }
