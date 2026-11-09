@@ -440,6 +440,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
 
     private var isPlayerFullscreen = false
+    private var miniSwipeDy = 0f // how far the video was dragged down in the normal screen
     // Holds whatever view WebChromeClient.onShowCustomView hands us
     // (Crunchyroll's own fullscreen video element) and the callback to
     // invoke when exiting -- separate from the native ExoPlayer fullscreen
@@ -692,6 +693,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             this,
             object : android.view.GestureDetector.SimpleOnGestureListener() {
                 override fun onDown(e: android.view.MotionEvent): Boolean {
+                    miniSwipeDy = 0f
                     // Reset so a fresh swipe seeds from the system's
                     // actual current volume, not a stale value left over
                     // from the last swipe (which could be off if the
@@ -749,7 +751,20 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                         return true
                     }
 
-                    // Not zoomed -- vertical swipe controls volume (right
+                    // normal (not fullscreen) screen: swiping the video down shrinks it to the mini player
+                    if (!isPlayerFullscreen) {
+                        val sy = e1?.y ?: return false
+                        val dy = e2.y - sy
+                        val dx = e2.x - (e1?.x ?: e2.x)
+                        if (!isMiniPlayerActive && kotlin.math.abs(dy) > kotlin.math.abs(dx) && dy > 0f) {
+                            miniSwipeDy = dy
+                            binding.exoPlayerView.translationY = dy * 0.6f
+                            return true
+                        }
+                        return false
+                    }
+
+                    // Fullscreen only -- vertical swipe controls volume (right
                     // half) or screen brightness (left half), same split as
                     // double-tap seek uses. Only treat it as a vol/brightness
                     // gesture once the swipe is clearly more vertical than
@@ -774,6 +789,19 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         binding.exoPlayerView.setOnTouchListener { _, event ->
             scaleDetector.onTouchEvent(event)
             gestureDetector.onTouchEvent(event)
+            // finger lifted after dragging the video down: minimize, or spring back if it was a short drag
+            if (event.actionMasked == android.view.MotionEvent.ACTION_UP || event.actionMasked == android.view.MotionEvent.ACTION_CANCEL) {
+                if (miniSwipeDy > 0f && !isPlayerFullscreen && !isMiniPlayerActive) {
+                    val far = miniSwipeDy > 90 * resources.displayMetrics.density
+                    miniSwipeDy = 0f
+                    if (far && event.actionMasked == android.view.MotionEvent.ACTION_UP) {
+                        binding.exoPlayerView.translationY = 0f
+                        leaveWatch()
+                    } else {
+                        binding.exoPlayerView.animate().translationY(0f).setDuration(160).start()
+                    }
+                }
+            }
             // Let PlayerView's own controls (play/pause/seek tap) still
             // receive the event too — we're only adding zoom/pan/double-tap-
             // seek on top, not replacing normal tap-to-show-controls behavior.
