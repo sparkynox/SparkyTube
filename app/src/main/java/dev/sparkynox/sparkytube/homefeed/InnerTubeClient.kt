@@ -354,6 +354,7 @@ object InnerTubeClient {
                 }
             }
             walk(root)
+            LogRecorder.d(TAG, "add-to-playlist options: ${out.size}")
             out
         } catch (e: Exception) {
             LogRecorder.w(TAG, "playlist list failed: ${e.message}")
@@ -361,11 +362,23 @@ object InnerTubeClient {
         }
     }
 
-    suspend fun addToPlaylist(playlistId: String, videoId: String) = action(
-        "browse/edit_playlist",
-        JSONObject().put("playlistId", playlistId)
-            .put("actions", JSONArray().put(JSONObject().put("action", "ACTION_ADD_VIDEO").put("addedVideoId", videoId)))
-    )
+    suspend fun addToPlaylist(playlistId: String, videoId: String): Boolean = withContext(Dispatchers.IO) {
+        if (!Session.loggedIn) return@withContext false
+        try {
+            val r = post(
+                "browse/edit_playlist",
+                JSONObject().put("playlistId", playlistId)
+                    .put("actions", JSONArray().put(JSONObject().put("action", "ACTION_ADD_VIDEO").put("addedVideoId", videoId)))
+            )
+            // YouTube answers 200 even when it refused, the real result is in status
+            val st = r.optString("status")
+            LogRecorder.d(TAG, "edit_playlist $playlistId status=$st")
+            st.isEmpty() || st == "STATUS_SUCCEEDED"
+        } catch (e: Exception) {
+            LogRecorder.w(TAG, "edit_playlist failed: ${e.message}")
+            false
+        }
+    }
 
     // ---------- subscribed channels (the avatar strip on the Subs tab)
 
