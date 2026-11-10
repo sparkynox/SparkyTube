@@ -771,6 +771,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                         if (!isMiniPlayerActive && kotlin.math.abs(dy) > kotlin.math.abs(dx) && dy > 0f) {
                             miniSwipeDy = dy
                             binding.exoPlayerView.translationY = dy * 0.6f
+                            nav.watchDrag = (dy / (resources.displayMetrics.heightPixels * 0.35f)).coerceIn(0f, 1f)
                             return true
                         }
                         return false
@@ -807,10 +808,10 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                     val far = miniSwipeDy > 90 * resources.displayMetrics.density
                     miniSwipeDy = 0f
                     if (far && event.actionMasked == android.view.MotionEvent.ACTION_UP) {
-                        binding.exoPlayerView.translationY = 0f
-                        leaveWatch()
+                        minimizeWithAnimation()
                     } else {
                         binding.exoPlayerView.animate().translationY(0f).setDuration(160).start()
+                        animateWatchDragTo(0f, 160)
                     }
                 }
             }
@@ -1237,6 +1238,9 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         if (!isNativePlaybackActive) return
 
         isMiniPlayerActive = true
+        binding.exoPlayerView.animate().cancel()
+        binding.exoPlayerView.alpha = 1f
+        binding.exoPlayerView.translationY = 0f
 
         if (originalPlayerLayoutParams == null) {
             originalPlayerLayoutParams = binding.exoPlayerView.layoutParams as android.widget.FrameLayout.LayoutParams
@@ -1259,6 +1263,9 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }
         binding.exoPlayerView.clipToOutline = true
         binding.miniPlayerContainer.clipToOutline = true // rounds the blurred backdrop
+        binding.miniPlayerContainer.alpha = 0f
+        binding.miniPlayerContainer.translationY = 24 * resources.displayMetrics.density
+        binding.miniPlayerContainer.animate().alpha(1f).translationY(0f).setDuration(200).start()
         bindMiniBar()
         // Controller UI (seek bar, quality gear, etc.) doesn't fit a
         // 160x90dp box — tapping the mini-player re-expands it instead.
@@ -1301,6 +1308,11 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             )
         binding.webViewContainer.addView(binding.exoPlayerView, restoredParams) // appended at the end -- exact index doesn't matter here, just needs to sit above webView (index 0) to stay visible
         binding.exoPlayerView.useController = true
+        // rises into place from the bar
+        binding.exoPlayerView.alpha = 0f
+        binding.exoPlayerView.translationY = 120 * resources.displayMetrics.density
+        binding.exoPlayerView.animate().alpha(1f).translationY(0f).setDuration(240)
+            .setInterpolator(android.view.animation.DecelerateInterpolator()).start()
         musicArt.sync()
     }
 
@@ -2714,7 +2726,8 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
             override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
                 super.onPageStarted(view, url, favicon)
-                binding.loadingSpinner.visibility = View.VISIBLE
+                // the compose screens have their own loader
+                binding.loadingSpinner.visibility = if (composeNav()) View.GONE else View.VISIBLE
                 hideConnectionErrorScreen()
 
                 // about:blank is the hidden history player being cleared, it must not stop the video that just started
@@ -2970,9 +2983,68 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     }
 
     /** Back / tab switch / search while a video is open: collapse it to the mini-player, like the YouTube app. */
+    private var minimizing = false
+
+    private fun animateWatchDragTo(target: Float, ms: Long, onEnd: (() -> Unit)? = null) {
+        val from = nav.watchDrag
+        android.animation.ValueAnimator.ofFloat(from, target).apply {
+            duration = ms
+            addUpdateListener { nav.watchDrag = it.animatedValue as Float }
+            addListener(object : android.animation.AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: android.animation.Animator) { onEnd?.invoke() }
+            })
+            start()
+        }
+    }
+
+    /**
+     * Swipe-down finish: the video flies and shrinks into the mini bar's thumbnail spot while the
+     * watch page fades out, then the real mini player takes over.
+     */
+    private fun minimizeWithAnimation() {
+        if (minimizing) return
+        val v = binding.exoPlayerView
+        if (v.width == 0 || v.height == 0 || !isNativePlaybackActive) { v.translationY = 0f; nav.watchDrag = 0f; leaveWatch(); return }
+        minimizing = true
+        val d = resources.displayMetrics.density
+        val loc = IntArray(2)
+        v.getLocationOnScreen(loc)
+        // thumbnail spot inside the bar: 10dp bar margin + 6dp, bar sits 72dp above the bottom and is 64dp tall
+        val targetCx = 16 * d + 48 * d
+        val targetCy = binding.root.height - (72 + 64) * d + 5 * d + 27 * d
+        val startTx = v.translationX
+        val startTy = v.translationY
+        val dx = targetCx - (loc[0] + v.width / 2f)
+        val dy = targetCy - (loc[1] + v.height / 2f)
+        val sx = 96 * d / v.width
+        val sy = 54 * d / v.height
+        val startDrag = nav.watchDrag
+        android.animation.ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 240
+            interpolator = android.view.animation.DecelerateInterpolator(1.4f)
+            addUpdateListener {
+                val t = it.animatedValue as Float
+                v.translationX = startTx + dx * t
+                v.translationY = startTy + dy * t
+                v.scaleX = 1f + (sx - 1f) * t
+                v.scaleY = 1f + (sy - 1f) * t
+                nav.watchDrag = startDrag + (1f - startDrag) * t
+            }
+            addListener(object : android.animation.AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: android.animation.Animator) {
+                    v.translationX = 0f; v.translationY = 0f; v.scaleX = 1f; v.scaleY = 1f
+                    minimizing = false
+                    leaveWatch()
+                }
+            })
+            start()
+        }
+    }
+
     private fun leaveWatch() {
         if (!nav.watchVisible) return
         nav.watchVisible = false
+        nav.watchDrag = 0f
         if (isNativePlaybackActive) {
             enterMiniPlayerMode()
             if (!isMiniPlayerActive) {
@@ -3454,7 +3526,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }
 
         isResolving = true
-        binding.loadingSpinner.visibility = View.VISIBLE
+        binding.loadingSpinner.visibility = if (composeNav()) View.GONE else View.VISIBLE
         // Snapshot the generation for THIS call -- if resolveGeneration
         // has moved on by the time the async resolve below finishes
         // (meaning a newer resolveAndPlayNative call started since), this
