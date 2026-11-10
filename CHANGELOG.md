@@ -7,6 +7,13 @@
 - **Glassy mini-player**: the mini player is now a rounded glass bar docked above the bottom bar, with the video, title, play/pause and close. Tap it or swipe it up to open the full player
 - **Sleep timer**: menu (⋮) > Sleep timer. Slide to pick 5 to 120 minutes and press Start, or choose end of the video. It shows the time left and can be turned off from the same sheet
 - **Mix panel on normal videos**: when YouTube has a Mix for the video you are watching, the Mix list now shows under the player, just like on the YouTube site. Tap an item to carry on inside that Mix
+- **Swipe to mini player**: on the normal watch screen, drag the video down and the whole page fades with it. Let go and the video shrinks and flies into the mini player; the bar fades in. Opening it again rises the player back up. Short drags spring back
+- **New loading indicator**: every spinner and pull-to-refresh now uses the Material 3 Expressive loading indicator, the morphing shape from the Play Store
+- **Stylish icons**: settings, the ⋮ menu and the accounts sheet use cookie-shaped icon tiles
+- **More animation**: cards fade and rise in, the watch screen and search slide in, the bottom bar icons pop when selected, Like and Subscribe animate between their states
+- **Real glass mini player**: the mini bar now has a blurred copy of the video's thumbnail behind it. The blur is done natively (C++, `lunoblur.cpp`)
+- **Player settings menu**: the gear on the player now opens a YouTube-style menu with Quality, Playback speed, Loop video, Music mode, Sleep timer, Audio track and More (Download, Downloaded videos, Audio FX). Sleep timer and Audio FX moved here from the ⋮ menu
+- **Luno Glass** (Settings > Appearance): frosted glass sheets with real window blur behind them, a blurred copy of the video behind the watch page, glass panels and bottom bar. Needs Android 12+ with window blur turned on. On phones that can't do it the switch refuses to turn on and says why
 - **Multiple accounts**: tap your picture on Home to open the Accounts sheet. Add as many YouTube accounts as you want, tap one to switch (Home, Subscriptions, Library and history follow the account you pick), or remove one with the X. Add account opens Google's own account chooser, so an account already on the phone is one tap, and "Use another account" adds a new one. Backing out keeps your current account
 
 ## Fixes
@@ -51,6 +58,9 @@
 
 ## Bug Fixes
 
+- The old round spinner no longer shows on top of the new loader while a video is loading
+- Volume and brightness swipes now work only in fullscreen, so scrolling or swiping on the normal player no longer changes them
+- Music mode in the mini player: the picture is now the small rounded thumbnail on the left instead of covering the whole bar
 - Save to playlist and Save to Watch later now really save (the request was cancelled when the menu closed). It also waits for YouTube's answer before showing Added
 - Videos with a Mix under them now carry on inside the Mix when they end, instead of jumping to Up next
 - **Background history**: watch history sometimes wasn't saved while the app was in the background. Android could kill the hidden player's page process and nothing brought it back. The renderer is now kept at high priority, rebuilt if it dies anyway, and the hidden watch page is retried (up to 3 times) when it doesn't load or has no video
