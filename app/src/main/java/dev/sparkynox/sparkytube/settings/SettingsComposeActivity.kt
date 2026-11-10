@@ -249,6 +249,9 @@ class SettingsComposeActivity : AppCompatActivity() {
                 toggle("dynamiccolor", "Dynamic color (Material You)", "drop",
                         "Matches app colors to your wallpaper on Android 12+. Restart app to apply.",
                         { p.isDynamicColorEnabled(this) }, { p.setDynamicColorEnabled(this, it) }),
+                toggle("lunoglass", "Luno Glass", "drop",
+                        "Frosted glass sheets and a blurred video backdrop. Needs Android 12+ with window blur on",
+                        { dev.sparkynox.sparkytube.lunokit.glass.LunoGlass.isOn() }, { dev.sparkynox.sparkytube.lunokit.glass.LunoGlass.setEnabled(this, it) }),
                 toggle("customcss", "Custom CSS", "code", "Your own CSS, applied on top of SparkyTube's",
                         { p.isCustomCssEnabled(this) }, { p.setCustomCssEnabled(this, it) }),
                 Item("cssedit", "css", "Edit CSS", "code", sub = { "Write or paste your CSS" }, value = { p.getCustomCss(this) })
