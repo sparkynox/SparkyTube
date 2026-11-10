@@ -29,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import dev.sparkynox.sparkytube.lunokit.glass.LunoSheet
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -78,7 +79,7 @@ fun VideoMenuSheet(
         return
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    LunoSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(bottom = 24.dp)) {
             Text(
                 item.title, Modifier.padding(horizontal = 24.dp, vertical = 8.dp),

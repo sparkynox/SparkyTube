@@ -29,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import dev.sparkynox.sparkytube.lunokit.glass.LunoSheet
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,7 +55,7 @@ fun AccountsSheet(
     var removing by remember { mutableStateOf<AccountStore.Account?>(null) }
     val accounts = AccountStore.accounts
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    LunoSheet(onDismissRequest = onDismiss) {
         Column(Modifier.navigationBarsPadding().padding(bottom = 12.dp)) {
             Text(
                 "Accounts",

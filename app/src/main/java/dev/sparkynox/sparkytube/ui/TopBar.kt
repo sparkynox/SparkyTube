@@ -23,6 +23,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import dev.sparkynox.sparkytube.lunokit.glass.LunoSheet
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -90,7 +91,7 @@ fun TopBar(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OverflowSheet(items: List<OverflowItem>, onDismiss: () -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    LunoSheet(onDismissRequest = onDismiss) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(4),
             contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 28.dp),

@@ -15,6 +15,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import dev.sparkynox.sparkytube.lunokit.glass.LunoSheet
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -40,7 +41,7 @@ fun SleepTimerSheet(player: () -> Player?, pause: () -> Unit, onDismiss: () -> U
     // keeps the "left" text moving while the sheet is open
     LaunchedEffect(Unit) { while (true) { now = System.currentTimeMillis(); delay(1000) } }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    LunoSheet(onDismissRequest = onDismiss) {
         Column(Modifier.navigationBarsPadding().padding(horizontal = 24.dp).padding(bottom = 20.dp)) {
             Text("Sleep timer", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
 

@@ -192,6 +192,9 @@ class NavViewModel : ViewModel() {
     val queue: List<HomeFeedItem> get() = watchInfo?.queue ?: emptyList()
 
     // the Mix YouTube offers under a plain video. Kept apart from [queue] so autoplay is untouched
+    // 0..1 while the video is dragged down to the mini player, the watch page fades with it
+    var watchDrag by mutableStateOf(0f)
+
     var autoMix by mutableStateOf<List<HomeFeedItem>>(emptyList()); private set
     var autoMixTitle by mutableStateOf<String?>(null); private set
 

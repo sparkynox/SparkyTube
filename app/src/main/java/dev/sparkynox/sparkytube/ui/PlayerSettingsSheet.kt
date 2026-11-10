@@ -29,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import dev.sparkynox.sparkytube.lunokit.glass.LunoSheet
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -59,7 +60,7 @@ fun PlayerSettingsSheet(h: PlayerControlsHost, onDismiss: () -> Unit, onSleep: (
     var quality by remember { mutableStateOf(h.qualityLabel()) }
     val onIcon = MaterialTheme.colorScheme.onSecondaryContainer
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    LunoSheet(onDismissRequest = onDismiss) {
         AnimatedContent(
             targetState = page,
             transitionSpec = { fadeIn(tween(160)) togetherWith fadeOut(tween(110)) },

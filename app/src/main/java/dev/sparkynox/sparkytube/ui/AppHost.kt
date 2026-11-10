@@ -342,7 +342,7 @@ private fun LibraryRow(title: String, subtitle: String, onClick: () -> Unit) {
 @Composable
 fun AppNavBar(selected: NavViewModel.Tab, onSelect: (NavViewModel.Tab) -> Unit) {
     NavigationBar(
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        containerColor = dev.sparkynox.sparkytube.lunokit.glass.glassColor(MaterialTheme.colorScheme.surfaceContainer, 0.6f),
         windowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
     ) {
         listOf(

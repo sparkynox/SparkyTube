@@ -5,6 +5,12 @@ import androidx.compose.foundation.layout.height
 import dev.sparkynox.sparkytube.lunokit.ambient.ambientGlow
 import android.content.Intent
 import android.widget.Toast
+import androidx.compose.animation.togetherWith
+import dev.sparkynox.sparkytube.lunokit.glass.GlassBackdrop
+import dev.sparkynox.sparkytube.lunokit.glass.LunoGlass
+import dev.sparkynox.sparkytube.lunokit.glass.glassBorder
+import dev.sparkynox.sparkytube.lunokit.glass.glassColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.aspectRatio
@@ -51,7 +57,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.sparkynox.sparkytube.homefeed.HomeFeedItem
-import androidx.compose.animation.togetherWith // <--- Added missing import
 
 /**
  * Everything under the player while a video is open: title, channel, description, up next.
@@ -64,6 +69,8 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
     val openMenu = LocalOpenMenu.current
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
+    // the phone can turn window blur off at any time (battery saver), so look again for every video
+    LaunchedEffect(nav.watchId) { LunoGlass.refresh(ctx) }
     // 0 none, 1 liked, 2 disliked, read from the watch page once it has loaded
     var reaction by remember(nav.watchId, info?.likeStatus) { mutableStateOf(info?.likeStatus ?: 0) }
     // the subscriptions list is the fallback when the watch page doesn't say
@@ -85,8 +92,15 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
     }
     LaunchedEffect(nearEnd, nav.related.size) { if (nearEnd && nav.related.isNotEmpty()) nav.loadMoreRelated() }
 
-    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    Surface(
+        Modifier.fillMaxSize().graphicsLayer {
+            alpha = 1f - nav.watchDrag * 0.9f
+            translationY = nav.watchDrag * 90f
+        },
+        color = if (LunoGlass.active) Color.Transparent else MaterialTheme.colorScheme.background,
+    ) {
         androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+        GlassBackdrop(nav.watchId)
         // the real player is a native view drawn over the top 220dp, this only shows while the next video is still loading
         if (!nav.playerReady && nav.watchId != null) {
             androidx.compose.foundation.layout.Box(
@@ -236,7 +250,8 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
                         .clip(RoundedCornerShape(16.dp)).clickable { expanded = !expanded },
                     shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    color = glassColor(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    border = glassBorder(),
                 ) {
                     Text(
                         info?.description.orEmpty(),
@@ -303,7 +318,7 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
                     val current = q.videoId == nav.watchId
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 12.dp).clip(RoundedCornerShape(14.dp))
-                            .background(if (current) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+                            .background(if (current) glassColor(MaterialTheme.colorScheme.secondaryContainer, 0.55f) else Color.Transparent)
                             .clickable { if (!current) onOpen(q) }.padding(6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
