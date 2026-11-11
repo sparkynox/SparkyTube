@@ -101,7 +101,7 @@ fun PlayerSettingsSheet(h: PlayerControlsHost, onDismiss: () -> Unit, onSleep: (
                         SettingRow(
                             icon = { ResIcon(android.R.drawable.ic_menu_gallery, onIcon, 22.dp) }, label = "Ambient mode",
                             trailing = { Switch(checked = AmbientPrefs.enabled, onCheckedChange = null) },
-                        ) { AmbientPrefs.setEnabled(!AmbientPrefs.enabled) }
+                        ) { AmbientPrefs.changeEnabled(!AmbientPrefs.enabled) }
                         if (AmbientPrefs.enabled) Row0(android.R.drawable.ic_menu_preferences, onIcon, "Ambient settings", null, chevron = true) { page = Page.AMBIENT }
                         val sleepText = if (!SleepTimer.active) "Off" else if (SleepTimer.atVideoEnd) "End of video" else
                             "${((SleepTimer.endsAt - System.currentTimeMillis()) / 60000L).coerceAtLeast(0) + 1} min"
@@ -127,18 +127,18 @@ fun PlayerSettingsSheet(h: PlayerControlsHost, onDismiss: () -> Unit, onSleep: (
                         ChoiceRow(fmtSpeed(s), s == speed) { speed = s; h.setSpeed(s); onDismiss() }
                     }
                     Page.AMBIENT -> {
-                        AmbientSlider("Strength", AmbientPrefs.strength, 0..100, "%") { AmbientPrefs.setStrength(it) }
-                        AmbientSlider("Spread", AmbientPrefs.spreadDp, 20..200, " dp") { AmbientPrefs.setSpread(it) }
+                        AmbientSlider("Strength", AmbientPrefs.strength, 0..100, "%") { AmbientPrefs.changeStrength(it) }
+                        AmbientSlider("Spread", AmbientPrefs.spreadDp, 20..200, " dp") { AmbientPrefs.changeSpread(it) }
                         AmbientSlider(
                             if (android.os.Build.VERSION.SDK_INT >= 31) "Blur" else "Blur (needs Android 12+)",
                             AmbientPrefs.blurDp, 0..60, " dp",
-                        ) { AmbientPrefs.setBlur(it) }
-                        AmbientSlider("Saturation", AmbientPrefs.saturation, 50..200, "%") { AmbientPrefs.setSaturation(it) }
-                        AmbientSlider("Update rate", AmbientPrefs.fps, 4..24, " fps") { AmbientPrefs.setFps(it) }
+                        ) { AmbientPrefs.changeBlur(it) }
+                        AmbientSlider("Saturation", AmbientPrefs.saturation, 50..200, "%") { AmbientPrefs.changeSaturation(it) }
+                        AmbientSlider("Update rate", AmbientPrefs.fps, 4..24, " fps") { AmbientPrefs.changeFps(it) }
                         SettingRow(
                             icon = { ResIcon(R.drawable.ic_play, onIcon, 22.dp) }, label = "Smooth frames",
                             trailing = { Switch(checked = AmbientPrefs.smooth, onCheckedChange = null) },
-                        ) { AmbientPrefs.setSmooth(!AmbientPrefs.smooth) }
+                        ) { AmbientPrefs.changeSmooth(!AmbientPrefs.smooth) }
                     }
                     Page.MORE -> {
                         if (h.downloadEnabled()) Row0(R.drawable.ic_download, onIcon, "Download", null) { onDismiss(); h.onDownload() }
