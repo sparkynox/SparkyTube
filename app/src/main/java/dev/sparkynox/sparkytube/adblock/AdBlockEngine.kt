@@ -30,10 +30,7 @@ class AdBlockEngine private constructor(
     private val youtubeAdPaths: List<String>,
     private val youtubeAdParamHints: List<String>,
     private val trackingDomains: List<String>,
-    private val dataSaverPaths: List<String>,
-    // ~53k domains from EasyList, EasyPrivacy and the Anti-Adblock list, see assets/blocklist_hosts.txt
-    // swapped as a whole by BlocklistUpdater when a fresh list arrives, readers always see a complete set
-    @Volatile private var blockedHosts: Set<String> = emptySet()
+    private val dataSaverPaths: List<String>
 ) {
 
     // googlevideo.com is the CDN domain YouTube's own web player streams
@@ -142,17 +139,9 @@ class AdBlockEngine private constructor(
         return if (end > start) url.substring(start, end) else null
     }
 
-    // a.b.example.com is blocked if a.b.example.com, b.example.com or example.com is in the list
-    fun isHostBlocked(host: String): Boolean {
-        if (blockedHosts.isEmpty()) return false
-        var h = host
-        while (true) {
-            if (blockedHosts.contains(h)) return true
-            val i = h.indexOf('.')
-            if (i < 0) return false
-            h = h.substring(i + 1)
-        }
-    }
+    // a.b.example.com is blocked if a.b.example.com, b.example.com or example.com is in the list.
+    // the ~54k hosts live in a memory mapped file, see HostIndex
+    fun isHostBlocked(host: String): Boolean = HostIndex.blocked(host)
 
     // hosts in a piece of text (a plugin's js/css) that are on the block lists
     fun findBlockedHosts(text: String, limit: Int = 5): List<String> {
@@ -247,15 +236,14 @@ class AdBlockEngine private constructor(
                     BufferedReader(InputStreamReader(stream)).readText()
                 }
                 val obj = JSONObject(json)
-                val hosts = loadHosts(context)
+                HostIndex.init(context)
                 NativeFilter.init(context)
                 AdBlockEngine(
                     adDomains = obj.getJSONArray("adDomains").toStringList(),
                     youtubeAdPaths = obj.getJSONArray("youtubeAdPaths").toStringList(),
                     youtubeAdParamHints = obj.getJSONArray("youtubeAdParamHints").toStringList(),
                     trackingDomains = obj.getJSONArray("trackingDomains").toStringList(),
-                    dataSaverPaths = obj.optJSONArray("dataSaverPaths")?.toStringList() ?: emptyList(),
-                    blockedHosts = hosts
+                    dataSaverPaths = obj.optJSONArray("dataSaverPaths")?.toStringList() ?: emptyList()
                 )
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to load blocklist.json, falling back to minimal built-in list", e)
@@ -266,38 +254,6 @@ class AdBlockEngine private constructor(
                     trackingDomains = listOf("google-analytics.com"),
                     dataSaverPaths = listOf("/api/stats/watchtime", "/generate_204", "/log_event")
                 )
-            }
-        }
-
-        /** Live swap after BlocklistUpdater downloaded a newer host list. No-op until the engine exists. */
-        internal fun applyHosts(hosts: Set<String>) {
-            instance?.blockedHosts = hosts
-        }
-
-        private fun loadHosts(context: Context): Set<String> {
-            // a list downloaded for this app version wins, the bundled one is the fallback
-            BlocklistUpdater.downloadedHosts(context)?.let { f ->
-                try {
-                    val set = HashSet<String>(70_000)
-                    f.bufferedReader().useLines { lines -> for (l in lines) if (l.isNotEmpty()) set.add(l) }
-                    if (set.size >= 20_000) {
-                        Log.i(TAG, "loaded ${set.size} blocked hosts (downloaded)")
-                        return set
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "downloaded host list unreadable, using the bundled one", e)
-                }
-            }
-            return try {
-                val set = HashSet<String>(70_000)
-                context.assets.open("blocklist_hosts.txt").bufferedReader().useLines { lines ->
-                    for (l in lines) if (l.isNotEmpty()) set.add(l)
-                }
-                Log.i(TAG, "loaded ${set.size} blocked hosts")
-                set
-            } catch (e: Exception) {
-                Log.e(TAG, "couldn't load blocklist_hosts.txt", e)
-                emptySet()
             }
         }
 
