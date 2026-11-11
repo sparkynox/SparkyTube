@@ -186,6 +186,7 @@ object UpdateManager {
             return
         }
         dev.sparkynox.sparkytube.logs.LogRecorder.i("Update", "download started: ${l.apkUrl}")
+        UpdateNotifier.progress(ctx, apkFile(ctx, l).name, 0, l.size, 0)
         phase = Phase.DOWNLOADING
         error = ""
         downloaded = 0
@@ -219,6 +220,7 @@ object UpdateManager {
                                 if (now - lastT >= 700) {
                                     speed = (downloaded - lastB) * 1000 / (now - lastT)
                                     lastT = now; lastB = downloaded
+                                    UpdateNotifier.progress(ctx, target.name, downloaded, total, speed)
                                 }
                             }
                         }
@@ -230,12 +232,14 @@ object UpdateManager {
                 }
                 if (!part.renameTo(target)) throw IllegalStateException("Couldn't save the file")
                 phase = Phase.READY
+                UpdateNotifier.progressDone(ctx, target.name, ok = true)
                 withContext(Dispatchers.Main) { install(ctx) }
             } catch (e: Exception) {
                 part.delete()
                 error = e.message ?: "Download failed"
                 dev.sparkynox.sparkytube.logs.LogRecorder.w("Update", "download failed: $error", e)
                 phase = Phase.ERROR
+                UpdateNotifier.progressDone(ctx, target.name, ok = false, error = error)
             }
         }
     }
