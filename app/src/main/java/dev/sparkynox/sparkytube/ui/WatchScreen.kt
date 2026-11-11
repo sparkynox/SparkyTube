@@ -8,8 +8,8 @@ import android.widget.Toast
 import androidx.compose.animation.togetherWith
 import dev.sparkynox.sparkytube.lunokit.glass.GlassBackdrop
 import dev.sparkynox.sparkytube.lunokit.glass.LunoGlass
-import dev.sparkynox.sparkytube.lunokit.glass.glassBorder
-import dev.sparkynox.sparkytube.lunokit.glass.glassColor
+import dev.sparkynox.sparkytube.lunokit.glass.panelBorder
+import dev.sparkynox.sparkytube.lunokit.glass.panelColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -254,8 +254,8 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
                         .clip(RoundedCornerShape(16.dp)).clickable { expanded = !expanded },
                     shape = RoundedCornerShape(16.dp),
-                    color = glassColor(MaterialTheme.colorScheme.surfaceContainerHigh),
-                    border = glassBorder(),
+                    color = panelColor(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    border = panelBorder(),
                 ) {
                     Text(
                         info?.description.orEmpty(),
@@ -322,7 +322,7 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
                     val current = q.videoId == nav.watchId
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 12.dp).clip(RoundedCornerShape(14.dp))
-                            .background(if (current) glassColor(MaterialTheme.colorScheme.secondaryContainer, 0.55f) else Color.Transparent)
+                            .background(if (current) panelColor(MaterialTheme.colorScheme.secondaryContainer, 0.55f) else Color.Transparent)
                             .clickable { if (!current) onOpen(q) }.padding(6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
