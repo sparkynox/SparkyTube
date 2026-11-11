@@ -32,7 +32,7 @@ fun glassBorder(): BorderStroke? = if (LunoGlass.active) BorderStroke(1.dp, Colo
 /** The video's own thumbnail, blown up and blurred, sitting behind the whole watch page. */
 @Composable
 fun GlassBackdrop(videoId: String?) {
-    if (!LunoGlass.active || videoId.isNullOrBlank()) return
+    if (!LunoGlass.active || videoId.isNullOrBlank() || dev.sparkynox.sparkytube.lunokit.ambient.AmbientPrefs.enabled) return
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         AsyncImage(
             model = "https://i.ytimg.com/vi/$videoId/mqdefault.jpg",
