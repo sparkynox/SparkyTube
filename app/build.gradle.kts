@@ -8,7 +8,7 @@ plugins {
 
 android {
     namespace = "dev.sparkynox.sparkytube"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "dev.sparkynox.sparkytube"
