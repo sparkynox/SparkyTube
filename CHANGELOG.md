@@ -59,6 +59,8 @@
 
 ## Bug Fixes
 
+- Live ambient now fills the whole watch page instead of a strip under the player (Spread goes up to 800 dp, default 650), and the description and Mix panels turn see-through so the glow shows behind them
+- Update screen: a download card with the file name, big percent, progress bar, size, speed and time left, plus a progress notification while the apk downloads and a Ready/Failed notification at the end
 - The old round spinner no longer shows on top of the new loader while a video is loading
 - Volume and brightness swipes now work only in fullscreen, so scrolling or swiping on the normal player no longer changes them
 - Music mode in the mini player: the picture is now the small rounded thumbnail on the left instead of covering the whole bar
