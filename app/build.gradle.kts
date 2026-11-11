@@ -4,7 +4,6 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
-    id("com.chaquo.python")
 }
 
 android {
@@ -15,8 +14,8 @@ android {
         applicationId = "dev.sparkynox.sparkytube"
         minSdk = 24
         targetSdk = 34
-        versionCode = 18
-        versionName = "2.5"
+        versionCode = 19
+        versionName = "2.6"
 
         // ARMv7 (armeabi-v7a) + ARM64 (arm64-v8a) — covers basically every real device.
         // x86/x86_64 skipped on purpose (emulator-only, not needed per Sparky's spec).
@@ -98,23 +97,6 @@ kotlin {
     compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
 }
 
-// Persistent in-process Python for yt-dlp (PyYtDlp.kt) -- replaces the
-// old youtubedl-android fallback, which spawned a brand new Python
-// subprocess on every single video (interpreter boot + yt-dlp module
-// import from scratch each time, the real reason it was slower than
-// NewPipe). With Chaquopy the interpreter starts once in
-// SparkyTubeApp.onCreate and stays warm for the app's whole lifetime --
-// every resolve after the first is just a function call into an
-// already-running interpreter with yt-dlp already imported.
-chaquopy {
-    defaultConfig {
-        version = "3.11"
-        pip {
-            install("yt-dlp")
-        }
-    }
-}
-
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
@@ -180,11 +162,11 @@ dependencies {
     // switched to for the same reason.
     implementation("io.github.maxrave-dev:ffmpeg-kit-audio:6.0.1")
 
-    // yt-dlp wrapper -- last-resort fallback for age-restricted videos
-    // when both NewPipeExtractor and Piped instances fail (see
-    // extractor/PyYtDlp.kt). Off by default via a Settings toggle since
-    // it bundles a full Python runtime + yt-dlp into the APK via the
-    // Chaquopy plugin (configured above, not a regular dependency line).
+    // InnerTubeX: pure Kotlin YouTube extractor (replaces the old Python/yt-dlp setup).
+    // comes from JitPack, check the version exists on https://jitpack.io/#MetrolistGroup/innertubex
+    implementation("com.github.MetrolistGroup.innertubex:innertubex:v0.11.6")
+    // http engine for the ktor client InnerTubeX uses
+    implementation("io.ktor:ktor-client-okhttp:3.6.0")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

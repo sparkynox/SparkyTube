@@ -24,19 +24,22 @@
 -keep class com.arthenica.ffmpegkit.** { *; }
 -dontwarn com.arthenica.ffmpegkit.**
 
-## yt-dlp runs through Chaquopy (extractor/PyYtDlp.kt). Chaquopy calls
-## into Kotlin/Java classes by reflection from the Python side, so R8
-## must not strip or rename them.
--keep class com.chaquo.python.** { *; }
--dontwarn com.chaquo.python.**
+## InnerTubeX + ktor (extractor/InnerTubeXResolver.kt). The library is kotlinx.serialization heavy and
+## ships its own QuickJS bindings, so keep it whole instead of letting R8 guess.
+-keep class com.metrolist.** { *; }
+-keep class com.github.metrolistgroup.** { *; }
+-keepattributes *Annotation*, InnerClasses, Signature
+-dontwarn io.ktor.**
+-dontwarn kotlinx.serialization.**
+-dontwarn org.slf4j.**
+-dontwarn java.lang.management.**
+-keep class kotlinx.serialization.** { *; }
+-keepclassmembers class **$$serializer { *; }
 -keepclassmembers class * {
-    @com.chaquo.python.PyIgnore *;
+    @kotlinx.serialization.Serializable *;
 }
 
-## The app bundles its own org.json (org.json:json in build.gradle.kts), so R8
-## treats it as app code and renames it. Chaquopy looks org.json.JSONObject up
-## by name when it reads its build.json at startup, finds nothing that matches
-## the renamed class and dies with an AssertionError -> yt-dlp never starts.
+## the app bundles its own org.json (org.json:json in build.gradle.kts), keep it from being renamed
 -keep class org.json.** { *; }
 -dontwarn org.json.**
 
