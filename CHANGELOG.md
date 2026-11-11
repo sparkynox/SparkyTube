@@ -14,6 +14,7 @@
 - **Real glass mini player**: the mini bar now has a blurred copy of the video's thumbnail behind it. The blur is done natively (C++, `lunoblur.cpp`)
 - **Player settings menu**: the gear on the player now opens a YouTube-style menu with Quality, Playback speed, Loop video, Music mode, Sleep timer, Audio track and More (Download, Downloaded videos, Audio FX). Sleep timer and Audio FX moved here from the ⋮ menu
 - **Luno Glass** (Settings > Appearance): frosted glass sheets with real window blur behind them, a blurred copy of the video behind the watch page, glass panels and bottom bar. Needs Android 12+ with window blur turned on. On phones that can't do it the switch refuses to turn on and says why
+- **Ambient mode (live)**: the glow around the video now follows the real frames of the video that is playing, not a still colour. Player menu (gear) > Ambient mode, with Strength, Spread, Blur, Saturation, Update rate and Smooth frames. Black bars are detected and cut out. The frame work is done natively (C++). Idea and approach from the MIT licensed Ambient light for YouTube extension, credited in THIRD_PARTY_NOTICES.md
 - **Multiple accounts**: tap your picture on Home to open the Accounts sheet. Add as many YouTube accounts as you want, tap one to switch (Home, Subscriptions, Library and history follow the account you pick), or remove one with the X. Add account opens Google's own account chooser, so an account already on the phone is one tap, and "Use another account" adds a new one. Backing out keeps your current account
 
 ## Fixes
