@@ -368,9 +368,8 @@ object StreamExtractor {
         // trips age-restricted/gated videos. Try the fallback chain, in
         // order: Piped public instances first (fast, server-side auth
         // handling, no local heavy lifting), then the personal
-        // yt-dlp-backed Render server if configured, then on-device
-        // yt-dlp (youtubedl-android) as the last resort since it's the
-        // slowest/heaviest. Each stage is a no-op miss (not a crash) if
+        // yt-dlp-backed Render server if configured, then InnerTubeX
+        // (pure Kotlin, in-app) as the last resort. Each stage is a no-op miss (not a crash) if
         // unavailable/unconfigured, so this chain degrades gracefully.
         if (dev.sparkynox.sparkytube.settings.SettingsPrefs.isPipedFallbackEnabled(appContextRef) && !pipedBreaker.open) {
             val t1 = System.currentTimeMillis()
@@ -391,13 +390,13 @@ object StreamExtractor {
             return serverFallback
         }
 
-        if (dev.sparkynox.sparkytube.settings.SettingsPrefs.isYtDlpFallbackEnabled(appContextRef)) {
-            PyYtDlp.init(appContextRef)
-            val ytDlpResult = PyYtDlp.resolve(videoId)
-            if (ytDlpResult != null) {
-                xlog("yt-dlp ok, ${System.currentTimeMillis() - t0} ms since the start")
-                cacheResolved(videoId, ytDlpResult)
-                return ytDlpResult
+        if (dev.sparkynox.sparkytube.settings.SettingsPrefs.isInnerTubeXFallbackEnabled(appContextRef)) {
+            InnerTubeXResolver.init(appContextRef)
+            val itx = InnerTubeXResolver.resolve(videoId)
+            if (itx != null) {
+                xlog("InnerTubeX ok, ${System.currentTimeMillis() - t0} ms since the start")
+                cacheResolved(videoId, itx)
+                return itx
             }
         }
 
