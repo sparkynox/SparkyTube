@@ -3453,55 +3453,26 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 StreamExtractor.resolvePlayableUrl(videoId) // old setting, local servers are gone
             dev.sparkynox.sparkytube.settings.SettingsPrefs.ExtractorMethod.NEWPIPE ->
                 StreamExtractor.resolvePlayableUrl(videoId)
-            dev.sparkynox.sparkytube.settings.SettingsPrefs.ExtractorMethod.YT_DLP -> {
-                // yt-dlp only, no NewPipe/Piped chain. Default method now.
-                // init() is a no-op once Python is up (SparkyTubeApp warms
-                // it at launch); it's inside the IO block so a cold first
-                // call can't freeze the UI while the interpreter starts.
+            dev.sparkynox.sparkytube.settings.SettingsPrefs.ExtractorMethod.INNERTUBEX -> {
+                // InnerTubeX first, the normal NewPipe chain takes over if it comes back empty
                 val hit = StreamExtractor.cached(videoId)
                 if (hit != null) {
                     hit
                 } else {
                     val t0 = android.os.SystemClock.elapsedRealtime()
-                    val wantFull = !dev.sparkynox.sparkytube.settings.SettingsPrefs.isDataSaverEnabled(this)
-                    val viaYtDlp = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                        if (!wantFull) {
-                            dev.sparkynox.sparkytube.extractor.PyYtDlp.init(this@MainActivity)
-                            dev.sparkynox.sparkytube.extractor.PyYtDlp.resolve(videoId)
-                        } else {
-                            // yt-dlp's android clients only hand out the muxed 360p these days, so with
-                            // Data Saver off NewPipe runs next to it and wins if it has higher qualities
-                            // own scope on purpose: python can't be cancelled, so if NewPipe wins we
-                            // don't want to sit and wait for yt-dlp to finish in the background
-                            val dlp = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).async {
-                                dev.sparkynox.sparkytube.extractor.PyYtDlp.init(this@MainActivity)
-                                dev.sparkynox.sparkytube.extractor.PyYtDlp.resolve(videoId)
-                            }
-                            val p = kotlinx.coroutines.withTimeoutOrNull(12000) { StreamExtractor.resolvePlayableUrl(videoId) }
-                            if (p != null && p.availableQualities.any { it.resolutionValue > 360 }) {
-                                dev.sparkynox.sparkytube.logs.LogRecorder.i("Resolve", "NewPipe gave ${p.availableQualities.size} qualities, using it ($videoId)")
-                                p
-                            } else {
-                                dlp.await() ?: p
-                            }
-                        }
+                    val viaItx = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        dev.sparkynox.sparkytube.extractor.InnerTubeXResolver.init(this@MainActivity)
+                        dev.sparkynox.sparkytube.extractor.InnerTubeXResolver.resolve(videoId)
                     }
-                    val ytMs = android.os.SystemClock.elapsedRealtime() - t0
-                    if (viaYtDlp != null) {
-                        // a 360p-only result must not stick in the cache when full quality was
-                        // wanted, the next play should try for the real list again
-                        if (!wantFull || viaYtDlp.availableQualities.any { it.resolutionValue > 360 }) {
-                            StreamExtractor.cacheResolved(videoId, viaYtDlp)
-                        }
-                        dev.sparkynox.sparkytube.logs.LogRecorder.i("Resolve", "yt-dlp ok in $ytMs ms ($videoId)")
-                        viaYtDlp
+                    val ms = android.os.SystemClock.elapsedRealtime() - t0
+                    if (viaItx != null) {
+                        StreamExtractor.cacheResolved(videoId, viaItx)
+                        dev.sparkynox.sparkytube.logs.LogRecorder.i("Resolve", "InnerTubeX ok in $ms ms ($videoId)")
+                        viaItx
                     } else {
-                        // yt-dlp came back empty (error, age gate, whatever) -> use the
-                        // normal NewPipe chain instead of failing the video
                         val viaPipe = StreamExtractor.resolvePlayableUrl(videoId)
-                        val total = android.os.SystemClock.elapsedRealtime() - t0
                         dev.sparkynox.sparkytube.logs.LogRecorder.i(
-                            "Resolve", "yt-dlp failed after $ytMs ms, NewPipe fallback total $total ms, got=${viaPipe != null} ($videoId)"
+                            "Resolve", "InnerTubeX failed after $ms ms, NewPipe fallback got=${viaPipe != null} ($videoId)"
                         )
                         viaPipe
                     }
@@ -3657,17 +3628,14 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     private fun showPlaybackErrorDialog() {
         if (isFinishing || isDestroyed) return
 
-        // If yt-dlp is the explicitly-selected Extractor Method (not just
-        // the last link in AUTO's fallback chain), show its actual error
-        // instead of the generic message -- a silent "couldn't play"
-        // with no detail was the actual bug report here: yt-dlp WAS
-        // failing, but nothing showed why.
+        // If InnerTubeX is the explicitly-selected Extractor Method, show its actual
+        // error instead of the generic message
         val method = dev.sparkynox.sparkytube.settings.SettingsPrefs.getExtractorMethod(this)
-        if (method == dev.sparkynox.sparkytube.settings.SettingsPrefs.ExtractorMethod.YT_DLP) {
-            val error = dev.sparkynox.sparkytube.extractor.PyYtDlp.lastErrorMessage
+        if (method == dev.sparkynox.sparkytube.settings.SettingsPrefs.ExtractorMethod.INNERTUBEX) {
+            val error = dev.sparkynox.sparkytube.extractor.InnerTubeXResolver.lastErrorMessage
             AlertDialog.Builder(this)
-                .setTitle("yt-dlp couldn't play this video")
-                .setMessage(error ?: "yt-dlp failed with no specific error message.")
+                .setTitle("InnerTubeX couldn't play this video")
+                .setMessage(error ?: "InnerTubeX failed with no specific error message.")
                 .setPositiveButton("OK", null)
                 .setNeutralButton("Check Logs") { _, _ ->
                     startActivity(Intent(this, dev.sparkynox.sparkytube.logs.LogsActivity::class.java))
@@ -3791,13 +3759,13 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         android.widget.Toast.makeText(this, "Skipped ${segment.category.label}", android.widget.Toast.LENGTH_SHORT).show()
     }
 
-    // warm the cache for the next video with yt-dlp itself, the old prefetch
-    // ran the (slow) NewPipe chain in the background and resolveStream never used it
-    private fun prefetchViaYtDlp(videoId: String) {
+    // warm the cache for the next video with InnerTubeX when that's the selected method,
+    // the NewPipe prefetch wouldn't be used by resolveStream in that mode
+    private fun prefetchViaInnerTubeX(videoId: String) {
         if (StreamExtractor.cached(videoId) != null) return
         lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            dev.sparkynox.sparkytube.extractor.PyYtDlp.init(this@MainActivity)
-            dev.sparkynox.sparkytube.extractor.PyYtDlp.resolve(videoId)?.let {
+            dev.sparkynox.sparkytube.extractor.InnerTubeXResolver.init(this@MainActivity)
+            dev.sparkynox.sparkytube.extractor.InnerTubeXResolver.resolve(videoId)?.let {
                 StreamExtractor.cacheResolved(videoId, it)
                 dev.sparkynox.sparkytube.net.NetCache.prefetch(it)
             }
@@ -3812,16 +3780,16 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         if (duration <= 0) return
 
         val remaining = duration - position
-        if (remaining > 45_000) return // not close enough to the end yet (yt-dlp needs ~20s, so start early)
+        if (remaining > 45_000) return // not close enough to the end yet (extractors need a few seconds, so start early)
 
         if (composeNav() && browseMode == BrowseMode.YOUTUBE) {
             val nextId = nav.nextVideo()?.videoId
             if (nextId != null && nextId != prefetchedForVideoId) {
                 prefetchedForVideoId = nextId
                 if (dev.sparkynox.sparkytube.settings.SettingsPrefs.getExtractorMethod(this) ==
-                    dev.sparkynox.sparkytube.settings.SettingsPrefs.ExtractorMethod.YT_DLP
+                    dev.sparkynox.sparkytube.settings.SettingsPrefs.ExtractorMethod.INNERTUBEX
                 ) {
-                    prefetchViaYtDlp(nextId)
+                    prefetchViaInnerTubeX(nextId)
                 } else {
                     StreamExtractor.prefetch(nextId, lifecycleScope)
                 }
@@ -3836,9 +3804,9 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             if (predictedId != null && predictedId != prefetchedForVideoId) {
                 prefetchedForVideoId = predictedId
                 if (dev.sparkynox.sparkytube.settings.SettingsPrefs.getExtractorMethod(this) ==
-                    dev.sparkynox.sparkytube.settings.SettingsPrefs.ExtractorMethod.YT_DLP
+                    dev.sparkynox.sparkytube.settings.SettingsPrefs.ExtractorMethod.INNERTUBEX
                 ) {
-                    prefetchViaYtDlp(predictedId)
+                    prefetchViaInnerTubeX(predictedId)
                 } else {
                     StreamExtractor.prefetch(predictedId, lifecycleScope)
                 }

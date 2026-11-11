@@ -35,8 +35,10 @@ class SparkyTubeApp : Application() {
         // background check for new versions + developer messages (every ~6h, only on network)
         dev.sparkynox.sparkytube.update.UpdateManager.schedule(this)
 
-        // refresh the ad/tracker lists in the background on every app start (ETag check, tiny when unchanged)
-        dev.sparkynox.sparkytube.adblock.BlocklistUpdater.schedule(this)
+        // refresh the ad/tracker lists in the background on app start (version.json check, tiny when unchanged)
+        if (dev.sparkynox.sparkytube.settings.SettingsPrefs.isBlocklistAutoUpdateEnabled(this)) {
+            dev.sparkynox.sparkytube.adblock.BlocklistUpdater.schedule(this)
+        }
 
         // Nothing else heavy here on purpose — AdBlockEngine loads its JSON
         // lazily the first time MainActivity spins up the WebView.
@@ -52,20 +54,13 @@ class SparkyTubeApp : Application() {
             DynamicColors.applyToActivitiesIfAvailable(this)
         }
 
-        // yt-dlp fallback (see extractor/PyYtDlp.kt): only init if the
-        // user has actually turned this on in Settings. Chaquopy's Python
-        // interpreter starts once here on a background thread and then
-        // stays resident for the app's whole process lifetime -- unlike
-        // the old youtubedl-android version, nothing here needs to run
-        // again before a video resolve, there's no per-call subprocess
-        // boot cost anymore.
+        // InnerTubeX: building the client is cheap, the player-config/cipher warm-up runs on its own
+        // background scope. only when it can actually be used (selected method or fallback on)
         val settings = dev.sparkynox.sparkytube.settings.SettingsPrefs
-        val ytDlpIsDefault = settings.getExtractorMethod(this) ==
-            dev.sparkynox.sparkytube.settings.SettingsPrefs.ExtractorMethod.YT_DLP
-        if (ytDlpIsDefault || settings.isYtDlpFallbackEnabled(this)) {
-            Thread {
-                dev.sparkynox.sparkytube.extractor.PyYtDlp.init(this)
-            }.start()
+        val itxSelected = settings.getExtractorMethod(this) ==
+            dev.sparkynox.sparkytube.settings.SettingsPrefs.ExtractorMethod.INNERTUBEX
+        if (itxSelected || settings.isInnerTubeXFallbackEnabled(this)) {
+            Thread { dev.sparkynox.sparkytube.extractor.InnerTubeXResolver.init(this) }.start()
         }
     }
 }
