@@ -29,6 +29,15 @@ fun glassColor(base: Color, alpha: Float = 0.38f): Color = if (LunoGlass.active)
 @Composable
 fun glassBorder(): BorderStroke? = if (LunoGlass.active) BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)) else null
 
+/** Panels on the watch page turn see-through for Luno Glass and for the live ambient glow. */
+@Composable
+fun panelColor(base: Color, alpha: Float = 0.38f): Color =
+    if (LunoGlass.active || dev.sparkynox.sparkytube.lunokit.ambient.AmbientPrefs.enabled) base.copy(alpha = alpha) else base
+
+@Composable
+fun panelBorder(): BorderStroke? =
+    if (LunoGlass.active || dev.sparkynox.sparkytube.lunokit.ambient.AmbientPrefs.enabled) BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)) else null
+
 /** The video's own thumbnail, blown up and blurred, sitting behind the whole watch page. */
 @Composable
 fun GlassBackdrop(videoId: String?) {
