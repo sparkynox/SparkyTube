@@ -9,6 +9,7 @@ add_library(sparkynet SHARED
     sparkynet.cpp      # speed estimate + DNS warm
     lunofx.cpp         # audio engine
     netfilter.cpp      # ad filter engine
+    hostindex.cpp      # blocked host list, mmap + binary search
     nativecrash.cpp    # native crash catcher
     fastio.cpp         # downloader file io
     lunoblur.cpp       # bitmap blur for the glass mini player
