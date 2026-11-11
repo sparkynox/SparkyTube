@@ -101,6 +101,8 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
     ) {
         androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
         GlassBackdrop(nav.watchId)
+        // the live glow from the playing video, behind the player and the page
+        dev.sparkynox.sparkytube.lunokit.ambient.LiveAmbient(Modifier.align(Alignment.TopStart))
         // the real player is a native view drawn over the top 220dp, this only shows while the next video is still loading
         if (!nav.playerReady && nav.watchId != null) {
             androidx.compose.foundation.layout.Box(
@@ -119,7 +121,9 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
         LazyColumn(
             state = list,
             // the first 220dp belong to the ExoPlayer view that MainActivity draws above this
-            modifier = Modifier.fillMaxSize().ambientGlow(nav.watchId).padding(top = 220.dp),
+            modifier = Modifier.fillMaxSize()
+                .then(if (dev.sparkynox.sparkytube.lunokit.ambient.AmbientPrefs.enabled) Modifier else Modifier.ambientGlow(nav.watchId))
+                .padding(top = 220.dp),
             contentPadding = PaddingValues(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
