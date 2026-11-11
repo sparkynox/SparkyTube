@@ -1,7 +1,18 @@
 #!/usr/bin/env python3
-# rebuilds app/src/main/assets/blocklist_hosts.txt from EasyList, EasyPrivacy and the Anti-Adblock list.
+# rebuilds the block lists from EasyList, EasyPrivacy and the Anti-Adblock list.
 # run it on a PC/CI: python3 tools/update_blocklist.py
-import re, urllib.request
+#
+# output:
+#   blocklist/hosts.txt, hosts.bin, filters_network.txt, version.json   <- what installed apps download
+#   app/src/main/assets/blocklist_hosts.bin, filters_network.txt        <- bundled copy for first start / offline
+import datetime, json, os, re, shutil, sys, urllib.request
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from host_index import build, sha256
+
+OUT = "blocklist"
+ASSETS = "app/src/main/assets"
+os.makedirs(OUT, exist_ok=True)
 
 RAW = "https://raw.githubusercontent.com/easylist"
 FILES = (
@@ -53,9 +64,10 @@ for repo, path in FILES:
     except Exception as e:
         print("skipped", path, e)
 
-with open("app/src/main/assets/blocklist_hosts.txt", "w") as f:
+with open(f"{OUT}/hosts.txt", "w") as f:
     f.write("\n".join(sorted(hosts)) + "\n")
-print(len(hosts), "hosts")
+n_hashes = build(hosts, f"{OUT}/hosts.bin")
+print(len(hosts), "hosts,", n_hashes, "unique hashes")
 
 # ---- full network rules (paths, wildcards, options) for the native engine, assets/filters_network.txt ----
 EXTRA = [("easylist", f"easylist/easylist_{n}.txt") for n in ("specific_block", "specific_block_popup", "general_block_dimensions")] + \
@@ -99,6 +111,31 @@ for repo, path in FILES + EXTRA:
     except Exception as e:
         print("skipped", path, e)
 
-with open("app/src/main/assets/filters_network.txt", "w") as f:
+with open(f"{OUT}/filters_network.txt", "w") as f:
     f.write("\n".join(rules) + "\n")
 print(len(rules), "network rules")
+
+# bundled copies
+shutil.copy(f"{OUT}/hosts.bin", f"{ASSETS}/blocklist_hosts.bin")
+shutil.copy(f"{OUT}/filters_network.txt", f"{ASSETS}/filters_network.txt")
+
+# version.json is what the app checks first (tiny). the date only moves when a list really changed,
+# so the weekly job doesn't make an empty commit
+info = {
+    "hosts": n_hashes,
+    "rules": len(rules),
+    "hosts_sha256": sha256(f"{OUT}/hosts.bin"),
+    "filters_sha256": sha256(f"{OUT}/filters_network.txt"),
+}
+try:
+    old = json.load(open(f"{OUT}/version.json"))
+except Exception:
+    old = {}
+if any(old.get(k) != v for k, v in info.items()):
+    info["version"] = datetime.date.today().isoformat()
+else:
+    info["version"] = old.get("version", datetime.date.today().isoformat())
+with open(f"{OUT}/version.json", "w") as f:
+    json.dump(info, f, indent=1, sort_keys=True)
+    f.write("\n")
+print("version", info["version"])
