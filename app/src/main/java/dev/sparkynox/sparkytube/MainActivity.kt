@@ -28,6 +28,7 @@ import dev.sparkynox.sparkytube.ui.ComposeAlertDialog as AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.media3.common.Player
@@ -1657,6 +1658,19 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        // feeds the live ambient glow with tiny frames of the playing video
+        lifecycleScope.launch {
+            repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+                dev.sparkynox.sparkytube.lunokit.ambient.AmbientSampler.run(
+                    texture = { binding.exoPlayerView.videoSurfaceView as? android.view.TextureView },
+                    shouldSample = {
+                        isNativePlaybackActive && !isMiniPlayerActive && !isPlayerFullscreen &&
+                            nav.watchVisible && mediaController?.isPlaying == true
+                    },
+                )
+            }
+        }
 
         prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 

@@ -27,6 +27,7 @@ class SparkyTubeApp : Application() {
         dev.sparkynox.sparkytube.auth.Session.init(this)
         dev.sparkynox.sparkytube.auth.AccountStore.init(this)
         dev.sparkynox.sparkytube.lunokit.glass.LunoGlass.init(this)
+        dev.sparkynox.sparkytube.lunokit.ambient.AmbientPrefs.init(this)
 
         // before any activity exists, so the very first screen already has the right colors
         dev.sparkynox.sparkytube.settings.SettingsPrefs.applyThemeMode(this)
