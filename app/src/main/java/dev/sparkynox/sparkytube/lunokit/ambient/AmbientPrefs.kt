@@ -12,7 +12,7 @@ object AmbientPrefs {
 
     var enabled by mutableStateOf(false); private set
     var strength by mutableStateOf(70); private set      // percent
-    var spreadDp by mutableStateOf(110); private set
+    var spreadDp by mutableStateOf(650); private set
     var blurDp by mutableStateOf(28); private set
     var saturation by mutableStateOf(125); private set   // percent
     var smooth by mutableStateOf(true); private set      // blend frames into each other
@@ -22,7 +22,7 @@ object AmbientPrefs {
         sp = ctx.applicationContext.getSharedPreferences("sparky_ambient", Context.MODE_PRIVATE)
         enabled = sp.getBoolean("enabled", false)
         strength = sp.getInt("strength", 70)
-        spreadDp = sp.getInt("spread", 110)
+        spreadDp = sp.getInt("spread2", 650)
         blurDp = sp.getInt("blur", 28)
         saturation = sp.getInt("saturation", 125)
         smooth = sp.getBoolean("smooth", true)
@@ -40,7 +40,7 @@ object AmbientPrefs {
     fun changeFps(v: Int) { fps = v }
 
     fun save() {
-        sp.edit().putInt("strength", strength).putInt("spread", spreadDp).putInt("blur", blurDp)
+        sp.edit().putInt("strength", strength).putInt("spread2", spreadDp).putInt("blur", blurDp)
             .putInt("saturation", saturation).putInt("fps", fps).apply()
     }
 }
