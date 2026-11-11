@@ -144,6 +144,10 @@ private fun UpdateScreen(prompt: Boolean, onCheck: () -> Unit, onClose: () -> Un
                 }
             }
 
+            if (l != null && hasUpdate && (m.phase == UpdateManager.Phase.DOWNLOADING || m.phase == UpdateManager.Phase.READY)) {
+                DownloadCard(m, "SparkyTube-${l.versionName}.apk")
+            }
+
             if (l != null && l.changelog.isNotBlank()) {
                 Text("What's new", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Surface(
@@ -161,16 +165,6 @@ private fun UpdateScreen(prompt: Boolean, onCheck: () -> Unit, onClose: () -> Un
 
             Spacer(Modifier.weight(1f))
 
-            if (m.phase == UpdateManager.Phase.DOWNLOADING) {
-                val total = m.total
-                if (total > 0) LinearProgressIndicator(progress = { (m.downloaded.toFloat() / total).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
-                else LinearProgressIndicator(Modifier.fillMaxWidth())
-                Text(
-                    "${fmtBytes(m.downloaded)}" + (if (total > 0) " / ${fmtBytes(total)}" else "") +
-                        (if (m.speed > 0) "  •  ${fmtBytes(m.speed)}/s" else ""),
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
             if (m.error.isNotBlank()) {
                 Text(m.error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             }
@@ -192,6 +186,48 @@ private fun UpdateScreen(prompt: Boolean, onCheck: () -> Unit, onClose: () -> Un
                     enabled = m.phase != UpdateManager.Phase.CHECKING,
                 ) { Text("Check for updates") }
             }
+        }
+    }
+}
+
+@Composable
+private fun DownloadCard(m: UpdateManager, fileName: String) {
+    val total = m.total
+    val done = m.downloaded
+    val ready = m.phase == UpdateManager.Phase.READY
+    val frac = if (ready) 1f else if (total > 0) (done.toFloat() / total).coerceIn(0f, 1f) else 0f
+    val shown by androidx.compose.animation.core.animateFloatAsState(frac, androidx.compose.animation.core.tween(350), label = "updateProgress")
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Text(
+                    fileName, Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleSmall, maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                )
+                Text(
+                    if (ready) "100%" else if (total > 0) "${(frac * 100).toInt()}%" else "...",
+                    style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            if (ready || total > 0) LinearProgressIndicator(
+                progress = { shown },
+                modifier = Modifier.fillMaxWidth().height(10.dp),
+                strokeCap = androidx.compose.ui.graphics.StrokeCap.Round,
+            ) else LinearProgressIndicator(Modifier.fillMaxWidth())
+            val left = if (!ready && m.speed > 0 && total > 0) (total - done) / m.speed else -1L
+            Text(
+                if (ready) "Downloaded, ready to install" else
+                    fmtBytes(done) + (if (total > 0) " / " + fmtBytes(total) else "") +
+                        (if (m.speed > 0) "  \u2022  " + fmtBytes(m.speed) + "/s" else "") +
+                        (if (left >= 0) "  \u2022  ${left}s left" else ""),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
