@@ -29,15 +29,15 @@ object AmbientPrefs {
         fps = sp.getInt("fps", 12)
     }
 
-    fun setEnabled(v: Boolean) { enabled = v; sp.edit().putBoolean("enabled", v).apply() }
-    fun setSmooth(v: Boolean) { smooth = v; sp.edit().putBoolean("smooth", v).apply() }
+    fun changeEnabled(v: Boolean) { enabled = v; sp.edit().putBoolean("enabled", v).apply() }
+    fun changeSmooth(v: Boolean) { smooth = v; sp.edit().putBoolean("smooth", v).apply() }
 
     // sliders call these while dragging, saved when the finger lifts
-    fun setStrength(v: Int) { strength = v }
-    fun setSpread(v: Int) { spreadDp = v }
-    fun setBlur(v: Int) { blurDp = v }
-    fun setSaturation(v: Int) { saturation = v }
-    fun setFps(v: Int) { fps = v }
+    fun changeStrength(v: Int) { strength = v }
+    fun changeSpread(v: Int) { spreadDp = v }
+    fun changeBlur(v: Int) { blurDp = v }
+    fun changeSaturation(v: Int) { saturation = v }
+    fun changeFps(v: Int) { fps = v }
 
     fun save() {
         sp.edit().putInt("strength", strength).putInt("spread", spreadDp).putInt("blur", blurDp)
