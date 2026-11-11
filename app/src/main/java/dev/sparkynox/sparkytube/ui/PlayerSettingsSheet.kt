@@ -128,7 +128,7 @@ fun PlayerSettingsSheet(h: PlayerControlsHost, onDismiss: () -> Unit, onSleep: (
                     }
                     Page.AMBIENT -> {
                         AmbientSlider("Strength", AmbientPrefs.strength, 0..100, "%") { AmbientPrefs.changeStrength(it) }
-                        AmbientSlider("Spread", AmbientPrefs.spreadDp, 20..200, " dp") { AmbientPrefs.changeSpread(it) }
+                        AmbientSlider("Spread", AmbientPrefs.spreadDp, 40..800, " dp") { AmbientPrefs.changeSpread(it) }
                         AmbientSlider(
                             if (android.os.Build.VERSION.SDK_INT >= 31) "Blur" else "Blur (needs Android 12+)",
                             AmbientPrefs.blurDp, 0..60, " dp",
