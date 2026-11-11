@@ -5,8 +5,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -40,10 +39,13 @@ fun LiveAmbient(modifier: Modifier = Modifier) {
     }
 
     val spread = AmbientPrefs.spreadDp.dp
-    var m = modifier.fillMaxWidth().height(220.dp + spread)
+    // the whole page, not just a strip under the player
+    var m = modifier.fillMaxSize()
     // a real gaussian on top on Android 12+, below that the soft upscale of the tiny frame does the job
-    if (AmbientPrefs.blurDp > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        m = m.blur(AmbientPrefs.blurDp.dp, BlurredEdgeTreatment.Unbounded)
+    // a big spread needs a softer blur too, otherwise the layer edges show as bands
+    val blurDp = maxOf(AmbientPrefs.blurDp, AmbientPrefs.spreadDp / 14)
+    if (blurDp > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        m = m.blur(blurDp.dp, BlurredEdgeTreatment.Unbounded)
     }
     Canvas(m) {
         val boxH = 220.dp.toPx()
@@ -54,7 +56,7 @@ fun LiveAmbient(modifier: Modifier = Modifier) {
         val left = (w - vw) / 2f
         val top = (boxH - vh) / 2f
         val spreadPx = spread.toPx()
-        val levels = 6
+        val levels = (AmbientPrefs.spreadDp / 34).coerceIn(6, 18)
         val strength = AmbientPrefs.strength / 100f * 0.9f
         val t = blend.value
 
@@ -77,7 +79,7 @@ fun LiveAmbient(modifier: Modifier = Modifier) {
 
         // outermost first, so the strongest layer ends up on top and the glow fades outwards
         for (i in levels downTo 1) {
-            val a = strength * (1f - (i - 1f) / levels).pow(1.3f)
+            val a = strength * (1f - (i - 1f) / levels).pow(1.8f)
             if (t < 1f && prev != null) layer(prev, i, a)
             layer(cur, i, if (t < 1f && prev != null) a * t else a)
         }
