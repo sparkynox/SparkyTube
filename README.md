@@ -91,7 +91,7 @@ The APK ends up in `app/build/outputs/apk/`.
 | `tools/` | Block list updater, remote config signing |
 | `plugins-examples/` | Example plugins (JS and Kotlin) |
 
-Stack: Kotlin, Jetpack Compose, Media3, OkHttp, Cronet, C++ (NDK, CMake), yt-dlp through Chaquopy for stream resolving.
+Stack: Kotlin, Jetpack Compose, Media3, OkHttp, Cronet, C++ (NDK, CMake), InnerTubeX and NewPipe Extractor for stream resolving.
 
 ---
 
@@ -101,7 +101,7 @@ Stack: Kotlin, Jetpack Compose, Media3, OkHttp, Cronet, C++ (NDK, CMake), yt-dlp
 python3 tools/update_blocklist.py
 ```
 
-Rebuilds `assets/blocklist_hosts.txt` and `assets/filters_network.txt` from the upstream lists.
+Rebuilds `blocklist/` (hosts.bin, filters_network.txt, version.json) and the bundled copies in `assets/` from the upstream lists.
 
 ---
 

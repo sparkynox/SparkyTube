@@ -4,7 +4,7 @@ SparkyTube's own code is GPL-3.0 (see `LICENSE`). Some things inside the repo an
 
 ## Filter lists (own terms)
 
-`app/src/main/assets/blocklist_hosts.txt` and `app/src/main/assets/filters_network.txt` are generated from:
+`blocklist/hosts.txt`, `blocklist/filters_network.txt` and the bundled `app/src/main/assets/blocklist_hosts.bin` / `filters_network.txt` are generated from:
 
 - **EasyList**, **EasyPrivacy** and the **Adblock Warning Removal List** by the EasyList authors (https://easylist.to, https://github.com/easylist)
 

@@ -1,5 +1,23 @@
 # SparkyTube Changelog
 
+# v2.6
+
+## New Features
+
+- **InnerTubeX extractor**: Settings > Extraction > Extractor Method now has InnerTubeX, a pure Kotlin YouTube extractor (MetrolistGroup/innertubex). It runs inside the app with no extra process. If it fails, NewPipe takes over. It also replaces yt-dlp as the last-resort fallback (Settings > Extraction > InnerTubeX fallback, on by default)
+- **Lighter ad block list**: the ~54k blocked hosts are no longer loaded into memory. They sit in a small binary index (~430 KB) that C++ memory-maps, so only the pages a lookup touches are in RAM. The 1 MB text list is gone from the APK
+- **Block list updates without a new APK**: on app start a ~200 byte version.json is checked, and only a list that really changed is downloaded (sha256 checked, sanity checked, swapped in live). GitHub is the main source with jsDelivr as a mirror. Settings > Features > Better ad block list turns it off
+
+## Removed
+
+- **Python / yt-dlp (Chaquopy)**: the whole Python runtime is gone from the APK, which saves a lot of install size and 60 MB+ of RAM at runtime. People who had yt-dlp selected are moved to InnerTubeX automatically
+- The "yt-dlp fallback" switch (replaced by the InnerTubeX fallback)
+
+## Known Issues
+
+- InnerTubeX streams don't carry the client's request headers yet, and don't include the description, so chapters from the description only work on the NewPipe path
+- Not tested on a device yet, check Settings > Logs (lines tagged InnerTubeX) if a video doesn't start
+
 # v2.5
 
 ## New Features

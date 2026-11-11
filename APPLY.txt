@@ -1,0 +1,8 @@
+Repo root me unzip karo (files overwrite ho jayengi), phir ye delete karo:
+
+git rm -f app/src/main/assets/blocklist_hosts.txt \
+          app/src/main/java/dev/sparkynox/sparkytube/extractor/PyYtDlp.kt
+git rm -rf app/src/main/python
+
+Phir push:
+git add . && git commit -m "v2.6 InnerTubeX, native host index" && git push ...
