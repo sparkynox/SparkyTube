@@ -12,6 +12,7 @@ add_library(sparkynet SHARED
     nativecrash.cpp    # native crash catcher
     fastio.cpp         # downloader file io
     lunoblur.cpp       # bitmap blur for the glass mini player
+    lunoambient.cpp    # frame bars + colour adjust for the live ambient glow
     rcverify.cpp       # remote config signature check
     ed25519/fe.c
     ed25519/ge.c
