@@ -40,8 +40,8 @@ object SettingsPrefs {
     private const val KEY_LOCAL_SERVER_ENABLED = "local_server_enabled"
     private const val KEY_LOCAL_SERVER_API_KEY = "local_server_api_key"
     private const val KEY_PIPED_FALLBACK_ENABLED = "piped_fallback_enabled"
-    private const val KEY_YTDLP_FALLBACK_ENABLED = "ytdlp_fallback_enabled"
-    private const val KEY_YTDLP_DATA_SAVER = "ytdlp_data_saver"
+    private const val KEY_ITX_FALLBACK_ENABLED = "innertubex_fallback_enabled"
+    private const val KEY_BLOCKLIST_AUTO_UPDATE = "blocklist_auto_update"
     private const val KEY_THEME_MODE = "theme_mode"
     private const val KEY_SETTINGS_UI = "settings_ui"
     private const val KEY_THEME_CHOSEN = "theme_mode_chosen"
@@ -260,10 +260,12 @@ object SettingsPrefs {
      * predictable behavior (e.g. always use the phone's local server, or
      * always use NewPipe because the local server isn't running).
      */
-    enum class ExtractorMethod { AUTO, LOCAL_SERVER, NEWPIPE, YT_DLP }
+    enum class ExtractorMethod { AUTO, LOCAL_SERVER, NEWPIPE, INNERTUBEX }
 
     fun getExtractorMethod(context: Context): ExtractorMethod {
         val stored = prefs(context).getString(KEY_EXTRACTOR_METHOD, ExtractorMethod.NEWPIPE.name)
+            // yt-dlp is gone, people who had it selected get its replacement
+            .let { if (it == "YT_DLP") ExtractorMethod.INNERTUBEX.name else it }
         return try {
             ExtractorMethod.valueOf(stored ?: ExtractorMethod.NEWPIPE.name)
         } catch (e: IllegalArgumentException) {
@@ -337,16 +339,21 @@ object SettingsPrefs {
         prefs(context).edit().putBoolean(KEY_PIPED_FALLBACK_ENABLED, enabled).apply()
     }
 
-    // yt-dlp (youtubedl-android) fallback: OFF by default. Unlike Piped,
-    // this bundles a real Python + yt-dlp runtime into the APK (~30-40MB)
-    // and spins up an actual process per call, so it's opt-in from
-    // Settings rather than always-on -- people who don't need the extra
-    // reliability shouldn't pay the size/perf cost for it.
-    fun isYtDlpFallbackEnabled(context: Context) =
-        prefs(context).getBoolean(KEY_YTDLP_FALLBACK_ENABLED, false)
+    // InnerTubeX as the last link of the NewPipe chain. On by default: it's pure Kotlin,
+    // so unlike the old yt-dlp setup it costs no extra APK size or memory
+    fun isInnerTubeXFallbackEnabled(context: Context) =
+        prefs(context).getBoolean(KEY_ITX_FALLBACK_ENABLED, true)
 
-    fun setYtDlpFallbackEnabled(context: Context, enabled: Boolean) {
-        prefs(context).edit().putBoolean(KEY_YTDLP_FALLBACK_ENABLED, enabled).apply()
+    fun setInnerTubeXFallbackEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_ITX_FALLBACK_ENABLED, enabled).apply()
+    }
+
+    // weekly-ish block list refresh from GitHub on app start (version.json check, tiny when nothing changed)
+    fun isBlocklistAutoUpdateEnabled(context: Context) =
+        prefs(context).getBoolean(KEY_BLOCKLIST_AUTO_UPDATE, true)
+
+    fun setBlocklistAutoUpdateEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_BLOCKLIST_AUTO_UPDATE, enabled).apply()
     }
 
     fun getMaxConcurrentDownloads(context: Context): Int =
@@ -395,14 +402,6 @@ object SettingsPrefs {
                 ThemeMode.SYSTEM -> androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
             }
         )
-    }
-
-    // yt-dlp Data Saver: on (default) = only 360p, off = every quality yt-dlp finds
-    fun isYtDlpDataSaverEnabled(context: Context) =
-        prefs(context).getBoolean(KEY_YTDLP_DATA_SAVER, true)
-
-    fun setYtDlpDataSaverEnabled(context: Context, enabled: Boolean) {
-        prefs(context).edit().putBoolean(KEY_YTDLP_DATA_SAVER, enabled).apply()
     }
 
     // Dynamic Color (Material You wallpaper theming, Android 12+). Off by

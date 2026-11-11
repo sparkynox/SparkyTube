@@ -151,6 +151,12 @@ class SettingsComposeActivity : AppCompatActivity() {
             Section("features", "Features", "shield", "Ad blocking, SponsorBlock, anime streaming", listOf(
                 toggle("adblock", "Ad blocking", "shield", "Blocks ad/tracker domains and hides ad slots",
                         { p.isAdBlockEnabled(this) }, { p.setAdBlockEnabled(this, it) }),
+                toggle("blocklistupdate", "Better ad block list", "shield",
+                        "Keeps the 54k-host block list fresh from GitHub. Only changed files are downloaded",
+                        { p.isBlocklistAutoUpdateEnabled(this) }, {
+                            p.setBlocklistAutoUpdateEnabled(this, it)
+                            if (it) dev.sparkynox.sparkytube.adblock.BlocklistUpdater.schedule(this)
+                        }),
                 toggle("sponsorblock", "SponsorBlock", "skip", "Auto-skip sponsor segments, self-promo, interaction reminders",
                         { p.isSponsorBlockEnabled(this) }, { p.setSponsorBlockEnabled(this, it) }),
                 toggle("anime", "Anime streaming", "film", "Crunchyroll wrapper, reachable from the overflow menu",
@@ -186,39 +192,21 @@ class SettingsComposeActivity : AppCompatActivity() {
             )),
             Section("extraction", "Extraction", "code", "Extractors and fallbacks", listOf(
                 choice("extractor", "Extractor Method", "code",
-                        listOf("AUTO" to "Auto", "NEWPIPE" to "NewPipe (default)", "YT_DLP" to "yt-dlp"),
+                        listOf("AUTO" to "Auto", "NEWPIPE" to "NewPipe (default)", "INNERTUBEX" to "InnerTubeX"),
                         { p.getExtractorMethod(this).name }, { p.setExtractorMethod(this, SettingsPrefs.ExtractorMethod.valueOf(it)) },
                         sub = {
                             when (it) {
                                 "NEWPIPE" -> "NewPipe only — skips the JS fast path"
-                                "YT_DLP" -> "yt-dlp first, NewPipe takes over if yt-dlp fails"
+                                "INNERTUBEX" -> "InnerTubeX first (pure Kotlin), NewPipe takes over if it fails"
                                 else -> "Auto — JavaScript → NewPipe"
                             }
                         }),
                 toggle("piped", "Piped fallback", "globe",
                         "Fixes age-restricted videos by routing through a public Piped instance when NewPipe fails",
                         { p.isPipedFallbackEnabled(this) }, { p.setPipedFallbackEnabled(this, it) }),
-                toggle("ytdlpfallback", "yt-dlp fallback (heavy)", "zap",
-                        "Last-resort extractor for age-gated videos. Adds ~30-40MB to the app.",
-                        { p.isYtDlpFallbackEnabled(this) }, { on ->
-                            if (on && !p.isYtDlpFallbackEnabled(this)) {
-                                AlertDialog.Builder(this)
-                                    .setTitle("Enable yt-dlp fallback?")
-                                    .setMessage(
-                                        "This runs yt-dlp on-device as a last-resort fallback when NewPipe and Piped both fail " +
-                                            "to play a video (usually age-restricted ones). It's slower than the other methods and " +
-                                            "uses more storage/battery, but is the most reliable."
-                                    )
-                                    .setPositiveButton("Enable") { _, _ ->
-                                        p.setYtDlpFallbackEnabled(this, true)
-                                        tick++
-                                    }
-                                    .setNegativeButton("Cancel", null)
-                                    .show()
-                            } else {
-                                p.setYtDlpFallbackEnabled(this, on)
-                            }
-                        })
+                toggle("itxfallback", "InnerTubeX fallback", "zap",
+                        "Last-resort extractor for age-gated or blocked videos when NewPipe and Piped both fail",
+                        { p.isInnerTubeXFallbackEnabled(this) }, { p.setInnerTubeXFallbackEnabled(this, it) })
             )),
             Section("downloads", "Downloads", "download", "Queue, progress and offline library", listOf(
                 toggle("download", "Download button", "download", "Shows the download button on videos",
