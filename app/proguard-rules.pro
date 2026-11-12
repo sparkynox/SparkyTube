@@ -48,3 +48,8 @@
 
 ## native plugin api, plugins are compiled against these names
 -keep class dev.sparkynox.sparkytube.plugins.api.** { *; }
+
+## PO token WebView bridge (extractor/BotGuardTokenProvider.kt)
+-keepclassmembers class dev.sparkynox.sparkytube.extractor.BotGuardTokenProvider$Bridge {
+    @android.webkit.JavascriptInterface <methods>;
+}
