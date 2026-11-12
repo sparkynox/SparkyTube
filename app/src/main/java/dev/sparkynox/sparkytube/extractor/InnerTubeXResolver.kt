@@ -91,7 +91,11 @@ object InnerTubeXResolver {
             tube.locale = YouTubeLocale(gl = country, hl = "en")
             val cipher = YouTubeCipherService(http, logger = logger)
             val parser = YtConfigParserImpl(http, tube, logger = logger, cipherService = cipher)
-            InnerTubeExtractor(parser, cipher, tube, logger = logger).also { extractor = it }
+            InnerTubeExtractor(
+                parser, cipher, tube,
+                tokenProvider = appContext?.let { BotGuardTokenProvider(it) },
+                logger = logger,
+            ).also { extractor = it }
         } catch (t: Throwable) {
             LogRecorder.e(TAG, "init failed", t)
             lastErrorMessage = "${t.javaClass.simpleName}: ${t.message ?: "unknown error"}"
@@ -206,7 +210,7 @@ object InnerTubeXResolver {
             } catch (e: StreamResolveException) {
                 if (!quiet) {
                     lastErrorMessage = "${e.reason}: ${e.message}"
-                    val tries = e.diagnostics?.attempts?.takeLast(4)?.joinToString { "${it.clientName}=${it.outcome}" }
+                    val tries = e.diagnostics?.attempts?.joinToString { "${it.clientName}=${it.outcome}" }
                     LogRecorder.w(TAG, "extract failed (${e.reason}) ${tries.orEmpty()}")
                 }
                 // age gate / unavailable won't change with another audio format
