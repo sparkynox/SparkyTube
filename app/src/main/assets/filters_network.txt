@@ -1353,6 +1353,7 @@ _prebid.js$script
 /adx.php?source=$popup
 /aff_ad?$popup
 /afu.php?$popup
+/api/direct/*?s1=$popup
 /api/users?token=$popup
 /click?adv=$popup
 /fb_hilltopads.php$popup
@@ -1519,6 +1520,7 @@ $third-party,xmlhttprequest,domain=opensubtitles.org
 ||api.bluecore.app/api/track/
 ||api.collarity.com/cws/*http
 ||api.config-security.com/first
+||api.firecrown.com/v1/events
 ||api.gist.ai/v1/analytics/track
 ||api.gleap.io/sessions/ping
 ||api.helloextend.com/mintsight
@@ -1545,6 +1547,7 @@ $third-party,xmlhttprequest,domain=opensubtitles.org
 ||app.clickfunnels.com/assets/userevents/application.js
 ||app.clickfunnels.com/cf.js
 ||app.factori.ai/personica.js
+||app.kajabi.com/health_check/ping
 ||app.lifesight.io/personica.js
 ||app.link/_r?$script,third-party
 ||app.octaneai.com/get_analytics_engine/
@@ -1935,6 +1938,8 @@ $third-party,xmlhttprequest,domain=opensubtitles.org
 ||elpais.com/t.gif
 ||emarketeer.com/tracker/
 ||emrld.ltd/collect
+||emrldco.com/collect
+||emrldtp.cc/collect
 ||endorsal.io/check/
 ||engagelab.com/ma-report/
 ||engageplatform.com/api/trace/d/record?
@@ -2018,8 +2023,6 @@ $third-party,xmlhttprequest,domain=opensubtitles.org
 ||fp-it-acc.portal101.cn/deviceprofile/
 ||fraud.blockifyapp.com/s/api/block/update-time
 ||freecurrencyrates.com/statgif.
-||freedom.com^*/analytic/
-||freedom.com^*/analytics/
 ||freehostedscripts.net^*.php?site=*&s=*&h=$third-party
 ||frontend-logger.flippback.com/api/logging
 ||ftimg.net/js/log.js?
@@ -2205,6 +2208,7 @@ $third-party,xmlhttprequest,domain=opensubtitles.org
 ||jobvite.com/analytics.js
 ||jotform.io/getReferrer/$third-party
 ||js.cdn.applicationinsights.io/scripts/b/ai.3.gbl.min.js
+||js.ciphera.net/script.js
 ||js.dashfi.net/dashfinet-analytics.js
 ||js.eruptr.io/epd.js
 ||js.go2sdk.com/v2/tune.js
@@ -2668,6 +2672,7 @@ $third-party,xmlhttprequest,domain=opensubtitles.org
 ||sdk-service.nsureapi.com/events
 ||sdk.getlimy.ai/p/limy-analytics.min.js
 ||sdk.mrf.io/statics/marfeel-sdk.js
+||sdk.stackup-ai.com/collect
 ||searchcompletion.com/BannerHandler.ashx
 ||searchrys.com/dot.php
 ||searchunify.com/analytics/suanlytics.png
@@ -5883,6 +5888,7 @@ $third-party,xmlhttprequest,domain=opensubtitles.org
 /statcounter.asp
 /statcounter.js
 /statcountex/count.asp?
+/statify/v1/track|
 /statistic/pixel?
 /statistiche/stat.php$xmlhttprequest
 /statistics.js?$third-party
@@ -6005,6 +6011,7 @@ $third-party,xmlhttprequest,domain=opensubtitles.org
 /tag/tag.jsp?
 /tag?name=PageView$xmlhttprequest
 /tag?tags=
+/tag_path/profile/visit/*
 /taganalyticscnil.js
 /tagAnalyticscnil.php
 /tagCNIL.js
@@ -7247,12 +7254,14 @@ $third-party,xmlhttprequest,domain=mega4upload.net
 ||api.deepai.org/thrad-ad-proxy
 ||api.deepai.org/thrad-placement-proxy
 ||api.production.k8s.y3o.tv/nevarro/video-ads/$domain=yallo.tv
+||api.thefinancialexpress.com.bd/api/ads/
 ||apkcube.com/loader.js
 ||app.mps.vsnt.net/fetch/ext/load-rottentomatoes-web.js$domain=rottentomatoes.com
 ||appteka.store/api/banners?
 ||arbiscan.io/images/gen/*_StylusBlitz_Arbiscan_Ad.png
 ||armyrecognition.com/images/stories/customer/
 ||artdaily.cc/banners/
+||askai.glarity.app/img/ads/
 ||assets.hearstapps.com/moapt/moapt-hdm.latest.js
 ||assets.presearch.com/backgrounds/
 ||assets.systemrequirementslabs.net/srl/wwwroot/js/stake-takeover.js
@@ -7758,6 +7767,7 @@ $third-party,xmlhttprequest,domain=mega4upload.net
 ||s-opgg-kit.op.gg/gnb/config/*/lol.ads.json
 ||s.radioreference.com/sm/$image
 ||s.w-x.co/helios/twc/$script,domain=weather.com|wunderground.com
+||s.yimg.com/du/site/prddyyadcpnmcfay.js
 ||s.yimg.com/zh/mrr/$image,domain=mail.yahoo.com
 ||s3.amazonaws.com/runguides2/site_takeovers/$image,domain=runguides.com
 ||saabsunited.com/wp-content/uploads/*banner
@@ -8371,7 +8381,6 @@ _800x80_
 ||api-router.kaspersky-labs.com/logger2/metrics/
 ||api.audio.com/analytics/event
 ||api.channel.io/*/events
-||api.community.fox.com/*/metrics
 ||api.deepai.org/log_stat
 ||api.doodle.com/data-layer/track
 ||api.ffm.to/sl/e/$image
@@ -8658,7 +8667,7 @@ _800x80_
 ||dubz.co/analytics/
 ||dubz.live/analytics/
 ||duckduckgo.com/t/
-||duolingo.com/2017-06-30/tracking-status
+||duolingo.com/api/1/sync/batch
 ||e.used.ca/event
 ||e2ma.net/track/
 ||ebay.com/4xvLYt8n2y2Icbf2jCP_k_JP/
@@ -8697,9 +8706,7 @@ _800x80_
 ||eventhub.eu01.miro.com/api/stream
 ||eventhub.us01.miro.com/api/stream
 ||everywatch.com/ingest/
-||excess.duolingo.com/batch
 ||expedia.*/cl/
-||experiences.wyng.com/api/*/event-api/events
 ||experte.com/t/events
 ||exporntoons.net/api/stats?
 ||expressvpn.com/__px.gif?
@@ -8759,8 +8766,6 @@ _800x80_
 ||foxsports.com.au/akam/
 ||freedownloadmanager.org/ajax/th_hit.php
 ||freedownloadmanager.org/ajax/th_view.php
-||freepik.*/download.gif?
-||freepik.com/_ga?
 ||freeplayervideo.com/cdn-cgi/trace
 ||freeprivacypolicy.com/track/
 ||fsho.st/tracker.js
@@ -9433,6 +9438,7 @@ _800x80_
 ||strtapewithadblock.xyz/stat/
 ||strtpe.link/stat/
 ||stubhub.com/a/icph
+||stuff.co.nz/otel/
 ||stytch.com/sdk/v1/events
 ||suaurl.com/adblock/js/smarttag.js
 ||substrate.office.com/search/api/v1/events
@@ -9529,14 +9535,13 @@ _800x80_
 ||tradingview-widget.com/static/bundles/embed/snowplow-embed-widget-tracker.$script
 ||tradingview.com/ping
 ||traveloka.com/api/v1/tvlk/events
-||trip.com/bee/collect
-||trip.com/bf.gif?
 ||tripadvisor.*/BALinkImpressionTracking/
 ||tripadvisor.*/CookiePingback?
 ||tripadvisor.*/GARecord^
 ||tripadvisor.*/MetricsAjax
 ||tripadvisor.*/wm/record
 ||tripcdn.com/bee/collect$domain=trip.com
+||tripcdn.com/bf.gif
 ||trivago.com/tracking/
 ||trulia.com/track/trackingPixel.gif?
 ||trumba.com/et.aspx?
@@ -9658,6 +9663,7 @@ _800x80_
 ||wheregoes.com/api/event
 ||whistleout.com.au/track
 ||wikihow.com/x/collect?
+||wikily.gg/api/event
 ||wikimonde.com/matom.js
 ||wikipedia.org/beacon/
 ||wikipedia.org/ins-502b/v2/events
