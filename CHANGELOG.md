@@ -1,27 +1,13 @@
 # SparkyTube Changelog
 
-# v2.6
-
-## New Features
-
-- **InnerTubeX extractor**: Settings > Extraction > Extractor Method now has InnerTubeX, a pure Kotlin YouTube extractor (MetrolistGroup/innertubex). It runs inside the app with no extra process. If it fails, NewPipe takes over. It also replaces yt-dlp as the last-resort fallback (Settings > Extraction > InnerTubeX fallback, on by default)
-- **Lighter ad block list**: the ~54k blocked hosts are no longer loaded into memory. They sit in a small binary index (~430 KB) that C++ memory-maps, so only the pages a lookup touches are in RAM. The 1 MB text list is gone from the APK
-- **Block list updates without a new APK**: on app start a ~200 byte version.json is checked, and only a list that really changed is downloaded (sha256 checked, sanity checked, swapped in live). GitHub is the main source with jsDelivr as a mirror. Settings > Features > Better ad block list turns it off
-
-## Removed
-
-- **Python / yt-dlp (Chaquopy)**: the whole Python runtime is gone from the APK, which saves a lot of install size and 60 MB+ of RAM at runtime. People who had yt-dlp selected are moved to InnerTubeX automatically
-- The "yt-dlp fallback" switch (replaced by the InnerTubeX fallback)
-
-## Known Issues
-
-- InnerTubeX streams don't carry the client's request headers yet, and don't include the description, so chapters from the description only work on the NewPipe path
-- Not tested on a device yet, check Settings > Logs (lines tagged InnerTubeX) if a video doesn't start
-
 # v2.5
 
 ## New Features
 
+- **LazyLuno extractor (beta)**: our own C++ YouTube extractor, selectable in Settings > Extraction > Extractor Method. It tries the TV_EMBEDDED, TVHTML5, ANDROID and IOS clients in turn, and NewPipe takes over if it fails. It is a beta, and YouTube may ask for PO tokens it doesn't have yet
+- **InnerTubeX extractor** (experimental): Settings > Extraction > Extractor Method now has InnerTubeX, a pure Kotlin extractor (MetrolistGroup/innertubex). NewPipe stays the default. It needs a PO token for video, so it is mainly for testing; its fallback switch is off by default
+- **Lighter ad block list**: the ~54k blocked hosts are no longer loaded into memory. They sit in a small binary index (~430 KB) that C++ memory-maps, so only the pages a lookup touches are in RAM. The 1 MB text list is gone from the APK
+- **Block list updates without a new APK**: on app start a ~200 byte version.json is checked, and only a list that really changed is downloaded (sha256 checked, swapped in live). GitHub is the main source with jsDelivr as a mirror. Settings > Features > Better ad block list turns it off
 - **Glassy mini-player**: the mini player is now a rounded glass bar docked above the bottom bar, with the video, title, play/pause and close. Tap it or swipe it up to open the full player
 - **Sleep timer**: menu (⋮) > Sleep timer. Slide to pick 5 to 120 minutes and press Start, or choose end of the video. It shows the time left and can be turned off from the same sheet
 - **Mix panel on normal videos**: when YouTube has a Mix for the video you are watching, the Mix list now shows under the player, just like on the YouTube site. Tap an item to carry on inside that Mix
@@ -35,8 +21,13 @@
 - **Ambient mode (live)**: the glow around the video now follows the real frames of the video that is playing, not a still colour. Player menu (gear) > Ambient mode, with Strength, Spread, Blur, Saturation, Update rate and Smooth frames. Black bars are detected and cut out. The frame work is done natively (C++). Idea and approach from the MIT licensed Ambient light for YouTube extension, credited in THIRD_PARTY_NOTICES.md
 - **Multiple accounts**: tap your picture on Home to open the Accounts sheet. Add as many YouTube accounts as you want, tap one to switch (Home, Subscriptions, Library and history follow the account you pick), or remove one with the X. Add account opens Google's own account chooser, so an account already on the phone is one tap, and "Use another account" adds a new one. Backing out keeps your current account
 
+## Removed
+
+- **Python / yt-dlp (Chaquopy)**: the whole Python runtime is gone from the APK, saving a lot of install size and 60 MB+ of RAM. Anyone who had yt-dlp selected goes back to NewPipe
+
 ## Fixes
 
+- **Ambient light flicker**: the smooth mode used to draw the old and new frame on top of each other, which made the glow pulse every frame. Frames are now averaged over time instead, and the black-bar crop moves slowly, so scene cuts fade smoothly
 - Videos you already liked now show as Liked, and channels you already subscribed to show as Subscribed on the watch page
 
 # v2.4
