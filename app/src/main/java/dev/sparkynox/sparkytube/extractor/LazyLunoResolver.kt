@@ -118,7 +118,7 @@ object LazyLunoResolver {
     }
 
     /** LazyLuno first, the normal NewPipe chain if it comes back empty. Blocking. */
-    fun resolveWithFallback(ctx: Context, videoId: String): StreamExtractor.ResolvedStream? {
+    suspend fun resolveWithFallback(ctx: Context, videoId: String): StreamExtractor.ResolvedStream? {
         StreamExtractor.cached(videoId)?.let { return it }
         val t0 = android.os.SystemClock.elapsedRealtime()
         val own = resolve(ctx, videoId)
