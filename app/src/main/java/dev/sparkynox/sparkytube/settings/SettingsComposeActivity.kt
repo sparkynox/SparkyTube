@@ -159,6 +159,9 @@ class SettingsComposeActivity : AppCompatActivity() {
                         }),
                 toggle("sponsorblock", "SponsorBlock", "skip", "Auto-skip sponsor segments, self-promo, interaction reminders",
                         { p.isSponsorBlockEnabled(this) }, { p.setSponsorBlockEnabled(this, it) }),
+                toggle("ryd", "Return YouTube Dislike", "zap",
+                        "Shows like and dislike counts on the watch screen (video id is sent to returnyoutubedislikeapi.com)",
+                        { p.isDislikeCountEnabled(this) }, { p.setDislikeCountEnabled(this, it) }),
                 toggle("anime", "Anime streaming", "film", "Crunchyroll wrapper, reachable from the overflow menu",
                         { p.isAnimeStreamingEnabled(this) }, { p.setAnimeStreamingEnabled(this, it) })
             )),
