@@ -3453,6 +3453,11 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 StreamExtractor.resolvePlayableUrl(videoId) // old setting, local servers are gone
             dev.sparkynox.sparkytube.settings.SettingsPrefs.ExtractorMethod.NEWPIPE ->
                 StreamExtractor.resolvePlayableUrl(videoId)
+            dev.sparkynox.sparkytube.settings.SettingsPrefs.ExtractorMethod.LAZYLUNO -> {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    dev.sparkynox.sparkytube.extractor.LazyLunoResolver.resolveWithFallback(this@MainActivity, videoId)
+                }
+            }
             dev.sparkynox.sparkytube.settings.SettingsPrefs.ExtractorMethod.INNERTUBEX -> {
                 // InnerTubeX first, the normal NewPipe chain takes over if it comes back empty
                 val hit = StreamExtractor.cached(videoId)
@@ -3636,6 +3641,18 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         // If InnerTubeX is the explicitly-selected Extractor Method, show its actual
         // error instead of the generic message
         val method = dev.sparkynox.sparkytube.settings.SettingsPrefs.getExtractorMethod(this)
+        if (method == dev.sparkynox.sparkytube.settings.SettingsPrefs.ExtractorMethod.LAZYLUNO) {
+            AlertDialog.Builder(this)
+                .setTitle("LazyLuno couldn't play this video")
+                .setMessage(dev.sparkynox.sparkytube.extractor.LazyLunoResolver.lastErrorMessage
+                    ?: "LazyLuno failed with no specific error message.")
+                .setPositiveButton("OK", null)
+                .setNeutralButton("Check Logs") { _, _ ->
+                    startActivity(Intent(this, dev.sparkynox.sparkytube.logs.LogsActivity::class.java))
+                }
+                .show()
+            return
+        }
         if (method == dev.sparkynox.sparkytube.settings.SettingsPrefs.ExtractorMethod.INNERTUBEX) {
             val error = dev.sparkynox.sparkytube.extractor.InnerTubeXResolver.lastErrorMessage
             AlertDialog.Builder(this)
