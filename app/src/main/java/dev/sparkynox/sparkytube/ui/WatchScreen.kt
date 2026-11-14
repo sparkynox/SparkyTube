@@ -15,6 +15,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
@@ -199,7 +200,7 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     val vid = nav.watchId
-                    val likeBtn: @Composable (String, Boolean, () -> Unit) -> Unit = { label, on, click ->
+                    val likeBtn: @Composable (String, Boolean, Int, () -> Unit) -> Unit = { label, on, iconRes, click ->
                         androidx.compose.animation.AnimatedContent(
                             targetState = on,
                             transitionSpec = {
@@ -209,10 +210,10 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
                             },
                             label = "react-$label",
                         ) { isOn ->
-                            if (isOn) Button(onClick = click) { Text(label) } else FilledTonalButton(onClick = click) { Text(label) }
+                            if (isOn) Button(onClick = click) { ActionContent(iconRes, label) } else FilledTonalButton(onClick = click) { ActionContent(iconRes, label) }
                         }
                     }
-                    likeBtn("Like" + (votes?.let { " · " + ReturnYouTubeDislike.compact(it.likes) } ?: ""), reaction == 1) {
+                    likeBtn("Like" + (votes?.let { " · " + ReturnYouTubeDislike.compact(it.likes) } ?: ""), reaction == 1, dev.sparkynox.sparkytube.R.drawable.ic_thumb_up) {
                         if (vid != null && !needLogin()) {
                             val prev = reaction
                             reaction = if (prev == 1) 0 else 1
@@ -222,7 +223,7 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
                             }
                         }
                     }
-                    likeBtn("Dislike" + (votes?.let { " · " + ReturnYouTubeDislike.compact(it.dislikes) } ?: ""), reaction == 2) {
+                    likeBtn("Dislike" + (votes?.let { " · " + ReturnYouTubeDislike.compact(it.dislikes) } ?: ""), reaction == 2, dev.sparkynox.sparkytube.R.drawable.ic_thumb_down) {
                         if (vid != null && !needLogin()) {
                             val prev = reaction
                             reaction = if (prev == 2) 0 else 2
@@ -238,7 +239,7 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
                                 .putExtra(Intent.EXTRA_TEXT, "https://youtu.be/$vid")
                             ctx.startActivity(Intent.createChooser(send, "Share").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                         }
-                    }) { Text("Share") }
+                    }) { ActionContent(dev.sparkynox.sparkytube.R.drawable.ic_share, "Share") }
                     FilledTonalButton(onClick = {
                         if (vid != null) openMenu(
                             dev.sparkynox.sparkytube.homefeed.HomeFeedItem(
@@ -251,7 +252,7 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
                                 channelId = info?.channelId,
                             )
                         )
-                    }) { Text("More") }
+                    }) { ActionContent(dev.sparkynox.sparkytube.R.drawable.ic_more, "More") }
                 }
             }
 
@@ -365,4 +366,15 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
         }
         }
     }
+}
+
+// icon + label inside the action buttons under the player
+@Composable
+private fun ActionContent(iconRes: Int, label: String) {
+    androidx.compose.material3.Icon(
+        androidx.compose.ui.res.painterResource(iconRes), contentDescription = null,
+        modifier = Modifier.size(18.dp),
+    )
+    androidx.compose.foundation.layout.Spacer(Modifier.width(8.dp))
+    Text(label)
 }
