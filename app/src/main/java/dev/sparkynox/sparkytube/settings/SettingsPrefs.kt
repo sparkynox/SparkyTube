@@ -261,7 +261,7 @@ object SettingsPrefs {
      * predictable behavior (e.g. always use the phone's local server, or
      * always use NewPipe because the local server isn't running).
      */
-    enum class ExtractorMethod { AUTO, LOCAL_SERVER, NEWPIPE, INNERTUBEX }
+    enum class ExtractorMethod { AUTO, LOCAL_SERVER, NEWPIPE, INNERTUBEX, LAZYLUNO }
 
     fun getExtractorMethod(context: Context): ExtractorMethod {
         val stored = prefs(context).getString(KEY_EXTRACTOR_METHOD, ExtractorMethod.NEWPIPE.name)
