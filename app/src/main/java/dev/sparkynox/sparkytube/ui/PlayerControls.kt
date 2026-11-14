@@ -177,16 +177,33 @@ fun PlayerControls(h: PlayerControlsHost) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(clock(shown.toLong()), color = Color.White, style = MaterialTheme.typography.labelMedium)
-            Slider(
-                value = shown.coerceIn(0f, duration.coerceAtLeast(1L).toFloat()),
-                onValueChange = { vis.poke(); dragging = true; dragValue = it },
-                onValueChangeFinished = {
-                    c?.seekTo(dragValue.toLong())
-                    dragging = false
-                },
-                valueRange = 0f..duration.coerceAtLeast(1L).toFloat(),
-                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
-            )
+            Box(Modifier.weight(1f).padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
+                Slider(
+                    value = shown.coerceIn(0f, duration.coerceAtLeast(1L).toFloat()),
+                    onValueChange = { vis.poke(); dragging = true; dragValue = it },
+                    onValueChangeFinished = {
+                        c?.seekTo(dragValue.toLong())
+                        dragging = false
+                    },
+                    valueRange = 0f..duration.coerceAtLeast(1L).toFloat(),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                // SponsorBlock segments as coloured marks on the track (10dp = the slider thumb radius)
+                val segs = dev.sparkynox.sparkytube.sponsorblock.SponsorBlockManager.shown
+                if (duration > 0 && segs.isNotEmpty()) {
+                    androidx.compose.foundation.Canvas(Modifier.fillMaxWidth().height(4.dp).padding(horizontal = 10.dp)) {
+                        for (sg in segs) {
+                            val x0 = (sg.startSeconds * 1000 / duration).toFloat().coerceIn(0f, 1f) * size.width
+                            val x1 = (sg.endSeconds * 1000 / duration).toFloat().coerceIn(0f, 1f) * size.width
+                            drawRect(
+                                color = Color(sg.category.color),
+                                topLeft = androidx.compose.ui.geometry.Offset(x0, 0f),
+                                size = androidx.compose.ui.geometry.Size(kotlin.math.max(x1 - x0, 3f), size.height),
+                            )
+                        }
+                    }
+                }
+            }
             Text(clock(duration), color = Color.White, style = MaterialTheme.typography.labelMedium)
             RoundButton(onClick = poke(h.onSpeed), modifier = Modifier.padding(start = 8.dp), wide = true) {
                 Text(h.speedLabel(), color = Color.White, style = MaterialTheme.typography.labelLarge)
