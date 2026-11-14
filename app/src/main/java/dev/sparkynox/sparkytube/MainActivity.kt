@@ -3510,6 +3510,11 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             exitMiniPlayerMode()
         }
 
+        // every way of starting a video ends up here, so this is the one place that fetches the
+        // SponsorBlock segments (they used to be fetched only from the old WebView bridge path,
+        // which feed taps, autoplay and the Compose screens never go through)
+        if (sponsorSegmentsFetchedForVideoId != videoId) fetchSponsorSegmentsForCurrentVideo(videoId)
+
         isResolving = true
         binding.loadingSpinner.visibility = if (composeNav()) View.GONE else View.VISIBLE
         // Snapshot the generation for THIS call -- if resolveGeneration
@@ -3718,6 +3723,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
      */
     private fun fetchSponsorSegmentsForCurrentVideo(videoId: String) {
         sponsorSegments = emptyList()
+        dev.sparkynox.sparkytube.sponsorblock.SponsorBlockManager.shown = emptyList()
         lastSkippedSegmentEnd = -1.0
         sponsorSegmentsFetchedForVideoId = videoId
 
@@ -3731,6 +3737,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 // already moved to a different video.
                 if (sponsorSegmentsFetchedForVideoId == videoId) {
                     sponsorSegments = segments
+                    dev.sparkynox.sparkytube.sponsorblock.SponsorBlockManager.shown = segments
                 }
             }
         }
