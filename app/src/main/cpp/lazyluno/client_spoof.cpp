@@ -38,9 +38,9 @@ ClientProfile getClientProfile(ClientType type) {
 
     // ── ANDROID ──────────────────────────────────────────────────────────────
     // No po_token required. Full adaptive formats. Use as primary non-auth fallback.
-    case ClientType::ANDROID:
+    case ClientType::ANDROID_APP:
         return {
-            .type             = ClientType::ANDROID,
+            .type             = ClientType::ANDROID_APP,
             .clientName       = "ANDROID",
             .clientVersion    = "21.26.364",   // FILL: check yt-dlp _base.py for latest
             .clientId         = "3",

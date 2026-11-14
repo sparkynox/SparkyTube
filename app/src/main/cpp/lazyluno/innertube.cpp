@@ -110,7 +110,7 @@ std::string playerRequest(const std::string& videoId, const SpoofConfig& spoof, 
         if (!r.empty()) return r;
     }
     if (spoof.appendAuthFallback && auth && auth->hasAuth()) {
-        for (auto t : {ClientType::ANDROID, ClientType::TV_EMBEDDED, ClientType::WEB}) {
+        for (auto t : {ClientType::ANDROID_APP, ClientType::TV_EMBEDDED, ClientType::WEB}) {
             auto r = tryClient(t, true);
             if (!r.empty()) return r;
         }
