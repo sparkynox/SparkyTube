@@ -29,3 +29,20 @@ target_compile_options(sparkynet PRIVATE -O3 -Wall
 # 16 KB page size, needed for newer devices
 target_link_options(sparkynet PRIVATE -Wl,-z,max-page-size=16384)
 target_link_libraries(sparkynet ${log-lib} ${jnigraphics-lib})
+
+# LazyLuno, the C++ YouTube extractor (beta). own library because the rest of the app code builds with
+# -fno-exceptions and LazyLuno throws
+add_library(lazyluno SHARED
+    lazyluno/lazyluno_jni.cpp
+    lazyluno/extractor.cpp
+    lazyluno/innertube.cpp
+    lazyluno/stream_parser.cpp
+    lazyluno/client_spoof.cpp
+    lazyluno/cipher.cpp
+    lazyluno/url_utils.cpp
+    lazyluno/auth.cpp
+    lazyluno/http.cpp)
+target_include_directories(lazyluno PRIVATE lazyluno/include third_party)
+target_compile_options(lazyluno PRIVATE -O2 -Wall -Wno-c++20-designator)
+target_link_options(lazyluno PRIVATE -Wl,-z,max-page-size=16384)
+target_link_libraries(lazyluno ${log-lib})
