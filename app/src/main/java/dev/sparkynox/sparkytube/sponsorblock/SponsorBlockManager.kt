@@ -1,5 +1,10 @@
 package dev.sparkynox.sparkytube.sponsorblock
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import dev.sparkynox.sparkytube.logs.LogRecorder
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
@@ -22,18 +27,21 @@ import java.util.concurrent.TimeUnit
  */
 object SponsorBlockManager {
 
-    enum class Category(val apiName: String, val label: String) {
-        SPONSOR("sponsor", "Sponsor"),
-        SELFPROMO("selfpromo", "Self-promo"),
-        INTERACTION("interaction", "Interaction reminder"),
-        INTRO("intro", "Intermission/intro"),
-        OUTRO("outro", "Endcards/credits"),
-        PREVIEW("preview", "Preview/recap"),
-        FILLER("filler", "Filler tangent"),
-        MUSIC_OFFTOPIC("music_offtopic", "Non-music section")
+    enum class Category(val apiName: String, val label: String, val color: Long) {
+        SPONSOR("sponsor", "Sponsor", 0xFF00D400),
+        SELFPROMO("selfpromo", "Self-promo", 0xFFFFFF00),
+        INTERACTION("interaction", "Interaction reminder", 0xFFCC00FF),
+        INTRO("intro", "Intermission/intro", 0xFF00FFFF),
+        OUTRO("outro", "Endcards/credits", 0xFF0202ED),
+        PREVIEW("preview", "Preview/recap", 0xFF008FD6),
+        FILLER("filler", "Filler tangent", 0xFF7300FF),
+        MUSIC_OFFTOPIC("music_offtopic", "Non-music section", 0xFFFF9900)
     }
 
     data class Segment(val category: Category, val startSeconds: Double, val endSeconds: Double)
+
+    // what the seek bar draws for the current video (set by MainActivity, read by PlayerControls)
+    var shown by mutableStateOf<List<Segment>>(emptyList())
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(6, TimeUnit.SECONDS)
@@ -56,7 +64,9 @@ object SponsorBlockManager {
             val hash = sha256Hex(videoId)
             val hashPrefix = hash.substring(0, 4)
             val categoriesParam = enabledCategories.joinToString(",", prefix = "[", postfix = "]") { "\"${it.apiName}\"" }
-            val url = "$API_BASE/skipSegments/$hashPrefix?categories=$categoriesParam"
+            val url = "$API_BASE/skipSegments/$hashPrefix".toHttpUrl().newBuilder()
+                .addQueryParameter("categories", categoriesParam)
+                .build()
 
             val request = Request.Builder()
                 .url(url)
@@ -64,11 +74,18 @@ object SponsorBlockManager {
                 .build()
 
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return emptyList()
+                // 404 just means nobody submitted segments for any video with this hash prefix
+                if (!response.isSuccessful) {
+                    LogRecorder.i("SponsorBlock", "no segments for $videoId (HTTP ${response.code})")
+                    return emptyList()
+                }
                 val body = response.body?.string() ?: return emptyList()
-                parseHashPrefixResponse(body, videoId)
+                val list = parseHashPrefixResponse(body, videoId)
+                LogRecorder.i("SponsorBlock", "$videoId: ${list.size} segments ${list.joinToString { it.category.apiName }}")
+                list
             }
         } catch (e: Exception) {
+            LogRecorder.w("SponsorBlock", "fetch failed for $videoId: ${e.javaClass.simpleName} ${e.message}")
             emptyList()
         }
     }
