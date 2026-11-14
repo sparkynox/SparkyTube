@@ -53,3 +53,7 @@
 -keepclassmembers class dev.sparkynox.sparkytube.extractor.BotGuardTokenProvider$Bridge {
     @android.webkit.JavascriptInterface <methods>;
 }
+
+## LazyLuno: liblazyluno.so calls LazyLunoNet.request by name and implements LazyLuno.nativeResolve
+-keep class dev.sparkynox.sparkytube.extractor.LazyLunoNet { *; }
+-keep class dev.sparkynox.sparkytube.extractor.LazyLuno { *; }
