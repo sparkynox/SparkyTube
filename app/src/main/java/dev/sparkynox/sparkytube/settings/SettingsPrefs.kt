@@ -40,6 +40,7 @@ object SettingsPrefs {
     private const val KEY_LOCAL_SERVER_ENABLED = "local_server_enabled"
     private const val KEY_LOCAL_SERVER_API_KEY = "local_server_api_key"
     private const val KEY_PIPED_FALLBACK_ENABLED = "piped_fallback_enabled"
+    private const val KEY_RYD_ENABLED = "ryd_enabled"
     private const val KEY_ITX_FALLBACK_ENABLED = "innertubex_fallback_enabled"
     private const val KEY_BLOCKLIST_AUTO_UPDATE = "blocklist_auto_update"
     private const val KEY_THEME_MODE = "theme_mode"
@@ -264,8 +265,8 @@ object SettingsPrefs {
 
     fun getExtractorMethod(context: Context): ExtractorMethod {
         val stored = prefs(context).getString(KEY_EXTRACTOR_METHOD, ExtractorMethod.NEWPIPE.name)
-            // yt-dlp is gone, people who had it selected get its replacement
-            .let { if (it == "YT_DLP") ExtractorMethod.INNERTUBEX.name else it }
+            // yt-dlp is gone, people who had it selected go back to NewPipe
+            .let { if (it == "YT_DLP") ExtractorMethod.NEWPIPE.name else it }
         return try {
             ExtractorMethod.valueOf(stored ?: ExtractorMethod.NEWPIPE.name)
         } catch (e: IllegalArgumentException) {
@@ -339,10 +340,9 @@ object SettingsPrefs {
         prefs(context).edit().putBoolean(KEY_PIPED_FALLBACK_ENABLED, enabled).apply()
     }
 
-    // InnerTubeX as the last link of the NewPipe chain. On by default: it's pure Kotlin,
-    // so unlike the old yt-dlp setup it costs no extra APK size or memory
+    // InnerTubeX as the last link of the NewPipe chain. OFF by default (needs a PO token, experimental)
     fun isInnerTubeXFallbackEnabled(context: Context) =
-        prefs(context).getBoolean(KEY_ITX_FALLBACK_ENABLED, true)
+        prefs(context).getBoolean(KEY_ITX_FALLBACK_ENABLED, false)
 
     fun setInnerTubeXFallbackEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_ITX_FALLBACK_ENABLED, enabled).apply()
@@ -455,6 +455,14 @@ object SettingsPrefs {
 
     fun setSponsorBlockEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_SPONSORBLOCK_ENABLED, enabled).apply()
+    }
+
+    // Return YouTube Dislike counts on the watch screen (sends the video id to returnyoutubedislikeapi.com)
+    fun isDislikeCountEnabled(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_RYD_ENABLED, true)
+
+    fun setDislikeCountEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_RYD_ENABLED, enabled).apply()
     }
 
     fun getSponsorBlockCategories(context: Context): Set<dev.sparkynox.sparkytube.sponsorblock.SponsorBlockManager.Category> {
