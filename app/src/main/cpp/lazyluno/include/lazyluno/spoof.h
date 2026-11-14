@@ -10,7 +10,7 @@
 namespace lazyluno {
 
 enum class ClientType {
-    WEB, ANDROID, IOS, TVHTML5, TV_EMBEDDED, TVHTML5_SIMPLY, MWEB, VISIONOS, WEB_CREATOR,
+    WEB, ANDROID_APP, IOS, TVHTML5, TV_EMBEDDED, TVHTML5_SIMPLY, MWEB, VISIONOS, WEB_CREATOR,
 };
 
 // field order matters, client_spoof.cpp uses designated initializers
@@ -41,14 +41,14 @@ struct SpoofConfig {
 
     static SpoofConfig defaultConfig() {
         SpoofConfig c;
-        c.clientOrder = {ClientType::TV_EMBEDDED, ClientType::TVHTML5, ClientType::ANDROID, ClientType::IOS};
+        c.clientOrder = {ClientType::TV_EMBEDDED, ClientType::TVHTML5, ClientType::ANDROID_APP, ClientType::IOS};
         return c;
     }
     // same list, age bypass first and kept first
     static SpoofConfig ageBypassConfig() {
         SpoofConfig c;
         c.clientOrder = {ClientType::TV_EMBEDDED, ClientType::TVHTML5_SIMPLY, ClientType::TVHTML5,
-                         ClientType::ANDROID, ClientType::IOS};
+                         ClientType::ANDROID_APP, ClientType::IOS};
         return c;
     }
 };
