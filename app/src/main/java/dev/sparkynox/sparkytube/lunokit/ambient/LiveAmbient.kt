@@ -1,14 +1,9 @@
 package dev.sparkynox.sparkytube.lunokit.ambient
 
 import android.os.Build
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
@@ -27,16 +22,6 @@ import kotlin.math.pow
 fun LiveAmbient(modifier: Modifier = Modifier) {
     if (!AmbientPrefs.enabled) return
     val cur = AmbientSampler.cur ?: return
-    val prev = AmbientSampler.prev
-    val blend = remember { Animatable(1f) }
-    val frameMs = 1000 / AmbientPrefs.fps.coerceIn(4, 30)
-    val smooth = AmbientPrefs.smooth
-    LaunchedEffect(cur) {
-        if (smooth) {
-            blend.snapTo(0f)
-            blend.animateTo(1f, tween(frameMs, easing = LinearEasing))
-        } else blend.snapTo(1f)
-    }
 
     val spread = AmbientPrefs.spreadDp.dp
     // the whole page, not just a strip under the player
@@ -58,7 +43,6 @@ fun LiveAmbient(modifier: Modifier = Modifier) {
         val spreadPx = spread.toPx()
         val levels = (AmbientPrefs.spreadDp / 34).coerceIn(6, 18)
         val strength = AmbientPrefs.strength / 100f * 0.9f
-        val t = blend.value
 
         fun layer(frame: AmbientSampler.Frame, i: Int, alpha: Float) {
             if (alpha <= 0f) return
@@ -80,8 +64,7 @@ fun LiveAmbient(modifier: Modifier = Modifier) {
         // outermost first, so the strongest layer ends up on top and the glow fades outwards
         for (i in levels downTo 1) {
             val a = strength * (1f - (i - 1f) / levels).pow(1.8f)
-            if (t < 1f && prev != null) layer(prev, i, a)
-            layer(cur, i, if (t < 1f && prev != null) a * t else a)
+            layer(cur, i, a)
         }
     }
 }
