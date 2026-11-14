@@ -73,6 +73,12 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
     LaunchedEffect(nav.watchId) { LunoGlass.refresh(ctx) }
     // 0 none, 1 liked, 2 disliked, read from the watch page once it has loaded
     var reaction by remember(nav.watchId, info?.likeStatus) { mutableStateOf(info?.likeStatus ?: 0) }
+    val rydOn = remember { dev.sparkynox.sparkytube.settings.SettingsPrefs.isDislikeCountEnabled(ctx) }
+    var votes by remember(nav.watchId) { mutableStateOf<ReturnYouTubeDislike.Votes?>(null) }
+    LaunchedEffect(nav.watchId) {
+        val id = nav.watchId
+        if (rydOn && id != null) votes = ReturnYouTubeDislike.get(id)
+    }
     // the subscriptions list is the fallback when the watch page doesn't say
     LaunchedEffect(nav.watchId) { if (Session.loggedIn) nav.loadSubChannels() }
     val inSubList = info?.channelId?.let { id -> nav.subChannels.any { it.id == id } } ?: false
@@ -206,7 +212,7 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
                             if (isOn) Button(onClick = click) { Text(label) } else FilledTonalButton(onClick = click) { Text(label) }
                         }
                     }
-                    likeBtn("Like", reaction == 1) {
+                    likeBtn("Like" + (votes?.let { " · " + ReturnYouTubeDislike.compact(it.likes) } ?: ""), reaction == 1) {
                         if (vid != null && !needLogin()) {
                             val prev = reaction
                             reaction = if (prev == 1) 0 else 1
@@ -216,7 +222,7 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
                             }
                         }
                     }
-                    likeBtn("Dislike", reaction == 2) {
+                    likeBtn("Dislike" + (votes?.let { " · " + ReturnYouTubeDislike.compact(it.dislikes) } ?: ""), reaction == 2) {
                         if (vid != null && !needLogin()) {
                             val prev = reaction
                             reaction = if (prev == 2) 0 else 2
