@@ -23,6 +23,7 @@ struct ExtractorConfig {
     bool        fetchPlayerJs     = true;   // only needed when a stream comes back with signatureCipher
     std::string hl                = "en";
     std::string gl                = "US";
+    std::string visitorData;               // set by the host, a PO token is bound to it
 };
 
 class Extractor {
