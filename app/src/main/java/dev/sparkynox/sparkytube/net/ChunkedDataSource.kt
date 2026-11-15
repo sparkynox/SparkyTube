@@ -29,7 +29,9 @@ class ChunkedDataSource(private val upstream: DataSource) : DataSource {
     }
 
     override fun open(dataSpec: DataSpec): Long {
+        val dataSpec = withClientUa(dataSpec)
         spec = dataSpec
+        counter = 0
         val uri = dataSpec.uri
         val total = uri.getQueryParameter("clen")?.toLongOrNull()
         if (!shouldChunk(uri) || total == null || total <= 0) {
@@ -54,7 +56,32 @@ class ChunkedDataSource(private val upstream: DataSource) : DataSource {
         return true
     }
 
-    private fun chunkSize(): Long = if (counter == 0) FIRST_CHUNK else CHUNK
+    // starts tiny so the first bytes show up right away, then grows. every seek starts the ramp again
+    private fun chunkSize(): Long = when (counter) {
+        0 -> 32L * 1024
+        1 -> 64L * 1024
+        2 -> 128L * 1024
+        3 -> 256L * 1024
+        4 -> 512L * 1024
+        5 -> 1024L * 1024
+        else -> CHUNK
+    }
+
+    // googlevideo ties a url to the client that asked for it (c=ANDROID, c=IOS ...), so the UA has to match
+    private fun withClientUa(s: DataSpec): DataSpec {
+        val c = s.uri.getQueryParameter("c") ?: return s
+        val host = s.uri.host ?: return s
+        if (!host.endsWith("googlevideo.com")) return s
+        val ua = when (c) {
+            "ANDROID" -> "com.google.android.youtube/21.26.364 (Linux; U; Android 11) gzip"
+            "IOS" -> "com.google.ios.youtube/21.26.4 (iPhone16,2; U; CPU iOS 18_3_2 like Mac OS X;)"
+            "TVHTML5", "TVHTML5_SIMPLY_EMBEDDED_PLAYER", "TVHTML5_SIMPLY" ->
+                "Mozilla/5.0 (SMART-TV; LINUX; Tizen 6.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/6.0 TV Safari/538.1"
+            else -> return s
+        }
+        if (s.httpRequestHeaders.keys.any { it.equals("User-Agent", ignoreCase = true) }) return s
+        return s.buildUpon().setHttpRequestHeaders(s.httpRequestHeaders + ("User-Agent" to ua)).build()
+    }
 
     private fun openChunk() {
         val s = spec ?: throw IOException("not opened")
@@ -105,7 +132,6 @@ class ChunkedDataSource(private val upstream: DataSource) : DataSource {
     }
 
     private companion object {
-        const val FIRST_CHUNK = 512L * 1024
         const val CHUNK = 2L * 1024 * 1024
     }
 }
