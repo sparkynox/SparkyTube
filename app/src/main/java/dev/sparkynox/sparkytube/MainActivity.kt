@@ -3642,14 +3642,25 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     private fun startQualityUpgrade(videoId: String, first: StreamExtractor.ResolvedStream) {
         val startLabel = currentQualityLabel
         lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            val better = dev.sparkynox.sparkytube.extractor.LazyLunoResolver.upgrade(this@MainActivity, videoId, first)
-                ?: return@launch
-            StreamExtractor.cacheResolved(videoId, better)
+            var better = dev.sparkynox.sparkytube.extractor.LazyLunoResolver.upgrade(this@MainActivity, videoId, first)
+            if (better == null) {
+                // the other LazyLuno clients had nothing (they need a PO token), NewPipe usually has the full ladder
+                val t0 = android.os.SystemClock.elapsedRealtime()
+                val np = StreamExtractor.resolveFresh(videoId)
+                val firstBest = first.availableQualities.maxOfOrNull { it.resolutionValue } ?: 0
+                val npBest = np?.availableQualities?.maxOfOrNull { it.resolutionValue } ?: 0
+                dev.sparkynox.sparkytube.logs.LogRecorder.i(
+                    "LazyLuno", "NewPipe upgrade in ${android.os.SystemClock.elapsedRealtime() - t0} ms: ${firstBest}p -> ${npBest}p"
+                )
+                if (np != null && npBest > firstBest) better = np
+            }
+            val upgraded = better ?: return@launch
+            StreamExtractor.cacheResolved(videoId, upgraded)
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                 if (lastResolvedVideoId != videoId || !isNativePlaybackActive) return@withContext
-                currentQualities = better.availableQualities
+                currentQualities = upgraded.availableQualities
                 topQuality = currentQualities.size > 1
-                if (better.downloadAudios.isNotEmpty()) currentDownloadAudios = better.downloadAudios
+                if (upgraded.downloadAudios.isNotEmpty()) currentDownloadAudios = upgraded.downloadAudios
                 if (currentQualityLabel != startLabel) return@withContext // they chose one already
                 val wanted = StreamExtractor.preferredQualityTarget()
                 val idx = currentQualities.indices.minByOrNull { kotlin.math.abs(currentQualities[it].resolutionValue - wanted) }
