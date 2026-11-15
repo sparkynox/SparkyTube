@@ -3621,6 +3621,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 android.widget.Toast.makeText(this@MainActivity, "Resumed from where you left off", android.widget.Toast.LENGTH_SHORT).show()
             }
             applyChapters(resolved.description, resolved.durationSeconds * 1000)
+            if (resolved.partial) startQualityUpgrade(videoId, resolved)
             binding.exoPlayerView.visibility = View.VISIBLE
             isNativePlaybackActive = true
             prefetchedForVideoId = null
@@ -3632,6 +3633,30 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             // a new video starts with the controls shown (they may have auto-hidden on the last one)
             dev.sparkynox.sparkytube.ui.PlayerControlsVisibility.poke()
             binding.exoPlayerView.visibility = View.VISIBLE
+        }
+    }
+
+    // LazyLuno gave a quick first answer (usually only 360p). the other clients are asked in the background and
+    // when better qualities turn up they go into the picker, and playback moves up to the wanted one
+    // if the person hasn't picked a quality themselves in the meantime
+    private fun startQualityUpgrade(videoId: String, first: StreamExtractor.ResolvedStream) {
+        val startLabel = currentQualityLabel
+        lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val better = dev.sparkynox.sparkytube.extractor.LazyLunoResolver.upgrade(this@MainActivity, videoId, first)
+                ?: return@launch
+            StreamExtractor.cacheResolved(videoId, better)
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                if (lastResolvedVideoId != videoId || !isNativePlaybackActive) return@withContext
+                currentQualities = better.availableQualities
+                topQuality = currentQualities.size > 1
+                if (better.downloadAudios.isNotEmpty()) currentDownloadAudios = better.downloadAudios
+                if (currentQualityLabel != startLabel) return@withContext // they chose one already
+                val wanted = StreamExtractor.preferredQualityTarget()
+                val idx = currentQualities.indices.minByOrNull { kotlin.math.abs(currentQualities[it].resolutionValue - wanted) }
+                    ?: return@withContext
+                val playingHeight = first.availableQualities.firstOrNull { it.label == startLabel }?.resolutionValue ?: 0
+                if (currentQualities[idx].resolutionValue > playingHeight) applyQuality(idx)
+            }
         }
     }
 
