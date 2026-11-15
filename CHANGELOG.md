@@ -4,7 +4,7 @@
 
 ## New Features
 
-- **LazyLuno extractor (beta)**: our own C++ YouTube extractor, selectable in Settings > Extraction > Extractor Method. It tries the TV_EMBEDDED, TVHTML5, ANDROID and IOS clients in turn, and NewPipe takes over if it fails. It is a beta, and YouTube may ask for PO tokens it doesn't have yet
+- **LazyLuno extractor (beta)**: our own C++ YouTube extractor, selectable in Settings > Extraction > Extractor Method. It tries the TV_EMBEDDED, TVHTML5, ANDROID and IOS clients in turn, and NewPipe takes over if it fails. It is a beta, and YouTube may ask for PO tokens it doesn't have yet. Playback starts from the fast first answer (ANDROID client), the other clients are asked in the background, and when better qualities turn up they appear in the picker and playback moves up to your default quality
 - **InnerTubeX extractor** (experimental): Settings > Extraction > Extractor Method now has InnerTubeX, a pure Kotlin extractor (MetrolistGroup/innertubex). NewPipe stays the default. It needs a PO token for video, so it is mainly for testing; its fallback switch is off by default
 - **Lighter ad block list**: the ~54k blocked hosts are no longer loaded into memory. They sit in a small binary index (~430 KB) that C++ memory-maps, so only the pages a lookup touches are in RAM. The 1 MB text list is gone from the APK
 - **Block list updates without a new APK**: on app start a ~200 byte version.json is checked, and only a list that really changed is downloaded (sha256 checked, swapped in live). GitHub is the main source with jsDelivr as a mirror. Settings > Features > Better ad block list turns it off
@@ -27,6 +27,7 @@
 
 ## Fixes
 
+- **Faster start**: googlevideo files are now fetched in a growing series of small ranges (32 KB, 64 KB, 128 KB ... up to 2 MB) so the first bytes arrive right away, for every video length. Every seek starts the ramp again
 - **Ambient light flicker**: the smooth mode used to draw the old and new frame on top of each other, which made the glow pulse every frame. Frames are now averaged over time instead, and the black-bar crop moves slowly, so scene cuts fade smoothly
 - Videos you already liked now show as Liked, and channels you already subscribed to show as Subscribed on the watch page
 
