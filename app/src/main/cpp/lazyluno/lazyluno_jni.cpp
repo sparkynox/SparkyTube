@@ -74,7 +74,7 @@ json streamJson(const Stream& s) {
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_dev_sparkynox_sparkytube_extractor_LazyLuno_nativeResolve(JNIEnv* env, jobject, jstring jvid, jstring jcookie,
-                                                               jstring jhl, jstring jgl) {
+                                                               jstring jhl, jstring jgl, jstring jclients) {
     std::call_once(gInit, [&] {
         jclass c = env->FindClass("dev/sparkynox/sparkytube/extractor/LazyLunoNet");
         if (c) {
@@ -92,6 +92,24 @@ Java_dev_sparkynox_sparkytube_extractor_LazyLuno_nativeResolve(JNIEnv* env, jobj
         ExtractorConfig cfg;
         cfg.hl = jstr(env, jhl).empty() ? "en" : jstr(env, jhl);
         cfg.gl = jstr(env, jgl).empty() ? "US" : jstr(env, jgl);
+        // "IOS,TV_EMBEDDED" = only those, in that order. empty = the default cascade
+        std::string list = jstr(env, jclients);
+        if (!list.empty()) {
+            cfg.spoof.clientOrder.clear();
+            cfg.spoof.appendAuthFallback = false;
+            size_t i = 0;
+            while (i <= list.size()) {
+                size_t j = list.find(',', i);
+                if (j == std::string::npos) j = list.size();
+                std::string n = list.substr(i, j - i);
+                if (n == "ANDROID_APP" || n == "ANDROID") cfg.spoof.clientOrder.push_back(ClientType::ANDROID_APP);
+                else if (n == "IOS") cfg.spoof.clientOrder.push_back(ClientType::IOS);
+                else if (n == "TV_EMBEDDED") cfg.spoof.clientOrder.push_back(ClientType::TV_EMBEDDED);
+                else if (n == "TVHTML5") cfg.spoof.clientOrder.push_back(ClientType::TVHTML5);
+                else if (n == "TVHTML5_SIMPLY") cfg.spoof.clientOrder.push_back(ClientType::TVHTML5_SIMPLY);
+                i = j + 1;
+            }
+        }
         Extractor ex(cfg);
         std::string cookie = jstr(env, jcookie);
         if (!cookie.empty()) ex.setAuth(AuthCookies::fromCookieString(cookie));
