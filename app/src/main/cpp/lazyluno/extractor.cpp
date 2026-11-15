@@ -77,7 +77,7 @@ struct Extractor::Impl {
 
     VideoInfo doFetch(const std::string& videoId) {
         std::string client;
-        auto json = innertube::playerRequest(videoId, cfg.spoof, authenticated ? &auth : nullptr, {},
+        auto json = innertube::playerRequest(videoId, cfg.spoof, authenticated ? &auth : nullptr, cfg.visitorData,
                                              cfg.connectTimeoutMs, cfg.requestTimeoutMs, cfg.hl, cfg.gl, &client);
         auto info = parser::parsePlayerResponse(json);
 
