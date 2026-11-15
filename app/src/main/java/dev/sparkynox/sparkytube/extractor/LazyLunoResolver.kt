@@ -69,13 +69,17 @@ object LazyLunoResolver {
 
     private class S(val url: String, val mime: String, val h: Int, val bitrate: Long, val kind: String)
 
-    private fun readStreams(o: JSONObject): List<S> {
+    private fun withPot(url: String, pot: String?): String =
+        if (pot == null || !url.contains("googlevideo.com") || url.contains("pot=")) url
+        else url + (if (url.contains('?')) "&" else "?") + "pot=" + android.net.Uri.encode(pot)
+
+    private fun readStreams(o: JSONObject, pot: String? = null): List<S> {
         val arr = o.optJSONArray("streams") ?: return emptyList()
         val all = ArrayList<S>()
         for (i in 0 until arr.length()) {
             val s = arr.getJSONObject(i)
             val url = s.optString("url")
-            if (url.isNotEmpty()) all += S(url, s.optString("mime"), s.optInt("h"), s.optLong("bitrate"), s.optString("kind"))
+            if (url.isNotEmpty()) all += S(withPot(url, pot), s.optString("mime"), s.optInt("h"), s.optLong("bitrate"), s.optString("kind"))
         }
         return all
     }
@@ -139,6 +143,7 @@ object LazyLunoResolver {
     fun resolveFast(ctx: Context, videoId: String): StreamExtractor.ResolvedStream? {
         val fast = resolve(ctx, videoId, "ANDROID_APP")
         if (fast != null) {
+            PoTokenService.warm(ctx) // no wait, the token is for the upgrade of this or the next video
             val dataSaver = SettingsPrefs.isDataSaverEnabled(ctx)
             val best = fast.availableQualities.maxOfOrNull { it.resolutionValue } ?: 0
             return if (!dataSaver && best < MAX_WANTED && fastStreams.containsKey(videoId)) fast.copy(partial = true) else fast
@@ -177,7 +182,36 @@ object LazyLunoResolver {
             val got = try { j.get(maxOf(remaining, 500), java.util.concurrent.TimeUnit.MILLISECONDS) } catch (e: Exception) { emptyList() }
             merged += got
         }
-        val result = build(ctx, first.title, first.durationSeconds, first.isLive, "", merged) ?: return null
+        var result = build(ctx, first.title, first.durationSeconds, first.isLive, "", merged) ?: return null
+
+        // still nothing taller? try again with a PO token if one is ready (never waits for it)
+        if ((result.availableQualities.maxOfOrNull { it.resolutionValue } ?: 0) <=
+            (first.availableQualities.maxOfOrNull { it.resolutionValue } ?: 0)
+        ) {
+            val tok = PoTokenService.ready()
+            if (tok == null) {
+                PoTokenService.warm(ctx)
+                LogRecorder.i(TAG, "no PO token yet, started getting one")
+            } else {
+                val (vd, pot) = tok
+                for (c in listOf("ANDROID_APP", "IOS")) {
+                    try {
+                        val raw = LazyLuno.resolveJson(videoId, cookie, "en", country, c, vd) ?: continue
+                        val o = JSONObject(raw)
+                        if (!o.optBoolean("ok")) {
+                            LogRecorder.i(TAG, "pot $c: ${o.optString("error").take(120)}")
+                            continue
+                        }
+                        val got = readStreams(o, pot)
+                        LogRecorder.i(TAG, "pot $c: ${got.size} streams, tallest ${got.maxOfOrNull { it.h } ?: 0}p")
+                        merged += got
+                    } catch (e: Throwable) {
+                        LogRecorder.w(TAG, "pot $c failed: ${e.message}")
+                    }
+                }
+                result = build(ctx, first.title, first.durationSeconds, first.isLive, "", merged) ?: return null
+            }
+        }
         val before = first.availableQualities.map { it.resolutionValue }.toSet()
         val after = result.availableQualities.map { it.resolutionValue }.toSet()
         LogRecorder.i(TAG, "upgrade done in ${System.currentTimeMillis() - t0} ms: ${before.sorted()} -> ${after.sorted()}")

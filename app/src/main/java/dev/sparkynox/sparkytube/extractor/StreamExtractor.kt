@@ -165,6 +165,9 @@ object StreamExtractor {
      * fast-path result behaves identically to a NewPipe-resolved one for
      * things like the 5-minute reuse window on back/forward navigation.
      */
+    /** Skips the cache and runs the whole NewPipe chain. Used to get a full quality list when a fast pass only had 360p. */
+    suspend fun resolveFresh(videoId: String): ResolvedStream? = withContext(Dispatchers.IO) { doResolve(videoId) }
+
     fun cached(videoId: String): ResolvedStream? {
         val entry = cache[videoId] ?: return null
         return if (System.currentTimeMillis() - entry.first < CACHE_TTL_MS) {

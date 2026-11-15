@@ -18,7 +18,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -80,6 +79,8 @@ class BotGuardTokenProvider(context: Context) : TokenProvider {
             mutex.withLock {
                 try {
                     tokens(videoId, visitorData)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     // stale minter or dead webview: one clean retry
                     LogRecorder.w(TAG, "mint failed (${e.message}), retrying with a fresh attestation")
@@ -87,6 +88,8 @@ class BotGuardTokenProvider(context: Context) : TokenProvider {
                     tokens(videoId, visitorData)
                 }
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             LogRecorder.w(TAG, "po token unavailable: ${e.javaClass.simpleName} ${e.message}")
             null
@@ -98,6 +101,8 @@ class BotGuardTokenProvider(context: Context) : TokenProvider {
     override suspend fun prewarm(cookie: String?) {
         try {
             mutex.withLock { ensureReady() }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             LogRecorder.w(TAG, "prewarm failed: ${e.javaClass.simpleName} ${e.message}")
         } finally {
@@ -136,7 +141,7 @@ class BotGuardTokenProvider(context: Context) : TokenProvider {
         val now = System.currentTimeMillis()
         minted[identifier]?.let { if (it.second > now) return it.first }
         val b64 = Base64.encodeToString(identifier.toByteArray(), Base64.NO_WRAP)
-        val token = js("return mintToken(${JSONObject.quote(b64)})", 10_000)
+        val token = js("return mintToken(${JSONObject.quote(b64)})", 6_000, "mint")
         if (token.length < 20) throw IllegalStateException("minter returned a short token")
         minted[identifier] = token to validUntil
         return token
@@ -151,21 +156,22 @@ class BotGuardTokenProvider(context: Context) : TokenProvider {
         minted.clear()
         startWebView()
 
+        LogRecorder.i(TAG, "attestation started")
         val challenge = parseChallenge(post("Create", "[\"$REQUEST_KEY\"]"))
         LogRecorder.i(TAG, "challenge ok in ${System.currentTimeMillis() - t0} ms")
 
         js(
             "return await initVm(${JSONObject.quote(challenge.interpreter)}, " +
                 "${JSONObject.quote(challenge.program)}, ${JSONObject.quote(challenge.globalName)})",
-            15_000
+            10_000, "initVm"
         )
-        val snapshot = js("return await takeSnapshot()", 20_000)
+        val snapshot = js("return await takeSnapshot()", 12_000, "snapshot")
         LogRecorder.i(TAG, "snapshot ok in ${System.currentTimeMillis() - t0} ms")
 
         val it = JSONArray(post("GenerateIT", JSONArray().put(REQUEST_KEY).put(snapshot).toString()))
         val integrity = it.getString(0)
         val ttlSec = it.optLong(1, 3600)
-        js("return await setupMinter(${JSONObject.quote(integrity)})", 15_000)
+        js("return await setupMinter(${JSONObject.quote(integrity)})", 8_000, "setupMinter")
 
         // refresh a bit before it really expires
         validUntil = System.currentTimeMillis() + (ttlSec - 600).coerceAtLeast(300) * 1000
@@ -228,6 +234,12 @@ class BotGuardTokenProvider(context: Context) : TokenProvider {
             val wv = WebView(app)
             wv.settings.javaScriptEnabled = true
             wv.addJavascriptInterface(Bridge(), "Android")
+            wv.webChromeClient = object : android.webkit.WebChromeClient() {
+                override fun onConsoleMessage(m: android.webkit.ConsoleMessage): Boolean {
+                    LogRecorder.i(TAG, "js: ${m.message().take(200)}")
+                    return true
+                }
+            }
             wv.webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView?, url: String?) {
                     loaded.complete(Unit)
@@ -237,10 +249,11 @@ class BotGuardTokenProvider(context: Context) : TokenProvider {
             wv.loadDataWithBaseURL("https://www.youtube.com/", HTML, "text/html", "utf-8", null)
             webView = wv
         }
-        withTimeout(10_000) { pageLoaded.await() }
+        kotlinx.coroutines.withTimeoutOrNull(10_000) { pageLoaded.await() }
+            ?: throw IllegalStateException("webview page didn't load")
     }
 
-    private suspend fun js(body: String, timeoutMs: Long): String {
+    private suspend fun js(body: String, timeoutMs: Long, step: String = "js"): String {
         val id = ids.incrementAndGet()
         val d = CompletableDeferred<String>()
         pending[id] = d
@@ -249,7 +262,8 @@ class BotGuardTokenProvider(context: Context) : TokenProvider {
                 val wv = webView ?: throw IllegalStateException("webview is gone")
                 wv.evaluateJavascript("run($id, async function(){ $body })", null)
             }
-            return withTimeout(timeoutMs) { d.await() }
+            return kotlinx.coroutines.withTimeoutOrNull(timeoutMs) { d.await() }
+                ?: throw IllegalStateException("$step timed out after ${timeoutMs / 1000}s")
         } finally {
             pending.remove(id)
         }
@@ -272,6 +286,7 @@ class BotGuardTokenProvider(context: Context) : TokenProvider {
         val HTML = """
 <!doctype html><html><head><meta charset="utf-8"></head><body><script>
 var vmFn = null, snap = null, signalOut = [], minter = null;
+window.onerror = function (m) { console.log('error: ' + m); };
 
 function run(id, fn) {
   Promise.resolve().then(fn).then(
@@ -310,7 +325,7 @@ async function takeSnapshot() {
   signalOut = [];
   return await new Promise(function (resolve, reject) {
     try {
-      snap([undefined, undefined, signalOut, undefined], function (resp) { resolve(resp); });
+      snap(function (resp) { resolve(resp); }, [undefined, undefined, signalOut, undefined]);
     } catch (e) { reject(e); }
   });
 }
