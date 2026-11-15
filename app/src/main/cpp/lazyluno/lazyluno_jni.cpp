@@ -74,7 +74,8 @@ json streamJson(const Stream& s) {
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_dev_sparkynox_sparkytube_extractor_LazyLuno_nativeResolve(JNIEnv* env, jobject, jstring jvid, jstring jcookie,
-                                                               jstring jhl, jstring jgl, jstring jclients) {
+                                                               jstring jhl, jstring jgl, jstring jclients,
+                                                               jstring jvisitor) {
     std::call_once(gInit, [&] {
         jclass c = env->FindClass("dev/sparkynox/sparkytube/extractor/LazyLunoNet");
         if (c) {
@@ -110,6 +111,7 @@ Java_dev_sparkynox_sparkytube_extractor_LazyLuno_nativeResolve(JNIEnv* env, jobj
                 i = j + 1;
             }
         }
+        cfg.visitorData = jstr(env, jvisitor);
         Extractor ex(cfg);
         std::string cookie = jstr(env, jcookie);
         if (!cookie.empty()) ex.setAuth(AuthCookies::fromCookieString(cookie));
