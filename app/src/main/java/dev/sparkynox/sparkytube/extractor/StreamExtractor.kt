@@ -647,7 +647,7 @@ object StreamExtractor {
         // it, in which case chapters just don't show for that video.
         val description: String? = null,
         // audio-only streams with their bitrate, only used by the download dialogs
-        val downloadAudios: List<DownloadAudioOption> = emptyList()
+        val downloadAudios: List<DownloadAudioOption> = emptyList(),
         // true when a fast first pass was returned and better qualities may still arrive (LazyLuno)
         val partial: Boolean = false,
     )
