@@ -3642,11 +3642,14 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     private fun startQualityUpgrade(videoId: String, first: StreamExtractor.ResolvedStream) {
         val startLabel = currentQualityLabel
         lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            // NewPipe starts right away next to the LazyLuno upgrade, it is the one that usually has the full ladder
+            val t0 = android.os.SystemClock.elapsedRealtime()
+            val pipe = async { StreamExtractor.resolveFresh(videoId) }
             var better = dev.sparkynox.sparkytube.extractor.LazyLunoResolver.upgrade(this@MainActivity, videoId, first)
-            if (better == null) {
-                // the other LazyLuno clients had nothing (they need a PO token), NewPipe usually has the full ladder
-                val t0 = android.os.SystemClock.elapsedRealtime()
-                val np = StreamExtractor.resolveFresh(videoId)
+            if (better != null) {
+                pipe.cancel()
+            } else {
+                val np = pipe.await()
                 val firstBest = first.availableQualities.maxOfOrNull { it.resolutionValue } ?: 0
                 val npBest = np?.availableQualities?.maxOfOrNull { it.resolutionValue } ?: 0
                 dev.sparkynox.sparkytube.logs.LogRecorder.i(
