@@ -1527,6 +1527,7 @@ $third-party,xmlhttprequest,domain=opensubtitles.org
 ||api.intelligems.io/v3/track
 ||api.ipgeolocation.io/getip
 ||api.iris.tv/update
+||api.iterable.com/api/events/
 ||api.mambasms.com/monitorEvent/
 ||api.pcid.ca/v1/client/logs
 ||api.pearcommerce.com/v1/client_request_log?
@@ -1670,6 +1671,7 @@ $third-party,xmlhttprequest,domain=opensubtitles.org
 ||blend.com/event/
 ||blink.net/e/
 ||blogblog.com/tracker/
+||bloomreach.com/js/brweb.min.js
 ||bobparsons.com/image.aspx?
 ||boei.help/pageview/
 ||bolt.com/v1/log?
@@ -2206,6 +2208,9 @@ $third-party,xmlhttprequest,domain=opensubtitles.org
 ||iyisayfa.net/inc.php?
 ||jangomail.com^*?UID$third-party
 ||jobvite.com/analytics.js
+||jolect.com/gohangout/log-proxy
+||jolect.com/shopify-buyer-center/buyer/event/
+||jolect.com/shopify-buyer-center/buyer/sg_event/
 ||jotform.io/getReferrer/$third-party
 ||js.cdn.applicationinsights.io/scripts/b/ai.3.gbl.min.js
 ||js.ciphera.net/script.js
@@ -2517,6 +2522,7 @@ $third-party,xmlhttprequest,domain=opensubtitles.org
 ||piano.io/tracker/
 ||pico.tools/metrics/
 ||pikapod.net/script.js
+||piratewires.substack.com/api/v1/firehose/islands/batch
 ||pixlee.com/assets/fp.js
 ||pixlee.com/assets/keen-
 ||pixlee.com/assets/pixlee_events.js
@@ -4004,6 +4010,7 @@ $third-party,xmlhttprequest,domain=opensubtitles.org
 /AppMeasurement2.js
 /AppMeasurement_Module_ActivityMap.min.js
 /AppMeasurementCustom.min.js
+/apps/awin/*
 /apps/ba-rev/app_metrics
 /aptrk.js
 /ard.png?
@@ -5445,6 +5452,7 @@ $third-party,xmlhttprequest,domain=opensubtitles.org
 /pixel/view?
 /pixel/visit?
 /pixel2.gif?
+/pixel?clientId=
 /pixel?tag=
 /pixel_identifier.js
 /pixel_iframe.php
@@ -5788,6 +5796,7 @@ $third-party,xmlhttprequest,domain=opensubtitles.org
 /shopify-boomerang-
 /shopify-datalayer-minified.js
 /shopify-event.gif?
+/shopify/fec/produce|
 /shopify/track.js
 /shopify_stats.js
 /shopifycloud/shopify/assets/shop_events_listener-$script
