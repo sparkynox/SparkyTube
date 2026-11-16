@@ -195,13 +195,13 @@ class SettingsComposeActivity : AppCompatActivity() {
             )),
             Section("extraction", "Extraction", "code", "Extractors and fallbacks", listOf(
                 choice("extractor", "Extractor Method", "code",
-                        listOf("AUTO" to "Auto", "NEWPIPE" to "NewPipe (default)", "INNERTUBEX" to "InnerTubeX", "LAZYLUNO" to "LazyLuno (beta)"),
+                        listOf("AUTO" to "Auto", "NEWPIPE" to "NewPipe", "INNERTUBEX" to "InnerTubeX", "LAZYLUNO" to "LazyLuno (default)"),
                         { p.getExtractorMethod(this).name }, { p.setExtractorMethod(this, SettingsPrefs.ExtractorMethod.valueOf(it)) },
                         sub = {
                             when (it) {
                                 "NEWPIPE" -> "NewPipe only — skips the JS fast path"
                                 "INNERTUBEX" -> "InnerTubeX first (pure Kotlin), NewPipe takes over if it fails"
-                                "LAZYLUNO" -> "LazyLuno first (our own C++ extractor, beta), NewPipe takes over if it fails"
+                                "LAZYLUNO" -> "LazyLuno first (our own C++ extractor), quality upgrades and fallback come from NewPipe"
                                 else -> "Auto — JavaScript → NewPipe"
                             }
                         }),
