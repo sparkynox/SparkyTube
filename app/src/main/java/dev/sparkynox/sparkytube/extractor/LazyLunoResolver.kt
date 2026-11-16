@@ -19,7 +19,8 @@ object LazyLunoResolver {
     // streams of the fast pass, kept for a few videos so the background upgrade can merge into them
     private val fastStreams = java.util.concurrent.ConcurrentHashMap<String, List<S>>()
     private val upgradePool = java.util.concurrent.Executors.newFixedThreadPool(4)
-    private val UPGRADE_CLIENTS = listOf("IOS", "TV_EMBEDDED", "TVHTML5", "TVHTML5_SIMPLY")
+    // the TV clients always answered "no streams" without a PO token in testing, so only IOS is worth a try here
+    private val UPGRADE_CLIENTS = listOf("IOS")
 
     /** Blocking. Null = failed, see lastErrorMessage. */
     fun resolve(ctx: Context, videoId: String, clients: String = ""): StreamExtractor.ResolvedStream? {
