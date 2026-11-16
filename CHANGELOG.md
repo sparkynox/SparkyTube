@@ -4,8 +4,10 @@
 
 ## New Features
 
-- **LazyLuno extractor (beta)**: our own C++ YouTube extractor, selectable in Settings > Extraction > Extractor Method. It tries the TV_EMBEDDED, TVHTML5, ANDROID and IOS clients in turn, and NewPipe takes over if it fails. It is a beta, and YouTube may ask for PO tokens it doesn't have yet. Playback starts from the fast first answer (ANDROID client), the other clients are asked in the background, and when better qualities turn up they appear in the picker and playback moves up to your default quality
+- **LazyLuno extractor, now the default**: our own C++ YouTube extractor (Settings > Extraction > Extractor Method). The first answer comes from the ANDROID client in 1 to 3 seconds, so the video starts right away, usually at 360p. A PO token (BotGuard, run in a hidden WebView) is made in the background, and NewPipe is asked at the same time for the full quality list. When better qualities arrive they appear in the picker and playback moves up to your default quality, unless you picked one yourself. NewPipe is also the fallback if LazyLuno fails. Anyone who picked an extractor before keeps their choice
 - **InnerTubeX extractor** (experimental): Settings > Extraction > Extractor Method now has InnerTubeX, a pure Kotlin extractor (MetrolistGroup/innertubex). NewPipe stays the default. It needs a PO token for video, so it is mainly for testing; its fallback switch is off by default
+- **Return YouTube Dislike**: like and dislike counts on the watch screen, with icons on the Like, Dislike, Share and More buttons. Settings > Features has a switch for it
+- **SponsorBlock marks on the seek bar**: sponsor, self-promo, intro, outro and the other categories show as coloured marks on the track
 - **Lighter ad block list**: the ~54k blocked hosts are no longer loaded into memory. They sit in a small binary index (~430 KB) that C++ memory-maps, so only the pages a lookup touches are in RAM. The 1 MB text list is gone from the APK
 - **Block list updates without a new APK**: on app start a ~200 byte version.json is checked, and only a list that really changed is downloaded (sha256 checked, swapped in live). GitHub is the main source with jsDelivr as a mirror. Settings > Features > Better ad block list turns it off
 - **Glassy mini-player**: the mini player is now a rounded glass bar docked above the bottom bar, with the video, title, play/pause and close. Tap it or swipe it up to open the full player
@@ -21,12 +23,17 @@
 - **Ambient mode (live)**: the glow around the video now follows the real frames of the video that is playing, not a still colour. Player menu (gear) > Ambient mode, with Strength, Spread, Blur, Saturation, Update rate and Smooth frames. Black bars are detected and cut out. The frame work is done natively (C++). Idea and approach from the MIT licensed Ambient light for YouTube extension, credited in THIRD_PARTY_NOTICES.md
 - **Multiple accounts**: tap your picture on Home to open the Accounts sheet. Add as many YouTube accounts as you want, tap one to switch (Home, Subscriptions, Library and history follow the account you pick), or remove one with the X. Add account opens Google's own account chooser, so an account already on the phone is one tap, and "Use another account" adds a new one. Backing out keeps your current account
 
+## Updated
+
+- NewPipe Extractor v0.27.0 to v0.27.1
+
 ## Removed
 
 - **Python / yt-dlp (Chaquopy)**: the whole Python runtime is gone from the APK, saving a lot of install size and 60 MB+ of RAM. Anyone who had yt-dlp selected goes back to NewPipe
 
 ## Fixes
 
+- **SponsorBlock never skipped anything**: segments were only fetched on the old WebView path, never for videos started from the feed, autoplay or the new screens. They are now fetched for every video
 - **Faster start**: googlevideo files are now fetched in a growing series of small ranges (32 KB, 64 KB, 128 KB ... up to 2 MB) so the first bytes arrive right away, for every video length. Every seek starts the ramp again
 - **Ambient light flicker**: the smooth mode used to draw the old and new frame on top of each other, which made the glow pulse every frame. Frames are now averaged over time instead, and the black-bar crop moves slowly, so scene cuts fade smoothly
 - Videos you already liked now show as Liked, and channels you already subscribed to show as Subscribed on the watch page
