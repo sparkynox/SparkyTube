@@ -264,13 +264,14 @@ object SettingsPrefs {
     enum class ExtractorMethod { AUTO, LOCAL_SERVER, NEWPIPE, INNERTUBEX, LAZYLUNO }
 
     fun getExtractorMethod(context: Context): ExtractorMethod {
-        val stored = prefs(context).getString(KEY_EXTRACTOR_METHOD, ExtractorMethod.NEWPIPE.name)
-            // yt-dlp is gone, people who had it selected go back to NewPipe
-            .let { if (it == "YT_DLP") ExtractorMethod.NEWPIPE.name else it }
+        // LazyLuno is the default (NewPipe stays as its fallback). yt-dlp is gone, so anyone who still
+        // has it stored lands on the default too
+        val stored = prefs(context).getString(KEY_EXTRACTOR_METHOD, ExtractorMethod.LAZYLUNO.name)
+            .let { if (it == "YT_DLP") ExtractorMethod.LAZYLUNO.name else it }
         return try {
-            ExtractorMethod.valueOf(stored ?: ExtractorMethod.NEWPIPE.name)
+            ExtractorMethod.valueOf(stored ?: ExtractorMethod.LAZYLUNO.name)
         } catch (e: IllegalArgumentException) {
-            ExtractorMethod.NEWPIPE
+            ExtractorMethod.LAZYLUNO
         }
     }
 
