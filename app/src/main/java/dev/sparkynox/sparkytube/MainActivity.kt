@@ -3121,6 +3121,9 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         loginTicks = 0
         loginNavTries = 0
         hideNativeHomeFeed() // shows the WebView
+        // the tabs mean nothing on the Google sign-in page, so the bottom bar steps aside until login is over
+        barsController?.show()
+        binding.bottomNav.visibility = View.GONE
         webView.loadUrl(url)
         dev.sparkynox.sparkytube.logs.LogRecorder.i("Login", "login started in the main WebView")
         android.widget.Toast.makeText(this, "Sign in to YouTube. You'll come back here automatically.", android.widget.Toast.LENGTH_LONG).show()
@@ -3129,8 +3132,10 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     }
 
     private fun cancelWebViewLogin() {
+        val wasLoggingIn = loginInProgress
         loginInProgress = false
         loginHandler.removeCallbacks(loginWatcher)
+        if (wasLoggingIn && browseMode == BrowseMode.YOUTUBE) binding.bottomNav.visibility = View.VISIBLE
         dev.sparkynox.sparkytube.auth.AccountStore.cancelAdd()
     }
 
