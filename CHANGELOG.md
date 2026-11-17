@@ -37,6 +37,7 @@
 
 ## Fixes
 
+- **"No Internet Connection" screen appearing for no reason**: a page being replaced by the next one (the hidden history player, redirects) is reported by WebView as an error, and was treated as a lost connection. Aborted loads are ignored now, and the screen only shows when Android itself says there is no working connection
 - **SponsorBlock never skipped anything**: segments were only fetched on the old WebView path, never for videos started from the feed, autoplay or the new screens. They are now fetched for every video
 - **Faster start**: googlevideo files are now fetched in a growing series of small ranges (32 KB, 64 KB, 128 KB ... up to 2 MB) so the first bytes arrive right away, for every video length. Every seek starts the ramp again
 - **Ambient light flicker**: the smooth mode used to draw the old and new frame on top of each other, which made the glow pulse every frame. Frames are now averaged over time instead, and the black-bar crop moves slowly, so scene cuts fade smoothly
