@@ -44,6 +44,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -54,6 +56,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -86,8 +89,10 @@ fun AppHost(
 ) {
     var menuItem by remember { mutableStateOf<HomeFeedItem?>(null) }
     val onMore: (HomeFeedItem) -> Unit = { menuItem = it }
+    SideEffect { BarsScroll.enabled = { nav.watchId == null && !nav.searchVisible } }
     CompositionLocalProvider(LocalOpenChannel provides onChannel, LocalOpenMenu provides onMore) {
-    Box(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize().nestedScroll(BarsScroll.connection)) {
+        if (nav.showAccounts) AccountsSheet(home, nav, onAddAccount = onAddAccount, onDismiss = { nav.showAccounts = false })
         val page = nav.pages.lastOrNull()
         if (page != null) {
             LaunchedEffect(page) { page.feed.onShown() }
@@ -338,39 +343,53 @@ private fun LibraryRow(title: String, subtitle: String, onClick: () -> Unit) {
     }
 }
 
-/** The bottom bar, in Compose now. Selection comes from [NavViewModel.tab]. */
+/** The bottom bar, in Compose now. Selection comes from [NavViewModel.tab]. Kept slim: 56dp. */
 @Composable
 fun AppNavBar(selected: NavViewModel.Tab, onSelect: (NavViewModel.Tab) -> Unit) {
-    NavigationBar(
-        containerColor = dev.sparkynox.sparkytube.lunokit.glass.glassColor(MaterialTheme.colorScheme.surfaceContainer, 0.6f),
-        windowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
+    androidx.compose.material3.Surface(
+        color = dev.sparkynox.sparkytube.lunokit.glass.glassColor(MaterialTheme.colorScheme.surfaceContainer, 0.6f),
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        listOf(
-            Triple(NavViewModel.Tab.HOME, R.drawable.nav_home, "Home"),
-            Triple(NavViewModel.Tab.SHORTS, R.drawable.nav_shorts, "Shorts"),
-            Triple(NavViewModel.Tab.SUBS, R.drawable.nav_subs, "Subs"),
-            Triple(NavViewModel.Tab.LIBRARY, R.drawable.nav_library, "Library"),
-        ).forEach { (tab, icon, label) ->
-            NavigationBarItem(
-                selected = selected == tab,
-                onClick = { onSelect(tab) },
-                icon = {
-                    val pop by androidx.compose.animation.core.animateFloatAsState(
-                        if (selected == tab) 1.18f else 1f,
-                        androidx.compose.animation.core.spring(dampingRatio = 0.45f, stiffness = 380f),
-                        label = "navPop",
-                    )
+        Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
+            listOf(
+                Triple(NavViewModel.Tab.HOME, R.drawable.nav_home, "Home"),
+                Triple(NavViewModel.Tab.SHORTS, R.drawable.nav_shorts, "Shorts"),
+                Triple(NavViewModel.Tab.SUBS, R.drawable.nav_subs, "Subs"),
+                Triple(NavViewModel.Tab.LIBRARY, R.drawable.nav_library, "Library"),
+            ).forEach { (tab, icon, label) ->
+                val on = selected == tab
+                val pop by androidx.compose.animation.core.animateFloatAsState(
+                    if (on) 1.12f else 1f,
+                    androidx.compose.animation.core.spring(dampingRatio = 0.45f, stiffness = 380f),
+                    label = "navPop",
+                )
+                Column(
+                    Modifier.weight(1f).fillMaxHeight()
+                        .clickable(
+                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                            indication = null,
+                        ) { onSelect(tab) },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
                     androidx.compose.foundation.layout.Box(Modifier.graphicsLayer { scaleX = pop; scaleY = pop }) {
-                        if (selected == tab) {
-                            ShapedIconBox(44.dp, MaterialTheme.colorScheme.primaryContainer) {
-                                Icon(painterResource(icon), label, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                        if (on) {
+                            ShapedIconBox(34.dp, MaterialTheme.colorScheme.primaryContainer) {
+                                Icon(painterResource(icon), label, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
                             }
-                        } else Icon(painterResource(icon), contentDescription = label)
+                        } else {
+                            androidx.compose.foundation.layout.Box(Modifier.size(34.dp), contentAlignment = Alignment.Center) {
+                                Icon(painterResource(icon), contentDescription = label, Modifier.size(22.dp))
+                            }
+                        }
                     }
-                },
-                colors = androidx.compose.material3.NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent),
-                label = { Text(label) },
-            )
+                    Text(
+                        label, style = MaterialTheme.typography.labelSmall,
+                        fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
+                        color = if (on) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
     }
 }

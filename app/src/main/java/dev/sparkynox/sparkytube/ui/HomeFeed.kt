@@ -73,7 +73,6 @@ fun HomeFeedScreen(
     onAddAccount: () -> Unit,
 ) {
     val state = rememberLazyListState()
-    var showAccounts by remember { mutableStateOf(false) }
 
     // infinite scroll, same trigger as Luno: a few rows before the end
     val nearEnd by remember {
@@ -99,16 +98,13 @@ fun HomeFeedScreen(
             contentPadding = PaddingValues(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
-            item(key = "header") {
-                AccountHeader(
-                    name = vm.accountName,
-                    photo = vm.accountPhoto,
-                    loggedIn = vm.loggedIn,
-                    onClick = { if (vm.loggedIn) showAccounts = true else onLogin() },
-                )
+            // signed in: no header at all, the avatar lives in the top bar (opens the accounts sheet)
+            if (!vm.loggedIn) {
+                item(key = "header") {
+                    AccountHeader(name = vm.accountName, photo = vm.accountPhoto, loggedIn = false, onClick = onLogin)
+                }
+                item(key = "login") { LoginCard(onLogin) }
             }
-
-            if (!vm.loggedIn) item(key = "login") { LoginCard(onLogin) }
 
             if (vm.chips.isNotEmpty()) item(key = "chips") {
                 LazyRow(
@@ -139,9 +135,6 @@ fun HomeFeedScreen(
         }
     }
 
-    if (showAccounts) {
-        AccountsSheet(vm, nav, onAddAccount = onAddAccount, onDismiss = { showAccounts = false })
-    }
 }
 
 @Composable

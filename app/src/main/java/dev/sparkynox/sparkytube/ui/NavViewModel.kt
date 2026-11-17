@@ -30,6 +30,9 @@ class NavViewModel : ViewModel() {
 
     var tab by mutableStateOf(Tab.HOME)
 
+    // the accounts sheet, opened from the avatar in the top bar
+    var showAccounts by mutableStateOf(false)
+
     // full-screen search (NewPipe), drawn above the tabs
     var searchVisible by mutableStateOf(false)
     val search = dev.sparkynox.sparkytube.search.SearchState(viewModelScope)

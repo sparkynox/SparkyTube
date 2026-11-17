@@ -62,9 +62,13 @@ fun TopBar(
     onSearch: () -> Unit,
     onSettings: () -> Unit,
     onOverflow: () -> Unit,
+    showAvatar: Boolean = false,
+    avatarUrl: String? = null,
+    avatarName: String = "",
+    onAvatar: () -> Unit = {},
 ) {
     Row(
-        Modifier.fillMaxWidth().height(52.dp).padding(start = 16.dp, end = 6.dp),
+        Modifier.fillMaxWidth().height(44.dp).padding(start = 14.dp, end = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -73,17 +77,20 @@ fun TopBar(
             maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
         val tint = MaterialTheme.colorScheme.onSurface
-        if (showAudio) IconButton(onClick = onAudio) { ResIcon(R.drawable.ic_audio_track, tint) }
-        if (showQuality) IconButton(onClick = onQuality) {
+        if (showAudio) IconButton(onClick = onAudio, modifier = Modifier.size(40.dp)) { ResIcon(R.drawable.ic_audio_track, tint) }
+        if (showQuality) IconButton(onClick = onQuality, modifier = Modifier.size(40.dp)) {
             androidx.compose.foundation.layout.Box(
                 Modifier.size(24.dp).border(1.5.dp, tint, RoundedCornerShape(5.dp)),
                 contentAlignment = Alignment.Center,
             ) { Text("HD", fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = tint) }
         }
         val tile = MaterialTheme.colorScheme.surfaceContainerHigh
-        IconButton(onClick = onSearch) { ShapedIconBox(38.dp, tile) { Icon(Icons.Filled.Search, "Search", Modifier.size(20.dp)) } }
-        IconButton(onClick = onSettings) { ShapedIconBox(38.dp, tile) { Icon(Icons.Filled.Settings, "Settings", Modifier.size(20.dp)) } }
-        IconButton(onClick = onOverflow) { ShapedIconBox(38.dp, tile) { Icon(Icons.Filled.MoreVert, "More options", Modifier.size(20.dp)) } }
+        val btn = Modifier.size(40.dp)
+        IconButton(onClick = onSearch, modifier = btn) { ShapedIconBox(32.dp, tile) { Icon(Icons.Filled.Search, "Search", Modifier.size(18.dp)) } }
+        IconButton(onClick = onSettings, modifier = btn) { ShapedIconBox(32.dp, tile) { Icon(Icons.Filled.Settings, "Settings", Modifier.size(18.dp)) } }
+        IconButton(onClick = onOverflow, modifier = btn) { ShapedIconBox(32.dp, tile) { Icon(Icons.Filled.MoreVert, "More options", Modifier.size(18.dp)) } }
+        // signed in: the account avatar is here (Home no longer has its own header), tap = accounts sheet
+        if (showAvatar) Avatar(avatarUrl, avatarName.ifBlank { "?" }, 30, Modifier.padding(start = 4.dp, end = 4.dp).clickable(onClick = onAvatar))
     }
 }
 
