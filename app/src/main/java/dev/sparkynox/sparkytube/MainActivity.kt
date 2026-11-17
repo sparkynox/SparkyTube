@@ -2017,6 +2017,10 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                         startActivity(Intent(this, dev.sparkynox.sparkytube.settings.SettingsComposeActivity::class.java))
                     },
                     onOverflow = { showOverflowMenu() },
+                    showAvatar = homeFeedVm.loggedIn,
+                    avatarUrl = homeFeedVm.accountPhoto,
+                    avatarName = homeFeedVm.accountName,
+                    onAvatar = { nav.showAccounts = true },
                 )
                 overflowItems?.let { dev.sparkynox.sparkytube.ui.OverflowSheet(it) { overflowItems = null } }
 
@@ -2818,7 +2822,12 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }
     }
 
+    private var barsController: dev.sparkynox.sparkytube.ui.BarsController? = null
+
     private fun setupBottomNav() {
+        // top and bottom bar slide away while scrolling down and come back on the way up
+        barsController = dev.sparkynox.sparkytube.ui.BarsController(binding.topBar, binding.bottomNav)
+        dev.sparkynox.sparkytube.ui.BarsScroll.onDirection = { hide -> barsController?.setHidden(hide) }
         binding.bottomNav.setContent {
             dev.sparkynox.sparkytube.ui.SparkyTheme(fill = false) {
                 dev.sparkynox.sparkytube.ui.AppNavBar(selected = nav.tab, onSelect = { onTabSelected(it) })
@@ -2827,6 +2836,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     }
 
     private fun onTabSelected(tab: dev.sparkynox.sparkytube.ui.NavViewModel.Tab) {
+        barsController?.show()
         if (!composeNav()) {
             // YouTube-skin / custom-HTML feed styles still browse the real site in the WebView
             nav.tab = tab
