@@ -2495,6 +2495,13 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
      * since it's genuinely useful for diagnosing which specific network
      * problem occurred, not because it's user-friendly wording.
      */
+    // a validated connection, i.e. Android itself got through to the internet
+    private fun isOnline(): Boolean {
+        val cm = getSystemService(android.net.ConnectivityManager::class.java) ?: return true
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork ?: return false) ?: return false
+        return caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    }
+
     private fun showConnectionErrorScreen(reason: String?) {
         binding.connectionErrorInclude.root.visibility = View.VISIBLE
         binding.loadingSpinner.visibility = View.GONE
@@ -2739,6 +2746,20 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 }
                 if (!isConnectivityError) return
 
+                val desc = error.description?.toString().orEmpty()
+                // a page replaced by the next one (the hidden history player loads watch pages, redirects, quick
+                // taps) reports net::ERR_ABORTED as ERROR_UNKNOWN. that is not a connection problem
+                if (desc.contains("ERR_ABORTED") || desc.contains("ERR_BLOCKED")) return
+                // the phone has a working connection: a failed load here is a one-off, YouTube's own
+                // page and the retry will handle it, no scary screen
+                if (error.errorCode == android.webkit.WebViewClient.ERROR_UNKNOWN && isOnline()) return
+                // the page of a video that is already playing natively isn't what the person is looking at
+                if (isNativePlaybackActive && extractVideoId(request.url.toString()) != null && isOnline()) {
+                    dev.sparkynox.sparkytube.logs.LogRecorder.w("WebView", "history page failed ($desc), ignored")
+                    return
+                }
+
+                dev.sparkynox.sparkytube.logs.LogRecorder.w("WebView", "main frame failed: ${error.errorCode} $desc")
                 showConnectionErrorScreen(error.description?.toString())
             }
 
