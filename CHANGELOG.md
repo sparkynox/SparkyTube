@@ -4,6 +4,10 @@
 
 ## New Features
 
+- **Bars hide while scrolling**: the top bar and bottom bar slide away when you scroll down and come back when you scroll up, like the real app
+- **No bottom bar while signing in**: the tabs are hidden on the Google sign-in page and come back when login is done or cancelled
+- **Slimmer bars**: the top bar is 44dp (was 52dp) and the bottom bar is 56dp (was about 80dp)
+- **Home header gone when signed in**: once you are logged in, the "Hi, name / Your feed" header is removed and your avatar sits in the top bar instead (tap it for the accounts sheet)
 - **LazyLuno extractor, now the default**: our own C++ YouTube extractor (Settings > Extraction > Extractor Method). The first answer comes from the ANDROID client in 1 to 3 seconds, so the video starts right away, usually at 360p. A PO token (BotGuard, run in a hidden WebView) is made in the background, and NewPipe is asked at the same time for the full quality list. When better qualities arrive they appear in the picker and playback moves up to your default quality, unless you picked one yourself. NewPipe is also the fallback if LazyLuno fails. Anyone who picked an extractor before keeps their choice
 - **InnerTubeX extractor** (experimental): Settings > Extraction > Extractor Method now has InnerTubeX, a pure Kotlin extractor (MetrolistGroup/innertubex). NewPipe stays the default. It needs a PO token for video, so it is mainly for testing; its fallback switch is off by default
 - **Return YouTube Dislike**: like and dislike counts on the watch screen, with icons on the Like, Dislike, Share and More buttons. Settings > Features has a switch for it
