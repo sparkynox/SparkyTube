@@ -23,8 +23,38 @@ object WatchHistoryStore {
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
+    // videos that were played for a while, drives the "Watched" badge on thumbnails
+    private val watched = HashSet<String>()
+    @Volatile private var watchedLoaded = false
+
+    private fun loadWatched(context: Context) {
+        if (watchedLoaded) return
+        synchronized(watched) {
+            if (watchedLoaded) return
+            prefs(context).getString("watched_ids", "")?.split(',')?.filter { it.length == 11 }?.let { watched.addAll(it) }
+            watchedLoaded = true
+        }
+    }
+
+    fun isWatched(context: Context, videoId: String?): Boolean {
+        if (videoId == null) return false
+        loadWatched(context)
+        return synchronized(watched) { videoId in watched }
+    }
+
+    private fun markWatched(context: Context, videoId: String) {
+        loadWatched(context)
+        val snapshot = synchronized(watched) {
+            if (!watched.add(videoId)) return
+            if (watched.size > 2000) watched.remove(watched.first())
+            watched.joinToString(",")
+        }
+        prefs(context).edit().putString("watched_ids", snapshot).apply()
+    }
+
     fun savePosition(context: Context, videoId: String, positionMs: Long, durationMs: Long) {
         if (durationMs <= 0) return
+        if (positionMs >= MIN_POSITION_MS) markWatched(context, videoId)
         // Don't bother persisting a save for something that isn't
         // resumable anyway (too early, or basically done) -- treat it
         // as "watched to completion" by just clearing any prior entry
