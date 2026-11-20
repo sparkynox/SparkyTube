@@ -18,5 +18,11 @@ data class HomeFeedItem(
     // channel page id (UC...), null when the renderer doesn't carry one
     val channelId: String? = null,
     // YouTube's "Not interested" token when the renderer carried one
-    val feedbackToken: String? = null
+    val feedbackToken: String? = null,
+    // non-null only for a "Shorts" shelf row inside a feed: the shorts it holds
+    val shortsShelf: List<HomeFeedItem>? = null,
+    // how much of the video this account already watched (0-100), from YouTube's own progress overlay
+    val watchedPercent: Int = 0,
+    // the renderer itself said age-restricted (the local AgeRestrictedStore knows more)
+    val ageRestricted: Boolean = false
 )

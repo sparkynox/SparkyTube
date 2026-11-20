@@ -171,6 +171,8 @@ object InnerTubeClient {
         val queue: List<HomeFeedItem> = emptyList(),
         val queueTitle: String? = null,
         val likeStatus: Int = 0, // 0 none, 1 liked, 2 disliked
+        val commentsToken: String? = null,
+        val isLive: Boolean = false,
     )
 
     /** Everything under the player on a watch page: title, channel, description and the related list. */
@@ -204,6 +206,8 @@ object InnerTubeClient {
                 channelId = owner?.let { findChannelId(it) },
                 subscribed = owner?.let { isSubscribed(it) } ?: false,
                 likeStatus = likeStatusOf(root),
+                commentsToken = CommentsApi.findToken(root),
+                isLive = findFirst(primary, "liveBadge") != null || (primary?.toString()?.contains("BADGE_STYLE_TYPE_LIVE_NOW") == true),
                 queue = if (playlistId != null) parseQueue(root, playlistId) else emptyList(),
                 queueTitle = if (playlistId != null) findFirst(root, "playlist")?.optJSONObject("playlist")?.optString("title")?.takeIf { it.isNotBlank() } else null,
             )
@@ -525,9 +529,14 @@ object InnerTubeClient {
 
     // ---------- request
 
-    private fun post(path: String, body: JSONObject): JSONObject {
+    internal fun post(
+        path: String,
+        body: JSONObject,
+        clientName: String = "WEB",
+        clientNameId: String = "1",
+    ): JSONObject {
         val client = JSONObject()
-            .put("clientName", "WEB")
+            .put("clientName", clientName)
             .put("clientVersion", Session.clientVersion ?: FALLBACK_CLIENT_VERSION)
             .put("hl", "en")
             .put("gl", Locale.getDefault().country.ifBlank { "US" })
@@ -546,7 +555,7 @@ object InnerTubeClient {
             .header("Origin", ORIGIN)
             .header("X-Origin", ORIGIN)
             .header("Referer", "$ORIGIN/")
-            .header("X-YouTube-Client-Name", "1")
+            .header("X-YouTube-Client-Name", clientNameId)
             .header("X-YouTube-Client-Version", Session.clientVersion ?: FALLBACK_CLIENT_VERSION)
         Session.visitorData?.let { rb.header("X-Goog-Visitor-Id", it) }
 
@@ -571,6 +580,27 @@ object InnerTubeClient {
         }
     }
 
+    /** Plain GET with the signed in session attached. Returns the HTTP code, -1 on a network error. */
+    internal fun rawGet(url: String): Int {
+        return try {
+            val rb = Request.Builder().url(url).get()
+                .header("User-Agent", UA)
+                .header("Origin", ORIGIN)
+                .header("Referer", "$ORIGIN/")
+            val cookie = Session.cookie
+            val sapisid = Session.sapisid()
+            if (cookie != null && sapisid != null) {
+                rb.header("Cookie", cookie)
+                rb.header("X-Goog-AuthUser", "0")
+                rb.header("Authorization", sapisidHash(sapisid))
+            }
+            http.newCall(rb.build()).execute().use { it.code }
+        } catch (e: Exception) {
+            LogRecorder.w(TAG, "GET failed: ${e.message}")
+            -1
+        }
+    }
+
     // SHA1("{timestamp} {sapisid} {origin}"), computed locally from the cookie, nothing is fetched for it
     private fun sapisidHash(sapisid: String): String {
         val t = System.currentTimeMillis() / 1000
@@ -591,6 +621,19 @@ object InnerTubeClient {
                 node.optJSONObject("compactVideoRenderer")?.let { parseVideoRenderer(it)?.let(out::add) }
                 node.optJSONObject("playlistVideoRenderer")?.let { parseVideoRenderer(it)?.let(out::add) }
                 node.optJSONObject("radioRenderer")?.let { parsePlaylistLike(it)?.let(out::add) }
+                // a Shorts shelf between normal videos becomes one row item
+                (node.optJSONObject("reelShelfRenderer") ?: node.optJSONObject("richShelfRenderer"))?.let { shelf ->
+                    val shorts = ArrayList<HomeFeedItem>()
+                    collectShorts(shelf, shorts)
+                    val unique = shorts.distinctBy { it.videoId }
+                    if (unique.size >= 2) out.add(
+                        HomeFeedItem(
+                            videoId = null, playlistId = "shorts-shelf-" + unique.first().videoId,
+                            title = "Shorts", channelName = "", thumbnailUrl = "", durationText = "", viewCountText = "",
+                            shortsShelf = unique,
+                        )
+                    )
+                }
                 (node.optJSONObject("playlistRenderer") ?: node.optJSONObject("compactPlaylistRenderer") ?: node.optJSONObject("gridPlaylistRenderer"))
                     ?.let { parsePlaylistLike(it)?.let(out::add) }
                 node.keys().forEach { collect(node.opt(it), out) }
@@ -632,6 +675,12 @@ object InnerTubeClient {
             viewCountText = listOf(views, age).filter { it.isNotBlank() }.joinToString(" • "),
             channelId = findChannelId(r),
             feedbackToken = findNotInterestedToken(r),
+            watchedPercent = r.optJSONArray("thumbnailOverlays")?.objs()
+                ?.firstNotNullOfOrNull { it.optJSONObject("thumbnailOverlayResumePlaybackRenderer") }
+                ?.optInt("percentDurationWatched", 0) ?: 0,
+            ageRestricted = r.optJSONArray("badges")?.toString()?.let {
+                it.contains("18+") || it.contains("ge-restricted", ignoreCase = true)
+            } ?: false,
         )
     }
 
