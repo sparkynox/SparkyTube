@@ -190,14 +190,28 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             videoId = { lastResolvedVideoId },
             resolving = { isResolving },
             nativeActive = { isNativePlaybackActive },
-            enabled = { composeNav() },
+            enabled = { composeNav() && dev.sparkynox.sparkytube.settings.SettingsPrefs.isWebViewHistoryEnabled(this) },
         )
     }
+
+    // same job without the hidden WebView: stats pings through InnerTube, see history/InnerTubeHistory.kt
+    private val innerHistory by lazy {
+        dev.sparkynox.sparkytube.history.InnerTubeHistory(
+            controller = { mediaController },
+            videoId = { lastResolvedVideoId },
+            resolving = { isResolving },
+            enabled = { dev.sparkynox.sparkytube.settings.SettingsPrefs.isInnerTubeHistoryEnabled(this) },
+        )
+    }
+
+    // the video that is open is a live broadcast
+    private var isLiveStream = false
 
     private fun maybeSaveWatchPosition() {
         if (!isNativePlaybackActive) return
         updateChapterLabel()
         bgHistory.tick()
+        innerHistory.tick()
         ticksSinceLastPositionSave++
         if (ticksSinceLastPositionSave < 8) return
         ticksSinceLastPositionSave = 0
@@ -663,6 +677,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 },
                 sleepPause = { userInitiatedPause = true; mediaController?.pause() },
                 onAudioFx = { startActivity(Intent(this, dev.sparkynox.sparkytube.fx.AudioFxActivity::class.java)) },
+                isLive = { isLiveStream },
                 onPlayPause = {
                     mediaController?.let { c ->
                         userInitiatedPause = c.isPlaying
@@ -1068,12 +1083,16 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }
 
         val audios = currentDownloadAudios
-        val labels = (currentQualities.map { it.label } + if (audios.isNotEmpty()) listOf("Audio only…") else emptyList()).toTypedArray()
+        val labels = (currentQualities.map { it.label } + (if (audios.isNotEmpty()) listOf("Audio only…") else emptyList()) + "Thumbnail (image)").toTypedArray()
         val title = mediaController?.mediaMetadata?.title?.toString() ?: "video"
 
         AlertDialog.Builder(this)
             .setTitle("Download quality")
             .setItems(labels) { _, which ->
+                if (which == labels.size - 1) {
+                    lastResolvedVideoId?.let { dev.sparkynox.sparkytube.download.ThumbnailDownloader.save(this, it, title) }
+                    return@setItems
+                }
                 if (which >= currentQualities.size) {
                     showAudioDownloadPicker(title, lastResolvedVideoId, audios)
                     return@setItems
@@ -1719,6 +1738,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 }
                 if (composeNav() && browseMode == BrowseMode.YOUTUBE) {
                     when {
+                        nav.shortsViewerOpen -> nav.closeShorts()
                         loginInProgress -> {
                             cancelWebViewLogin()
                             showComposeHost()
@@ -2149,8 +2169,10 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
             AlertDialog.Builder(this@MainActivity)
                 .setTitle("Download")
-                .setItems(arrayOf("Video", "Audio only")) { _, which ->
-                    if (which == 0) {
+                .setItems(arrayOf("Video", "Audio only", "Thumbnail (image)")) { _, which ->
+                    if (which == 2) {
+                        dev.sparkynox.sparkytube.download.ThumbnailDownloader.save(this@MainActivity, videoId, item.title)
+                    } else if (which == 0) {
                         showFeedQualityPicker(videoId, item.title, videoOptions)
                     } else if (resolved.downloadAudios.isNotEmpty()) {
                         showAudioDownloadPicker(item.title, videoId, resolved.downloadAudios)
@@ -2945,6 +2967,16 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     private fun ensureComposeHost() {
         if (composeHostReady) return
         composeHostReady = true
+        lifecycleScope.launch {
+            var first = true
+            androidx.compose.runtime.snapshotFlow { nav.shortsViewerOpen }.collect { open ->
+                if (first) { first = false; return@collect }
+                if (!open && isPlayerFullscreen) return@collect
+                val v = if (open) View.GONE else View.VISIBLE
+                binding.topBar.visibility = v
+                binding.bottomNav.visibility = v
+            }
+        }
         binding.nativeHomeFeedCompose.setContent {
             dev.sparkynox.sparkytube.ui.SparkyTheme {
                 dev.sparkynox.sparkytube.ui.AppHost(
@@ -2955,6 +2987,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                     onLogin = { startWebViewLogin() },
                     onAddAccount = { startAddAccount() },
                     onChannel = { openChannel(it) },
+                    onShortsOpened = { onShortsStarted() },
                     onOpenDownloads = {
                         startActivity(Intent(this, dev.sparkynox.sparkytube.download.OfflineLibraryActivity::class.java))
                     },
@@ -2997,11 +3030,19 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }
     }
 
+    // the Shorts viewer takes over: the normal player stops making noise
+    private fun onShortsStarted() {
+        userInitiatedPause = true
+        mediaController?.pause()
+    }
+
     private fun openFeedItem(item: dev.sparkynox.sparkytube.homefeed.HomeFeedItem) {
         val videoId = item.videoId
         val playlistId = item.playlistId
         if (videoId != null && item.isShort) {
-            openWebPage("https://m.youtube.com/shorts/$videoId")
+            val pool = if (nav.shorts.any { it.videoId == videoId }) nav.shorts else listOf(item)
+            nav.openShorts(pool, pool.indexOfFirst { it.videoId == videoId })
+            onShortsStarted()
         } else if (videoId != null) {
             openVideo(videoId, item.title, playlistId)
         } else if (playlistId != null) {
@@ -3594,8 +3635,10 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 return@launch
             }
 
-            if (resolved.isLive) {
-                // Live broadcasts skip native ExoPlayer entirely and stay on
+            isLiveStream = resolved.isLive && resolved.isHls
+            nav.watchLive = isLiveStream
+            if (resolved.isLive && !resolved.isHls) {
+                // Live broadcasts without an HLS manifest skip native ExoPlayer entirely and stay on
                 // YouTube's own WebView player, unmuted, with sound — the
                 // muted-background-WebView + visible-ExoPlayer swap that
                 // regular videos use doesn't fit a live stream (no fixed
@@ -3643,7 +3686,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
             // a saved spot too close to the end would just end the video again a second after it starts
             val durMs = resolved.durationSeconds * 1000
-            val savedPosition = dev.sparkynox.sparkytube.history.WatchHistoryStore.getPosition(this@MainActivity, videoId)
+            val savedPosition = if (isLiveStream) 0L else dev.sparkynox.sparkytube.history.WatchHistoryStore.getPosition(this@MainActivity, videoId)
                 ?.takeIf { durMs <= 0 || it < durMs - 20_000 } ?: 0L
             playOnController(
                 streamUrl = dataSaverQuality?.url ?: resolved.url,
@@ -3758,6 +3801,9 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     private fun stopNativePlayback() {
         // closing the video closes its background copy too
         bgHistory.stop(blank = true)
+        innerHistory.stop()
+        isLiveStream = false
+        nav.watchLive = false
         if (!isNativePlaybackActive) return
         // final save before the controller gets torn down, so leaving a
         // video mid-way always keeps the latest position, not just the
