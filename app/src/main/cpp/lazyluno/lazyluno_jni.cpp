@@ -72,6 +72,8 @@ json streamJson(const Stream& s) {
 
 } // namespace
 
+namespace lazyluno { namespace innertube { bool ageGateSeen(); } }
+
 extern "C" JNIEXPORT jstring JNICALL
 Java_dev_sparkynox_sparkytube_extractor_LazyLuno_nativeResolve(JNIEnv* env, jobject, jstring jvid, jstring jcookie,
                                                                jstring jhl, jstring jgl, jstring jclients,
@@ -108,7 +110,15 @@ Java_dev_sparkynox_sparkytube_extractor_LazyLuno_nativeResolve(JNIEnv* env, jobj
                 else if (n == "TV_EMBEDDED") cfg.spoof.clientOrder.push_back(ClientType::TV_EMBEDDED);
                 else if (n == "TVHTML5") cfg.spoof.clientOrder.push_back(ClientType::TVHTML5);
                 else if (n == "TVHTML5_SIMPLY") cfg.spoof.clientOrder.push_back(ClientType::TVHTML5_SIMPLY);
+                else if (n == "MWEB") cfg.spoof.clientOrder.push_back(ClientType::MWEB);
+                else if (n == "WEB") cfg.spoof.clientOrder.push_back(ClientType::WEB);
+                else if (n == "AGE") cfg.spoof.authFirst = true;  // age-restricted: signed in clients first
                 i = j + 1;
+            }
+            // only "AGE" given: keep the normal order behind the signed in pass
+            if (cfg.spoof.clientOrder.empty()) {
+                cfg.spoof.clientOrder = SpoofConfig::defaultConfig().clientOrder;
+                cfg.spoof.appendAuthFallback = true;
             }
         }
         cfg.visitorData = jstr(env, jvisitor);
@@ -127,13 +137,14 @@ Java_dev_sparkynox_sparkytube_extractor_LazyLuno_nativeResolve(JNIEnv* env, jobj
         out["author"] = info.channelName;
         out["durationMs"] = info.durationMs;
         out["live"] = info.isLive;
+        out["age"] = lazyluno::innertube::ageGateSeen();
         out["description"] = info.description;
         if (info.hlsManifestUrl) out["hls"] = *info.hlsManifestUrl;
         out["streams"] = json::array();
         for (auto& s : info.adaptiveStreams) out["streams"].push_back(streamJson(s));
         for (auto& s : info.muxedStreams) out["streams"].push_back(streamJson(s));
     } catch (const Error& e) {
-        out = {{"ok", false}, {"error", e.what()}, {"code", (int) e.code}};
+        out = {{"ok", false}, {"error", e.what()}, {"code", (int) e.code}, {"age", lazyluno::innertube::ageGateSeen()}};
     } catch (const std::exception& e) {
         out = {{"ok", false}, {"error", std::string("lazyluno: ") + e.what()}, {"code", -1}};
     } catch (...) {

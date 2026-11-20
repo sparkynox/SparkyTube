@@ -52,6 +52,18 @@ buildHeaders(const ClientProfile& client, const AuthCookies* auth, const std::st
     return h;
 }
 
+// set when any answer of the current request carried an age gate, read back with ageGateSeen()
+static thread_local bool tAgeGate = false;
+bool ageGateSeen() { return tAgeGate; }
+
+static bool looksAgeGated(const std::string& j) {
+    return j.find("AGE_VERIFICATION_REQUIRED") != std::string::npos ||
+           j.find("AGE_CHECK_REQUIRED") != std::string::npos ||
+           j.find("confirm your age") != std::string::npos ||
+           j.find("age-restricted") != std::string::npos ||
+           j.find("inappropriate for some users") != std::string::npos;
+}
+
 static bool isVideoUnavailable(const std::string& j) {
     return j.find("\"VIDEO_NOT_FOUND\"") != std::string::npos || j.find("\"REMOVED\"") != std::string::npos;
 }
@@ -64,6 +76,7 @@ std::string playerRequest(const std::string& videoId, const SpoofConfig& spoof, 
                           const std::string& visitorData, int connectTimeoutMs, int requestTimeoutMs,
                           const std::string& hl, const std::string& gl, std::string* usedClient) {
     std::string lastNote;
+    tAgeGate = false;
 
     auto tryClient = [&](ClientType t, bool withAuth) -> std::string {
         auto profile = getClientProfile(t);
@@ -90,6 +103,7 @@ std::string playerRequest(const std::string& videoId, const SpoofConfig& spoof, 
                         (resp.error.empty() ? "" : "(" + resp.error + ")") + " ";
             return {};
         }
+        if (looksAgeGated(resp.body)) tAgeGate = true;
         if (isVideoUnavailable(resp.body))
             throw Error(ErrorCode::VideoUnavailable, "video " + videoId + " is unavailable");
         if (!hasStreams(resp.body)) {
@@ -99,6 +113,16 @@ std::string playerRequest(const std::string& videoId, const SpoofConfig& spoof, 
         if (usedClient) *usedClient = profile.clientName;
         return resp.body;
     };
+
+    // the signed in TV client is the one that plays age-restricted videos for an adult account
+    static const ClientType kAuthClients[] = {ClientType::TVHTML5, ClientType::TV_EMBEDDED, ClientType::ANDROID_APP,
+                                              ClientType::WEB, ClientType::MWEB};
+    if (spoof.authFirst && auth && auth->hasAuth()) {
+        for (auto t : kAuthClients) {
+            auto r = tryClient(t, true);
+            if (!r.empty()) return r;
+        }
+    }
 
     if (spoof.forceClient) {
         auto r = tryClient(*spoof.forceClient, auth && auth->hasAuth());
@@ -110,7 +134,7 @@ std::string playerRequest(const std::string& videoId, const SpoofConfig& spoof, 
         if (!r.empty()) return r;
     }
     if (spoof.appendAuthFallback && auth && auth->hasAuth()) {
-        for (auto t : {ClientType::ANDROID_APP, ClientType::TV_EMBEDDED, ClientType::WEB}) {
+        for (auto t : kAuthClients) {
             auto r = tryClient(t, true);
             if (!r.empty()) return r;
         }
