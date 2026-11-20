@@ -23,7 +23,12 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -240,15 +245,47 @@ private fun ShortPage(
 
     var liked by remember(id) { mutableStateOf(false) }
 
+    // like from the button (toggles) or from a double tap (only ever likes, the heart pops either way)
+    var heartTick by remember(id) { mutableIntStateOf(0) }
+    fun setLike(wantLiked: Boolean) {
+        if (!Session.loggedIn) {
+            Toast.makeText(ctx, "Sign in first (Home tab)", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (liked == wantLiked) return
+        val prev = liked
+        liked = wantLiked
+        scope.launch {
+            val ok = if (wantLiked) InnerTubeClient.like(id) else InnerTubeClient.removeLike(id)
+            if (!ok) liked = prev
+        }
+    }
+    var heartShown by remember(id) { mutableStateOf(false) }
+    LaunchedEffect(heartTick) {
+        if (heartTick > 0) {
+            heartShown = true
+            delay(650)
+            heartShown = false
+        }
+    }
+    val heartScale by animateFloatAsState(if (heartShown) 1f else 0.4f, label = "heartScale")
+    val heartAlpha by animateFloatAsState(if (heartShown) 1f else 0f, label = "heartAlpha")
+
     Box(
-        Modifier.fillMaxSize().background(Color.Black).clickable(
-            interactionSource = remember { MutableInteractionSource() }, indication = null,
-        ) {
-            if (failed) {
-                attempt++
-            } else {
-                userPaused = !userPaused
-            }
+        Modifier.fillMaxSize().background(Color.Black).pointerInput(id, failed) {
+            detectTapGestures(
+                onTap = {
+                    if (failed) attempt++ else userPaused = !userPaused
+                },
+                onDoubleTap = {
+                    if (!failed) {
+                        // the first tap of a double tap paused it, put it back
+                        userPaused = false
+                        heartTick++
+                        setLike(true)
+                    }
+                },
+            )
         },
     ) {
         if (!firstFrame) {
@@ -270,6 +307,11 @@ private fun ShortPage(
         if (failed) Text(
             "Couldn't load this Short. Tap to try again.", Modifier.align(Alignment.Center).padding(32.dp),
             color = Color.White, style = MaterialTheme.typography.bodyMedium,
+        )
+        if (heartAlpha > 0f) Icon(
+            Icons.Filled.Favorite, null,
+            Modifier.align(Alignment.Center).size(110.dp).graphicsLayer { scaleX = heartScale; scaleY = heartScale; alpha = heartAlpha },
+            tint = Color(0xFFFF2D55),
         )
         if (userPaused && !failed) Box(
             Modifier.align(Alignment.Center).size(72.dp).clip(CircleShape).background(Color(0x77000000)),
@@ -310,16 +352,7 @@ private fun ShortPage(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             ShortAction(R.drawable.ic_thumb_up, if (liked) "Liked" else "Like", highlight = liked) {
-                if (!Session.loggedIn) {
-                    Toast.makeText(ctx, "Sign in first (Home tab)", Toast.LENGTH_SHORT).show()
-                } else {
-                    val prev = liked
-                    liked = !prev
-                    scope.launch {
-                        val ok = if (prev) InnerTubeClient.removeLike(id) else InnerTubeClient.like(id)
-                        if (!ok) liked = prev
-                    }
-                }
+                setLike(!liked)
             }
             ShortAction(R.drawable.ic_comment, "Comments", onClick = onComments)
             ShortAction(R.drawable.ic_share, "Share") {
