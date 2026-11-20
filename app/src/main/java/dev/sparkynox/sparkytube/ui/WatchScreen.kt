@@ -90,6 +90,7 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
         return true
     }
     var expanded by remember(nav.watchId) { mutableStateOf(false) }
+    var showComments by remember(nav.watchId) { mutableStateOf(false) }
     val list = rememberLazyListState()
     val nearEnd by remember {
         androidx.compose.runtime.derivedStateOf {
@@ -136,6 +137,12 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
         ) {
             item(key = "title") {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                    if (nav.watchLive) Text(
+                        "\u25CF LIVE", color = Color.White, style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 4.dp).clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFFE62117)).padding(horizontal = 8.dp, vertical = 2.dp),
+                    )
                     Text(
                         info?.title ?: nav.watchTitle,
                         style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
@@ -256,6 +263,27 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
                 }
             }
 
+            if (nav.watchId != null) item(key = "comments") {
+                Surface(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                        .clip(RoundedCornerShape(16.dp)).clickable { showComments = true },
+                    shape = RoundedCornerShape(16.dp),
+                    color = panelColor(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    border = panelBorder(),
+                ) {
+                    Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.material3.Icon(
+                            androidx.compose.ui.res.painterResource(dev.sparkynox.sparkytube.R.drawable.ic_comment), null,
+                            Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Column(Modifier.padding(start = 12.dp)) {
+                            Text("Comments", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                            Text("Tap to read what people are saying", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+
             if (!info?.description.isNullOrBlank()) item(key = "description") {
                 Surface(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
@@ -366,6 +394,8 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
         }
         }
     }
+    val cid = nav.watchId
+    if (showComments && cid != null) CommentsSheet(videoId = cid, knownToken = info?.commentsToken, onDismiss = { showComments = false })
 }
 
 // icon + label inside the action buttons under the player

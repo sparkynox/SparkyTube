@@ -86,11 +86,13 @@ fun AppHost(
     onOpenDownloads: () -> Unit,
     onChannel: (String) -> Unit = {},
     onAddAccount: () -> Unit = onLogin,
+    onShortsOpened: () -> Unit = {},
 ) {
     var menuItem by remember { mutableStateOf<HomeFeedItem?>(null) }
     val onMore: (HomeFeedItem) -> Unit = { menuItem = it }
     SideEffect { BarsScroll.enabled = { nav.watchId == null && !nav.searchVisible } }
-    CompositionLocalProvider(LocalOpenChannel provides onChannel, LocalOpenMenu provides onMore) {
+    val openShorts: (List<HomeFeedItem>, Int) -> Unit = { list, i -> nav.openShorts(list, i); onShortsOpened() }
+    CompositionLocalProvider(LocalOpenChannel provides onChannel, LocalOpenMenu provides onMore, LocalOpenShorts provides openShorts) {
     Box(Modifier.fillMaxSize().nestedScroll(BarsScroll.connection)) {
         if (nav.showAccounts) AccountsSheet(home, nav, onAddAccount = onAddAccount, onDismiss = { nav.showAccounts = false })
         val page = nav.pages.lastOrNull()
@@ -151,6 +153,8 @@ fun AppHost(
             exit = androidx.compose.animation.ExitTransition.None,
         ) { WatchScreen(nav, onOpen = onOpen, onMore = onMore) }
         menuItem?.let { VideoMenuSheet(it, nav, onDownload, onDismiss = { menuItem = null }) }
+        // the native Shorts player covers everything, bars included
+        if (nav.shortsViewerOpen) dev.sparkynox.sparkytube.ui.shorts.ShortsViewer(nav, onDownload = onDownload, onClose = { nav.closeShorts() })
     }
     }
 }
@@ -247,6 +251,7 @@ fun FeedScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ShortsScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit) {
+    val openShorts = LocalOpenShorts.current
     PullToRefreshBox(isRefreshing = nav.shortsLoading, onRefresh = { nav.loadShorts(force = true) }) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
@@ -276,7 +281,7 @@ fun ShortsScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit) {
                     Modifier.fillMaxWidth().aspectRatio(9f / 16f)
                         .clip(RoundedCornerShape(18.dp))
                         .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                        .clickable { onOpen(s) },
+                        .clickable { openShorts(nav.shorts, nav.shorts.indexOf(s)) },
                 ) {
                     AsyncImage(s.thumbnailUrl, s.title, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                     Column(

@@ -216,6 +216,8 @@ internal fun ErrorCard(msg: String, onRetry: () -> Unit) {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun VideoCard(item: HomeFeedItem, onOpen: () -> Unit, onMore: () -> Unit, modifier: Modifier = Modifier) {
+    // a Shorts row sitting between the videos
+    item.shortsShelf?.let { ShortsShelf(it, modifier); return }
     val openChannel = LocalOpenChannel.current
     val chId = item.channelId
     val chTap = if (chId != null) Modifier.clickable { openChannel(chId) } else Modifier
@@ -240,6 +242,26 @@ internal fun VideoCard(item: HomeFeedItem, onOpen: () -> Unit, onMore: () -> Uni
                 contentDescription = item.title,
                 modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
                 contentScale = ContentScale.Crop,
+            )
+            // 18+ top left (yellow), Watched top right
+            val ctx = LocalContext.current
+            val is18 = remember(item.videoId) { item.ageRestricted || dev.sparkynox.sparkytube.history.AgeRestrictedStore.has(ctx, item.videoId) }
+            val seen = remember(item.videoId) { item.watchedPercent > 0 || dev.sparkynox.sparkytube.history.WatchHistoryStore.isWatched(ctx, item.videoId) }
+            if (is18) Text(
+                "18+",
+                Modifier.align(Alignment.TopStart).padding(8.dp)
+                    .clip(RoundedCornerShape(8.dp)).background(Color(0xFFFFC107))
+                    .padding(horizontal = 7.dp, vertical = 2.dp),
+                color = Color.Black, fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.labelSmall,
+            )
+            if (seen) Text(
+                "Watched",
+                Modifier.align(Alignment.TopEnd).padding(8.dp)
+                    .clip(RoundedCornerShape(8.dp)).background(Color.Black.copy(alpha = 0.78f))
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                color = Color.White,
+                style = MaterialTheme.typography.labelSmall,
             )
             val badge = item.durationText.ifBlank { item.itemCountText.orEmpty() }
             if (badge.isNotBlank()) {

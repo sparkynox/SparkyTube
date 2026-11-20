@@ -1,6 +1,7 @@
 package dev.sparkynox.sparkytube.ui
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -72,6 +73,7 @@ class NavViewModel : ViewModel() {
         subs.reset()
         subChannels = emptyList(); subChannelsLoaded = false
         shorts = emptyList()
+        closeShorts()
     }
 
     fun push(title: String, source: FeedState.Source) {
@@ -107,6 +109,66 @@ class NavViewModel : ViewModel() {
         }
     }
 
+    // ---------- native Shorts viewer (full screen, vertical swipe)
+
+    var shortsViewerOpen by mutableStateOf(false); private set
+    var viewerShorts by mutableStateOf<List<HomeFeedItem>>(emptyList()); private set
+    var viewerStart by mutableIntStateOf(0); private set
+    private var viewerToken: String? = null
+    private var viewerSeeded = false
+    private var viewerFallbackDone = false
+    private var viewerLoading = false
+
+    fun openShorts(list: List<HomeFeedItem>, index: Int) {
+        val clean = list.filter { it.videoId != null }
+        if (clean.isEmpty()) return
+        val wanted = list.getOrNull(index)?.videoId
+        viewerShorts = clean
+        viewerStart = clean.indexOfFirst { it.videoId == wanted }.coerceAtLeast(0)
+        viewerToken = null; viewerSeeded = false; viewerFallbackDone = false
+        shortsViewerOpen = true
+    }
+
+    fun closeShorts() {
+        shortsViewerOpen = false
+        viewerShorts = emptyList()
+    }
+
+    /** The viewer calls this when it gets near the end of what it has. */
+    fun loadMoreViewerShorts() {
+        val last = viewerShorts.lastOrNull()?.videoId ?: return
+        if (viewerLoading) return
+        viewerLoading = true
+        viewModelScope.launch {
+            try {
+                val page = if (!viewerSeeded) {
+                    viewerSeeded = true
+                    dev.sparkynox.sparkytube.homefeed.ShortsApi.start(last)
+                } else {
+                    viewerToken?.let { dev.sparkynox.sparkytube.homefeed.ShortsApi.more(it) }
+                }
+                var added = merge(page?.items ?: emptyList())
+                viewerToken = page?.token
+                // the reel endpoints gave nothing: fall back to the Shorts the home feed has
+                if (added == 0 && viewerToken == null && !viewerFallbackDone) {
+                    viewerFallbackDone = true
+                    added = merge(InnerTubeClient.fetchShorts().items)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } finally {
+                viewerLoading = false
+            }
+        }
+    }
+
+    private fun merge(items: List<HomeFeedItem>): Int {
+        val seen = viewerShorts.mapTo(HashSet()) { it.videoId }
+        val add = items.filter { it.videoId != null && it.videoId !in seen }
+        if (add.isNotEmpty()) viewerShorts = viewerShorts + add
+        return add.size
+    }
+
     // ---------- Watch
 
     var watchVisible by mutableStateOf(false)
@@ -115,6 +177,8 @@ class NavViewModel : ViewModel() {
 
     // false from the moment a video is opened until the native player actually has it, the watch page shows a loading picture meanwhile
     var playerReady by mutableStateOf(false)
+    // the video that is open is a live broadcast (set by the activity once the stream is resolved)
+    var watchLive by mutableStateOf(false)
     var watchInfo by mutableStateOf<InnerTubeClient.WatchInfo?>(null); private set
     var related by mutableStateOf<List<HomeFeedItem>>(emptyList()); private set
     var relatedLoading by mutableStateOf(false); private set
@@ -208,6 +272,7 @@ class NavViewModel : ViewModel() {
             return
         }
         playerReady = false
+        watchLive = false
         val cur = watchId
         if (!back && cur != null && cur != videoId) {
             played.add(Played(cur, watchTitle, watchPlaylistId))
@@ -248,6 +313,7 @@ class NavViewModel : ViewModel() {
     fun closeWatch() {
         resume = null
         playerReady = false
+        watchLive = false
         watchVisible = false
         watchId = null
         watchInfo = null

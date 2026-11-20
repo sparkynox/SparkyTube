@@ -74,6 +74,7 @@ class PlayerControlsHost(
     val setSpeed: (Float) -> Unit,
     val sleepPause: () -> Unit,
     val onAudioFx: () -> Unit,
+    val isLive: () -> Boolean = { false },
 )
 
 // The native controller stays in the PlayerView but is invisible (see exo_player_controls.xml),
@@ -125,6 +126,8 @@ fun PlayerControls(h: PlayerControlsHost) {
     var dragging by remember { mutableStateOf(false) }
     var dragValue by remember { mutableStateOf(0f) }
     val shown = if (dragging) dragValue else position.toFloat()
+    val live = h.isLive()
+    val atEdge = live && (c?.currentLiveOffset ?: Long.MAX_VALUE).let { it != C.TIME_UNSET && it < 10_000 }
 
     // tap on the video shows / hides the controls, they hide on their own while playing
     val vis = PlayerControlsVisibility
@@ -176,7 +179,19 @@ fun PlayerControls(h: PlayerControlsHost) {
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(clock(shown.toLong()), color = Color.White, style = MaterialTheme.typography.labelMedium)
+            if (live) {
+                // red LIVE pill at the live edge, grey GO LIVE when behind it
+                Text(
+                    if (atEdge) "\u25CF LIVE" else "GO LIVE", color = Color.White,
+                    style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clip(CircleShape)
+                        .background(if (atEdge) Color(0xFFE62117) else Color(0x99555555))
+                        .clickable { vis.poke(); c?.seekToDefaultPosition() }
+                        .padding(horizontal = 10.dp, vertical = 3.dp),
+                )
+            } else {
+                Text(clock(shown.toLong()), color = Color.White, style = MaterialTheme.typography.labelMedium)
+            }
             Box(Modifier.weight(1f).padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
                 Slider(
                     value = shown.coerceIn(0f, duration.coerceAtLeast(1L).toFloat()),
@@ -204,8 +219,9 @@ fun PlayerControls(h: PlayerControlsHost) {
                     }
                 }
             }
-            Text(clock(duration), color = Color.White, style = MaterialTheme.typography.labelMedium)
-            RoundButton(onClick = poke(h.onSpeed), modifier = Modifier.padding(start = 8.dp), wide = true) {
+            if (!live) Text(clock(duration), color = Color.White, style = MaterialTheme.typography.labelMedium)
+            else if (!atEdge) Text("-" + clock((duration - position).coerceAtLeast(0)), color = Color.White, style = MaterialTheme.typography.labelMedium)
+            if (!live) RoundButton(onClick = poke(h.onSpeed), modifier = Modifier.padding(start = 8.dp), wide = true) {
                 Text(h.speedLabel(), color = Color.White, style = MaterialTheme.typography.labelLarge)
             }
             RoundButton(onClick = poke(h.onFullscreen), modifier = Modifier.padding(start = 6.dp)) {

@@ -103,6 +103,10 @@ fun VideoMenuSheet(
                     }
                 }
                 MenuRow(Icons.Filled.KeyboardArrowDown, "Download") { onDismiss(); onDownload(item) }
+                MenuRow(androidx.compose.ui.res.vectorResource(dev.sparkynox.sparkytube.R.drawable.ic_image), "Save thumbnail") {
+                    dev.sparkynox.sparkytube.download.ThumbnailDownloader.save(ctx, id, item.title)
+                    onDismiss()
+                }
             }
             val share = id ?: item.playlistId
             if (share != null) {
