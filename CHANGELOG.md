@@ -1,6 +1,6 @@
 # SparkyTube Changelog
 
-# v2.6
+# v2.6 ★
 
 ## New Features
 
