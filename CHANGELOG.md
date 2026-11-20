@@ -5,7 +5,7 @@
 ## Fixes
 
 - Mini player: autoplay and Play next no longer pop the video back up to the big player, the next video plays in the mini player
-- Playlists in Home, search and related (the "49 videos" cards) now open the playlist page. Mixes still just play
+- Playlists in Home, search and related (the "X videos" cards) now open the playlist page. Mixes still just play
 - Playlists and mixes show the channel picture (fetched once per channel and kept)
 - Top and bottom bar no longer stay hidden after scrolling the feed and opening a video: they come back when a video opens, when you leave the watch page (so the mini player has its place) and when the Shorts viewer closes
 - The Shorts tab in the bottom bar now opens the native Shorts player too, not the YouTube page
