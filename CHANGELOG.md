@@ -1,6 +1,16 @@
 # SparkyTube Changelog
 
-# v2.6 ★
+# v2.6
+
+## Fixes
+
+- Mini player: autoplay and Play next no longer pop the video back up to the big player, the next video plays in the mini player
+- Playlists in Home, search and related (the "49 videos" cards) now open the playlist page. Mixes still just play
+- Playlists and mixes show the channel picture (fetched once per channel and kept)
+- Top and bottom bar no longer stay hidden after scrolling the feed and opening a video: they come back when a video opens, when you leave the watch page (so the mini player has its place) and when the Shorts viewer closes
+- The Shorts tab in the bottom bar now opens the native Shorts player too, not the YouTube page
+- Shorts: double tap to like (a heart pops up, double tapping an already liked Short keeps it liked)
+- Build fix: `vectorResource` in the video menu
 
 ## New Features
 
@@ -12,6 +22,8 @@
 - **Download thumbnails**: "Save thumbnail" in the video menu and a "Thumbnail (image)" entry in both download dialogs save the biggest available jpg to Pictures/SparkyTube
 - **18+ and Watched badges**: thumbnails get a yellow 18+ badge (top left) on age-restricted videos and a Watched badge (top right) on videos you already played. The 18+ badge shows once an age gate has been seen for that video
 - **LazyLuno 18+ support**: age-restricted videos now play for a signed in adult account. LazyLuno reports the age gate, remembers the video, and from then on tries the signed in TV client first (TVHTML5, TV embedded, Android, Web, MWEB). Signed out, it says the video needs an adult account instead of a vague error
+- **Community posts and polls** show up in the feed (author, text, pictures, poll choices). Tap one to open it on YouTube, where you can vote
+- **Shelves**: titled rows like "Listen again" are shown as a sideways scrolling row with their title, like the YouTube site, instead of being flattened into single cards
 - **Better About screen**: Settings > About with developer links, project links, what SparkyTube is built with and a device info block you can copy for bug reports
 
 # v2.5
