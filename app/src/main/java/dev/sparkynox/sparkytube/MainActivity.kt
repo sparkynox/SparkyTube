@@ -1,5 +1,6 @@
 package dev.sparkynox.sparkytube
 
+import kotlinx.coroutines.flow.first
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.ComponentName
@@ -2878,6 +2879,14 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }
     }
 
+    // bars back after a scroll hide, the watch page, the mini player or the Shorts viewer
+    private fun restoreBars() {
+        if (isPlayerFullscreen || nav.shortsViewerOpen) return
+        binding.topBar.visibility = View.VISIBLE
+        binding.bottomNav.visibility = View.VISIBLE
+        barsController?.show()
+    }
+
     private fun onTabSelected(tab: dev.sparkynox.sparkytube.ui.NavViewModel.Tab) {
         barsController?.show()
         if (!composeNav()) {
@@ -2899,11 +2908,20 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         nav.pages.clear()
         nav.channels.clear()
         nav.tab = tab
-        if (tab == dev.sparkynox.sparkytube.ui.NavViewModel.Tab.SHORTS) {
-            openWebPage("https://m.youtube.com/shorts")
-            return
-        }
         showComposeHost()
+        if (tab == dev.sparkynox.sparkytube.ui.NavViewModel.Tab.SHORTS) {
+            // the Shorts tab opens the native player straight away (the grid is behind it)
+            nav.loadShorts()
+            lifecycleScope.launch {
+                val list = kotlinx.coroutines.withTimeoutOrNull(10_000) {
+                    androidx.compose.runtime.snapshotFlow { nav.shorts }.first { it.isNotEmpty() }
+                }
+                if (list != null && nav.tab == dev.sparkynox.sparkytube.ui.NavViewModel.Tab.SHORTS && !nav.shortsViewerOpen) {
+                    nav.openShorts(list, 0)
+                    onShortsStarted()
+                }
+            }
+        }
     }
 
     /** Legacy path (WebView-based feed styles) -- the Compose UI does not go through here. */
@@ -2971,10 +2989,12 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             var first = true
             androidx.compose.runtime.snapshotFlow { nav.shortsViewerOpen }.collect { open ->
                 if (first) { first = false; return@collect }
-                if (!open && isPlayerFullscreen) return@collect
-                val v = if (open) View.GONE else View.VISIBLE
-                binding.topBar.visibility = v
-                binding.bottomNav.visibility = v
+                if (open) {
+                    binding.topBar.visibility = View.GONE
+                    binding.bottomNav.visibility = View.GONE
+                } else {
+                    restoreBars()
+                }
             }
         }
         binding.nativeHomeFeedCompose.setContent {
@@ -3039,10 +3059,20 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     private fun openFeedItem(item: dev.sparkynox.sparkytube.homefeed.HomeFeedItem) {
         val videoId = item.videoId
         val playlistId = item.playlistId
+        item.post?.let {
+            openWebPage("https://m.youtube.com/post/${it.postId}")
+            return
+        }
         if (videoId != null && item.isShort) {
             val pool = if (nav.shorts.any { it.videoId == videoId }) nav.shorts else listOf(item)
             nav.openShorts(pool, pool.indexOfFirst { it.videoId == videoId })
             onShortsStarted()
+        } else if (playlistId != null && !playlistId.startsWith("RD")) {
+            // a real playlist opens its page (a Mix has no page, it just plays)
+            nav.push(
+                item.title.ifBlank { "Playlist" },
+                dev.sparkynox.sparkytube.homefeed.FeedState.Source.Browse("VL$playlistId")
+            )
         } else if (videoId != null) {
             openVideo(videoId, item.title, playlistId)
         } else if (playlistId != null) {
@@ -3055,8 +3085,17 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }
     }
 
+    // autoplay / Play next while the mini player is showing: the next video plays in the mini player, the watch page stays closed
+    private var keepMiniOnce = false
+
     private fun openVideo(videoId: String, title: String, playlistId: String? = null, auto: Boolean = false, back: Boolean = false) {
+        restoreBars()
+        val stayMini = auto && isMiniPlayerActive && videoId != lastResolvedVideoId
         nav.openWatch(videoId, title, playlistId, auto, back)
+        if (stayMini) {
+            nav.watchVisible = false
+            keepMiniOnce = true
+        }
         if (videoId == lastResolvedVideoId && isNativePlaybackActive) {
             // already playing (e.g. from the mini-player), just bring it back up
             if (isMiniPlayerActive) exitMiniPlayerMode()
@@ -3129,6 +3168,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
     private fun leaveWatch() {
         if (!nav.watchVisible) return
+        restoreBars()
         nav.watchVisible = false
         nav.watchDrag = 0f
         if (isNativePlaybackActive) {
@@ -3588,9 +3628,10 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         // real YouTube app: pull the player back to full view for the new
         // video rather than leaving the old mini-player box sitting there
         // while a second resolve happens underneath it.
-        if (isMiniPlayerActive && videoId != lastResolvedVideoId) {
+        if (isMiniPlayerActive && videoId != lastResolvedVideoId && !keepMiniOnce) {
             exitMiniPlayerMode()
         }
+        keepMiniOnce = false
 
         // every way of starting a video ends up here, so this is the one place that fetches the
         // SponsorBlock segments (they used to be fetched only from the old WebView bridge path,
