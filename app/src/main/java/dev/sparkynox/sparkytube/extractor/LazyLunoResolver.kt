@@ -31,8 +31,11 @@ object LazyLunoResolver {
         val t0 = System.currentTimeMillis()
         // the logged-in YouTube session, only used by LazyLuno's auth fallback
         val cookie = runCatching { CookieManager.getInstance().getCookie("https://www.youtube.com") }.getOrNull().orEmpty()
+        // a video that already showed an age gate goes straight to the signed in clients
+        val known18 = dev.sparkynox.sparkytube.history.AgeRestrictedStore.has(ctx, videoId)
+        val useClients = if (clients.isEmpty() && known18 && cookie.isNotEmpty()) "AGE" else clients
         val raw = try {
-            LazyLuno.resolveJson(videoId, cookie, "en", Locale.getDefault().country.ifBlank { "US" }, clients)
+            LazyLuno.resolveJson(videoId, cookie, "en", Locale.getDefault().country.ifBlank { "US" }, useClients)
         } catch (t: Throwable) {
             lastErrorMessage = "${t.javaClass.simpleName}: ${t.message}"
             LogRecorder.e(TAG, "native call failed", t)
@@ -43,8 +46,12 @@ object LazyLunoResolver {
             lastErrorMessage = "unreadable answer from the native side"
             return null
         }
+        if (o.optBoolean("age")) dev.sparkynox.sparkytube.history.AgeRestrictedStore.mark(ctx, videoId)
         if (!o.optBoolean("ok")) {
             lastErrorMessage = o.optString("error", "unknown error")
+            if (o.optBoolean("age") && cookie.isEmpty()) {
+                lastErrorMessage = "This video is age-restricted. Sign in with an adult account (Home tab) to watch it."
+            }
             LogRecorder.w(TAG, "failed in ${System.currentTimeMillis() - t0} ms: $lastErrorMessage")
             return null
         }
@@ -89,7 +96,8 @@ object LazyLunoResolver {
         ctx: Context, title: String, duration: Long, live: Boolean, hls: String, all: List<S>,
         partial: Boolean = false,
     ): StreamExtractor.ResolvedStream? {
-        if (all.isEmpty() && hls.isNotEmpty()) {
+        // live broadcast: the HLS manifest is the stream, ExoPlayer follows the live edge by itself
+        if ((all.isEmpty() || live) && hls.isNotEmpty()) {
             return StreamExtractor.ResolvedStream(url = hls, title = title, isHls = true, durationSeconds = duration, isLive = live)
         }
 
