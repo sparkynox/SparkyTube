@@ -1,5 +1,19 @@
 # SparkyTube Changelog
 
+# v2.6
+
+## New Features
+
+- **Native Shorts**: Shorts now open in a full screen vertical player (swipe up for the next one) instead of the YouTube page. Streams come from LazyLuno only, no NewPipe, at up to 720p with the muxed stream preferred so they start fast. The next Short is resolved and prepared while you watch. Tap to pause, like, comments, share, save, mute. The list carries on forever through the InnerTube reel endpoints
+- **Shorts shelf on the Home feed**: the "Shorts" shelf YouTube puts between videos is shown as a 2 column grid like m.youtube.com, with a menu on the header and on every card. Tap a card to open the Shorts player on it. It also shows in search and related lists
+- **Live streams**: live broadcasts now play natively (HLS) instead of the WebView player, with a LIVE / GO LIVE button, DVR seeking, and a LIVE tag on the watch page
+- **History sync switches**: Settings > History has "InnerTube history sync" (sends the same stats pings the web player sends, no hidden page, also marks watched Shorts) and "WebView history sync" (the old hidden watch page). Both are on by default, turn WebView off once InnerTube sync works for you. Check Settings > Logs (tag History) to see the pings
+- **Comments**: a Comments card on the watch page and a Comments button in Shorts open a sheet with Top / Newest sorting, endless scrolling and replies
+- **Download thumbnails**: "Save thumbnail" in the video menu and a "Thumbnail (image)" entry in both download dialogs save the biggest available jpg to Pictures/SparkyTube
+- **18+ and Watched badges**: thumbnails get a yellow 18+ badge (top left) on age-restricted videos and a Watched badge (top right) on videos you already played. The 18+ badge shows once an age gate has been seen for that video
+- **LazyLuno 18+ support**: age-restricted videos now play for a signed in adult account. LazyLuno reports the age gate, remembers the video, and from then on tries the signed in TV client first (TVHTML5, TV embedded, Android, Web, MWEB). Signed out, it says the video needs an adult account instead of a vague error
+- **Better About screen**: Settings > About with developer links, project links, what SparkyTube is built with and a device info block you can copy for bug reports
+
 # v2.5
 
 ## New Features
