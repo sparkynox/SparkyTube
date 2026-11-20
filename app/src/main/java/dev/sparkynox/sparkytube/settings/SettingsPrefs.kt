@@ -52,6 +52,8 @@ object SettingsPrefs {
     private const val KEY_SPONSORBLOCK_CATEGORIES = "sponsorblock_categories"
     private const val KEY_DEFAULT_QUALITY = "default_quality_value"
     private const val KEY_MUSIC_MODE_ACTIVE = "music_mode_active"
+    private const val KEY_INNERTUBE_HISTORY = "innertube_history_enabled"
+    private const val KEY_WEBVIEW_HISTORY = "webview_history_enabled"
 
     @Volatile
     private var migrated = false
@@ -475,5 +477,20 @@ object SettingsPrefs {
 
     fun setSponsorBlockCategories(context: Context, categories: Set<dev.sparkynox.sparkytube.sponsorblock.SponsorBlockManager.Category>) {
         prefs(context).edit().putStringSet(KEY_SPONSORBLOCK_CATEGORIES, categories.map { it.name }.toSet()).apply()
+    }
+
+    // history sync: native stats pings (InnerTube) and the hidden WebView watch page, each on its own switch
+    fun isInnerTubeHistoryEnabled(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_INNERTUBE_HISTORY, true)
+
+    fun setInnerTubeHistoryEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_INNERTUBE_HISTORY, enabled).apply()
+    }
+
+    fun isWebViewHistoryEnabled(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_WEBVIEW_HISTORY, true)
+
+    fun setWebViewHistoryEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_WEBVIEW_HISTORY, enabled).apply()
     }
 }

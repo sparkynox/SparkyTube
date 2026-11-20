@@ -302,9 +302,26 @@ class SettingsComposeActivity : AppCompatActivity() {
                         if (dev.sparkynox.sparkytube.logs.LogRecorder.getLastCrash(this) != null) "⚠ Last session crashed — tap to view"
                         else "Session log + crash reports"
                     }) { open(dev.sparkynox.sparkytube.logs.LogsActivity::class.java) }
+            )),
+            Section("history", "History", "list", "Save what you watch in your YouTube history", listOf(
+                toggle("ithistory", "InnerTube history sync", "pulse",
+                    "Adds watched videos and Shorts to your YouTube history straight from the player, no hidden page needed. Needs you to be signed in",
+                    { SettingsPrefs.isInnerTubeHistoryEnabled(this) }, { SettingsPrefs.setInnerTubeHistoryEnabled(this, it) }),
+                toggle("wvhistory", "WebView history sync", "globe",
+                    "Plays the real watch page in a hidden WebView so YouTube counts the view. Heavier, turn it off if InnerTube sync works for you",
+                    { SettingsPrefs.isWebViewHistoryEnabled(this) }, { SettingsPrefs.setWebViewHistoryEnabled(this, it) })
+            )),
+            Section("about", "About", "file", "Version, developer and links", listOf(
+                link("about", "About SparkyTube", "file", { "Version ${appVersion()}, credits, links and licenses" }) {
+                    open(AboutActivity::class.java)
+                }
             ))
         )
     }
+
+    private fun appVersion(): String = try {
+        packageManager.getPackageInfo(packageName, 0).versionName ?: ""
+    } catch (e: Exception) { "" }
 
 
     // ---------- UI
