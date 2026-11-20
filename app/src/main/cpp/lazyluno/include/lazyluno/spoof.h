@@ -38,6 +38,8 @@ struct SpoofConfig {
     std::vector<ClientType>   clientOrder;
     std::optional<ClientType> forceClient;
     bool                      appendAuthFallback = true;
+    // known age-restricted video: go straight to the signed in clients instead of trying the anonymous ones first
+    bool                      authFirst = false;
 
     static SpoofConfig defaultConfig() {
         SpoofConfig c;
