@@ -24,5 +24,25 @@ data class HomeFeedItem(
     // how much of the video this account already watched (0-100), from YouTube's own progress overlay
     val watchedPercent: Int = 0,
     // the renderer itself said age-restricted (the local AgeRestrictedStore knows more)
-    val ageRestricted: Boolean = false
+    val ageRestricted: Boolean = false,
+    // a community post (text, images, poll) sitting in the feed
+    val post: PostData? = null,
+    // a titled shelf of videos ("Listen again", ...) shown as a horizontal row
+    val shelf: ShelfData? = null
 )
+
+data class PostPoll(val choices: List<Pair<String, String?>>, val total: String?)
+
+data class PostData(
+    val postId: String,
+    val author: String,
+    val avatar: String?,
+    val time: String,
+    val text: String,
+    val images: List<String>,
+    val poll: PostPoll?,
+    val likes: String,
+    val channelId: String?,
+)
+
+data class ShelfData(val title: String, val subtitle: String?, val items: List<HomeFeedItem>)

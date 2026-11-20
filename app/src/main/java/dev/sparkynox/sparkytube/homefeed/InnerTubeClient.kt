@@ -621,24 +621,98 @@ object InnerTubeClient {
                 node.optJSONObject("compactVideoRenderer")?.let { parseVideoRenderer(it)?.let(out::add) }
                 node.optJSONObject("playlistVideoRenderer")?.let { parseVideoRenderer(it)?.let(out::add) }
                 node.optJSONObject("radioRenderer")?.let { parsePlaylistLike(it)?.let(out::add) }
-                // a Shorts shelf between normal videos becomes one row item
+                // a shelf between normal videos becomes one row item: Shorts, or a titled row like "Listen again"
                 (node.optJSONObject("reelShelfRenderer") ?: node.optJSONObject("richShelfRenderer"))?.let { shelf ->
                     val shorts = ArrayList<HomeFeedItem>()
                     collectShorts(shelf, shorts)
                     val unique = shorts.distinctBy { it.videoId }
-                    if (unique.size >= 2) out.add(
-                        HomeFeedItem(
-                            videoId = null, playlistId = "shorts-shelf-" + unique.first().videoId,
-                            title = "Shorts", channelName = "", thumbnailUrl = "", durationText = "", viewCountText = "",
-                            shortsShelf = unique,
+                    if (unique.size >= 2) {
+                        out.add(
+                            HomeFeedItem(
+                                videoId = null, playlistId = "shorts-shelf-" + unique.first().videoId,
+                                title = "Shorts", channelName = "", thumbnailUrl = "", durationText = "", viewCountText = "",
+                                shortsShelf = unique,
+                            )
                         )
-                    )
+                    } else {
+                        val vids = ArrayList<HomeFeedItem>()
+                        collect(shelf.opt("contents"), vids)
+                        val title = text(shelf.optJSONObject("title"))
+                        if (vids.size >= 2 && !title.isNullOrBlank()) out.add(
+                            HomeFeedItem(
+                                videoId = null, playlistId = "shelf-" + title + "-" + (vids.first().videoId ?: vids.first().playlistId),
+                                title = title, channelName = "", thumbnailUrl = "", durationText = "", viewCountText = "",
+                                shelf = ShelfData(title, text(shelf.optJSONObject("subtitle")), vids.distinctBy { it.videoId ?: it.playlistId }),
+                            )
+                        )
+                    }
                 }
+                // community posts, with their pictures and polls
+                (node.optJSONObject("postRenderer") ?: node.optJSONObject("backstagePostRenderer"))
+                    ?.let { parsePost(it)?.let(out::add) }
                 (node.optJSONObject("playlistRenderer") ?: node.optJSONObject("compactPlaylistRenderer") ?: node.optJSONObject("gridPlaylistRenderer"))
                     ?.let { parsePlaylistLike(it)?.let(out::add) }
-                node.keys().forEach { collect(node.opt(it), out) }
+                // shelves and posts are handled above, going into them again would repeat their videos
+                node.keys().forEach { k ->
+                    if (k != "richShelfRenderer" && k != "reelShelfRenderer" && k != "postRenderer" && k != "backstagePostRenderer")
+                        collect(node.opt(k), out)
+                }
             }
             is JSONArray -> for (i in 0 until node.length()) collect(node.opt(i), out)
+        }
+    }
+
+    private fun parsePost(r: JSONObject): HomeFeedItem? {
+        val postId = r.optString("postId").takeIf { it.isNotBlank() } ?: return null
+        val author = text(r.optJSONObject("authorText")) ?: ""
+        val body = text(r.optJSONObject("contentText")) ?: ""
+        val att = r.optJSONObject("backstageAttachment")
+
+        val images = ArrayList<String>()
+        fun addImages(n: Any?) {
+            when (n) {
+                is JSONObject -> {
+                    n.optJSONObject("backstageImageRenderer")?.optJSONObject("image")?.optJSONArray("thumbnails")
+                        ?.let { lastThumb(it) }?.let(images::add)
+                    n.keys().forEach { k -> if (k != "backstageImageRenderer") addImages(n.opt(k)) }
+                }
+                is JSONArray -> for (i in 0 until n.length()) addImages(n.opt(i))
+            }
+        }
+        addImages(att)
+
+        val poll = findFirst(att, "pollRenderer")?.let { p ->
+            val choices = p.optJSONArray("choices")?.objs()?.mapNotNull { c ->
+                val t = text(c.optJSONObject("text")) ?: return@mapNotNull null
+                val pct = text(c.optJSONObject("votePercentageIfNotSelected")) ?: text(c.optJSONObject("votePercentageIfSelected"))
+                t to pct
+            } ?: emptyList()
+            if (choices.isEmpty()) null else PostPoll(choices, text(p.optJSONObject("totalVotes")))
+        }
+        if (body.isBlank() && images.isEmpty() && poll == null) return null
+
+        val data = PostData(
+            postId = postId, author = author,
+            avatar = lastThumb(r.optJSONObject("authorThumbnail")?.optJSONArray("thumbnails")),
+            time = text(r.optJSONObject("publishedTimeText")) ?: "",
+            text = body, images = images, poll = poll,
+            likes = text(r.optJSONObject("voteCount")) ?: "",
+            channelId = findChannelId(r),
+        )
+        return HomeFeedItem(
+            videoId = null, playlistId = "post-$postId", title = body.take(80).ifBlank { author }, channelName = author,
+            thumbnailUrl = images.firstOrNull() ?: "", durationText = "", viewCountText = "", post = data,
+        )
+    }
+
+    /** Channel picture for cards that carry only a channel id (playlists, mixes). One request per channel, kept in memory. */
+    suspend fun fetchChannelAvatar(channelId: String): String? = withContext(Dispatchers.IO) {
+        try {
+            val root = post("browse", JSONObject().put("browseId", channelId))
+            findFirst(root, "avatarViewModel")?.optJSONObject("image")?.optJSONArray("sources")?.let { lastThumb(it) }
+                ?: findFirst(root, "avatar")?.optJSONArray("thumbnails")?.let { lastThumb(it) }
+        } catch (e: Exception) {
+            null
         }
     }
 
@@ -663,6 +737,8 @@ object InnerTubeClient {
             ?.optJSONObject("channelThumbnailWithLinkRenderer")
             ?.optJSONObject("thumbnail")?.optJSONArray("thumbnails")
             ?.optJSONObject(0)?.optString("url")?.takeIf { it.isNotBlank() }
+            ?: r.optJSONObject("channelThumbnail")?.optJSONArray("thumbnails")?.optJSONObject(0)?.optString("url")?.takeIf { it.isNotBlank() }
+            ?: r.optJSONObject("ownerThumbnail")?.optJSONArray("thumbnails")?.optJSONObject(0)?.optString("url")?.takeIf { it.isNotBlank() }
 
         return HomeFeedItem(
             videoId = videoId,
@@ -765,6 +841,7 @@ object InnerTubeClient {
             durationText = "",
             viewCountText = "",
             itemCountText = count?.takeIf { it.isNotBlank() },
+            channelId = findChannelId(r),
         )
     }
 
