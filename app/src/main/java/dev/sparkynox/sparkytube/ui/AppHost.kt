@@ -92,7 +92,10 @@ fun AppHost(
     val onMore: (HomeFeedItem) -> Unit = { menuItem = it }
     SideEffect { BarsScroll.enabled = { nav.watchId == null && !nav.searchVisible } }
     val openShorts: (List<HomeFeedItem>, Int) -> Unit = { list, i -> nav.openShorts(list, i); onShortsOpened() }
-    CompositionLocalProvider(LocalOpenChannel provides onChannel, LocalOpenMenu provides onMore, LocalOpenShorts provides openShorts) {
+    CompositionLocalProvider(
+        LocalOpenChannel provides onChannel, LocalOpenMenu provides onMore, LocalOpenShorts provides openShorts,
+        LocalOpenItem provides onOpen,
+    ) {
     Box(Modifier.fillMaxSize().nestedScroll(BarsScroll.connection)) {
         if (nav.showAccounts) AccountsSheet(home, nav, onAddAccount = onAddAccount, onDismiss = { nav.showAccounts = false })
         val page = nav.pages.lastOrNull()

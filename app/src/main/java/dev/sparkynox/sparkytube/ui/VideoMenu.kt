@@ -41,11 +41,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
-import dev.sparkynox.sparkytube.R
 import dev.sparkynox.sparkytube.auth.Session
 import dev.sparkynox.sparkytube.homefeed.HiddenVideos
 import dev.sparkynox.sparkytube.homefeed.HomeFeedItem
@@ -105,7 +104,7 @@ fun VideoMenuSheet(
                     }
                 }
                 MenuRow(Icons.Filled.KeyboardArrowDown, "Download") { onDismiss(); onDownload(item) }
-                MenuRow(ImageVector.vectorResource(R.drawable.ic_image), "Save thumbnail") {
+                MenuRow(androidx.compose.ui.graphics.vector.ImageVector.vectorResource(dev.sparkynox.sparkytube.R.drawable.ic_image), "Save thumbnail") {
                     dev.sparkynox.sparkytube.download.ThumbnailDownloader.save(ctx, id, item.title)
                     onDismiss()
                 }

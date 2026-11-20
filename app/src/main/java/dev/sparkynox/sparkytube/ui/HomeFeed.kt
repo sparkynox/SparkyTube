@@ -218,6 +218,8 @@ internal fun ErrorCard(msg: String, onRetry: () -> Unit) {
 internal fun VideoCard(item: HomeFeedItem, onOpen: () -> Unit, onMore: () -> Unit, modifier: Modifier = Modifier) {
     // a Shorts row sitting between the videos
     item.shortsShelf?.let { ShortsShelf(it, modifier); return }
+    item.shelf?.let { VideoShelf(it, modifier); return }
+    item.post?.let { PostCard(it, onOpen, modifier); return }
     val openChannel = LocalOpenChannel.current
     val chId = item.channelId
     val chTap = if (chId != null) Modifier.clickable { openChannel(chId) } else Modifier
@@ -276,7 +278,12 @@ internal fun VideoCard(item: HomeFeedItem, onOpen: () -> Unit, onMore: () -> Uni
             }
         }
         Row(Modifier.padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Avatar(item.channelAvatarUrl, item.channelName.ifBlank { "?" }, 36, chTap)
+            // playlists and mixes come without a channel picture: fetch it once per channel
+            val avatarUrl by androidx.compose.runtime.produceState<String?>(item.channelAvatarUrl, item.channelId) {
+                val id = item.channelId
+                if (value == null && id != null) value = dev.sparkynox.sparkytube.homefeed.ChannelAvatars.get(id)
+            }
+            Avatar(avatarUrl, item.channelName.ifBlank { "?" }, 36, chTap)
             Column(Modifier.weight(1f)) {
                 Text(
                     item.title,
