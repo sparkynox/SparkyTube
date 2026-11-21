@@ -10,7 +10,7 @@
 namespace lazyluno {
 
 enum class ClientType {
-    WEB, ANDROID_APP, IOS, TVHTML5, TV_EMBEDDED, TVHTML5_SIMPLY, MWEB, VISIONOS, WEB_CREATOR,
+    WEB, ANDROID_APP, IOS, TVHTML5, TV_EMBEDDED, TVHTML5_SIMPLY, MWEB, VISIONOS, WEB_CREATOR, ANDROID_VR,
 };
 
 // field order matters, client_spoof.cpp uses designated initializers
@@ -40,10 +40,13 @@ struct SpoofConfig {
     bool                      appendAuthFallback = true;
     // known age-restricted video: go straight to the signed in clients instead of trying the anonymous ones first
     bool                      authFirst = false;
+    // PO token for the player request (bound to the video), sent to the clients that want one
+    std::string               poToken;
 
     static SpoofConfig defaultConfig() {
         SpoofConfig c;
-        c.clientOrder = {ClientType::TV_EMBEDDED, ClientType::TVHTML5, ClientType::ANDROID_APP, ClientType::IOS};
+        // ANDROID_VR answers with the whole 144p-4K ladder and wants no PO token and no login
+        c.clientOrder = {ClientType::ANDROID_VR, ClientType::TV_EMBEDDED, ClientType::TVHTML5, ClientType::ANDROID_APP, ClientType::IOS};
         return c;
     }
     // same list, age bypass first and kept first
