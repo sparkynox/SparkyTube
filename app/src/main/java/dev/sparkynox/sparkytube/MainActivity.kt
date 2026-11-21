@@ -2419,7 +2419,21 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
         if (isHls) {
             itemBuilder.setMimeType(androidx.media3.common.MimeTypes.APPLICATION_M3U8)
+            // closer to the live edge than the manifest default, and only a hair of speed change to catch up
+            itemBuilder.setLiveConfiguration(
+                androidx.media3.common.MediaItem.LiveConfiguration.Builder()
+                    .setTargetOffsetMs(6_000)
+                    .setMinPlaybackSpeed(0.97f)
+                    .setMaxPlaybackSpeed(1.03f)
+                    .build()
+            )
         }
+        // a live master playlist lists every size up to 1080p+, starting at the top one is what made it slow:
+        // cap it at the default quality from Settings. Normal videos have their own url per quality, no cap.
+        controller.trackSelectionParameters = controller.trackSelectionParameters.buildUpon().apply {
+            if (isHls) setMaxVideoSize(Int.MAX_VALUE, maxOf(dev.sparkynox.sparkytube.extractor.StreamExtractor.preferredQualityTarget(), 360))
+            else clearVideoSizeConstraints()
+        }.build()
 
         controller.setMediaItem(itemBuilder.build())
         controller.prepare()
@@ -3062,6 +3076,10 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         item.post?.let {
             openWebPage("https://m.youtube.com/post/${it.postId}")
             return
+        }
+        // a LIVE card: resolve with the clients that have an HLS manifest right away
+        if (videoId != null && (item.durationText.equals("LIVE", true) || item.viewCountText.contains("watching", true))) {
+            dev.sparkynox.sparkytube.extractor.LazyLunoResolver.markLive(videoId)
         }
         if (videoId != null && item.isShort) {
             val pool = if (nav.shorts.any { it.videoId == videoId }) nav.shorts else listOf(item)
