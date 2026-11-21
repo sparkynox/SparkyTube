@@ -40,11 +40,14 @@ object LazyLuno {
         false
     }
 
-    private external fun nativeResolve(videoId: String, cookie: String, hl: String, gl: String, clients: String, visitorData: String): String
+    private external fun nativeResolve(videoId: String, cookie: String, hl: String, gl: String, clients: String, visitorData: String, poToken: String): String
 
     fun available() = loaded
 
     /** Raw json from the native side, null if the library didn't load. Blocking. */
-    fun resolveJson(videoId: String, cookie: String, hl: String, gl: String, clients: String = "", visitorData: String = ""): String? =
-        if (loaded) nativeResolve(videoId, cookie, hl, gl, clients, visitorData) else null
+    fun resolveJson(videoId: String, cookie: String, hl: String, gl: String, clients: String = "", visitorData: String = "", poToken: String = ""): String? =
+        if (loaded) nativeResolve(videoId, cookie, hl, gl, clients, visitorData, poToken) else null
+
+    /** Version of the native extractor, shown in About and the logs. Bump it when the C++ changes. */
+    const val VERSION = "1.1.0"
 }

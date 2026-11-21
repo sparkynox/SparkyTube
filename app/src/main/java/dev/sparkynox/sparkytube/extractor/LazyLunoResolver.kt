@@ -20,7 +20,18 @@ object LazyLunoResolver {
     private val fastStreams = java.util.concurrent.ConcurrentHashMap<String, List<S>>()
     private val upgradePool = java.util.concurrent.Executors.newFixedThreadPool(4)
     // the TV clients always answered "no streams" without a PO token in testing, so only IOS is worth a try here
-    private val UPGRADE_CLIENTS = listOf("IOS")
+    // ANDROID_VR needs neither a PO token nor a login and answers with the whole 144p-4K ladder
+    private val UPGRADE_CLIENTS = listOf("ANDROID_VR", "IOS")
+
+    // live broadcasts only answer with an HLS manifest, and the first client that has one is IOS
+    private const val LIVE_CLIENTS = "IOS,ANDROID_VR,TVHTML5,MWEB"
+    private val liveIds = java.util.Collections.synchronizedSet(LinkedHashSet<String>())
+
+    /** Called by the feed when a card says LIVE, so the resolve can skip the ANDROID try that never has an HLS manifest. */
+    fun markLive(videoId: String) {
+        liveIds.add(videoId)
+        if (liveIds.size > 200) synchronized(liveIds) { liveIds.remove(liveIds.first()) }
+    }
 
     /** Blocking. Null = failed, see lastErrorMessage. */
     fun resolve(ctx: Context, videoId: String, clients: String = ""): StreamExtractor.ResolvedStream? {
@@ -34,8 +45,16 @@ object LazyLunoResolver {
         // a video that already showed an age gate goes straight to the signed in clients
         val known18 = dev.sparkynox.sparkytube.history.AgeRestrictedStore.has(ctx, videoId)
         val useClients = if (clients.isEmpty() && known18 && cookie.isNotEmpty()) "AGE" else clients
+        // age-restricted: the TV clients want a PO token, a fresh one for this video (a few seconds, only for these)
+        var pot: String? = null
+        var vd = ""
+        var playerTok = ""
+        if (useClients == "AGE") {
+            PoTokenService.forVideo(ctx, videoId)?.let { (v, pt, gvs) -> vd = v; playerTok = pt; pot = gvs }
+            LogRecorder.i(TAG, "age-restricted $videoId, PO token ${if (pot != null) "ready" else "not available"}")
+        }
         val raw = try {
-            LazyLuno.resolveJson(videoId, cookie, "en", Locale.getDefault().country.ifBlank { "US" }, useClients)
+            LazyLuno.resolveJson(videoId, cookie, "en", Locale.getDefault().country.ifBlank { "US" }, useClients, vd, playerTok)
         } catch (t: Throwable) {
             lastErrorMessage = "${t.javaClass.simpleName}: ${t.message}"
             LogRecorder.e(TAG, "native call failed", t)
@@ -55,7 +74,7 @@ object LazyLunoResolver {
             LogRecorder.w(TAG, "failed in ${System.currentTimeMillis() - t0} ms: $lastErrorMessage")
             return null
         }
-        val streams = readStreams(o)
+        val streams = readStreams(o, pot)
         val result = build(ctx, o.optString("title"), o.optLong("durationMs") / 1000, o.optBoolean("live"),
             o.optString("hls"), streams)
         if (result != null && clients.isNotEmpty()) {
@@ -150,6 +169,10 @@ object LazyLunoResolver {
      * If it hands back less than the wanted quality, the caller starts upgrade() in the background.
      */
     fun resolveFast(ctx: Context, videoId: String): StreamExtractor.ResolvedStream? {
+        if (videoId in liveIds) {
+            resolve(ctx, videoId, LIVE_CLIENTS)?.let { return it }
+            return resolve(ctx, videoId, "")
+        }
         val fast = resolve(ctx, videoId, "ANDROID_APP")
         if (fast != null) {
             PoTokenService.warm(ctx) // no wait, the token is for the upgrade of this or the next video
@@ -158,7 +181,7 @@ object LazyLunoResolver {
             return if (!dataSaver && best < MAX_WANTED && fastStreams.containsKey(videoId)) fast.copy(partial = true) else fast
         }
         // ANDROID gave nothing, run the whole cascade
-        return resolve(ctx, videoId, "")
+        return resolve(ctx, videoId, "")?.also { if (it.isLive) markLive(videoId) }
     }
 
     private const val MAX_WANTED = 1080

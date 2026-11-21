@@ -98,6 +98,32 @@ class BotGuardTokenProvider(context: Context) : TokenProvider {
         }
     }
 
+    /** Player token (bound to the video) and GVS token (bound to the visitor), as plain strings for LazyLuno. */
+    suspend fun mintPair(videoId: String, visitorData: String): Pair<String, String>? {
+        return try {
+            mutex.withLock {
+                try {
+                    ensureReady()
+                    mint(videoId) to mint(visitorData)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    LogRecorder.w(TAG, "mint failed (${e.message}), retrying with a fresh attestation")
+                    reset()
+                    ensureReady()
+                    mint(videoId) to mint(visitorData)
+                }
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            LogRecorder.w(TAG, "po token unavailable: ${e.javaClass.simpleName} ${e.message}")
+            null
+        } finally {
+            scheduleIdleRelease()
+        }
+    }
+
     override suspend fun prewarm(cookie: String?) {
         try {
             mutex.withLock { ensureReady() }
