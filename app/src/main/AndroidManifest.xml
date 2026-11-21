@@ -130,6 +130,18 @@
                 android:resource="@xml/file_provider_paths" />
         </provider>
 
+        <receiver
+            android:name=".widget.NowPlayingWidget"
+            android:exported="false"
+            android:label="SparkyTube">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/now_playing_widget_info" />
+        </receiver>
+
         <service
             android:name=".player.PlaybackService"
             android:exported="false"
