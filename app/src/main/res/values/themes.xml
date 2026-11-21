@@ -33,6 +33,12 @@
         <item name="shapeAppearanceLargeComponent">@style/ShapeAppearance.Sparky.Large</item>
     </style>
 
+    <style name="Theme.SparkyTube.Share" parent="Theme.SparkyTube.NoActionBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">false</item>
+    </style>
+
     <style name="Theme.SparkyTube.NoActionBar">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
