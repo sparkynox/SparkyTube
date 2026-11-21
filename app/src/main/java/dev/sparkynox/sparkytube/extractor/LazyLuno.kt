@@ -49,5 +49,5 @@ object LazyLuno {
         if (loaded) nativeResolve(videoId, cookie, hl, gl, clients, visitorData, poToken) else null
 
     /** Version of the native extractor, shown in About and the logs. Bump it when the C++ changes. */
-    const val VERSION = "1.1.0"
+    const val VERSION = "2.0.0"
 }
