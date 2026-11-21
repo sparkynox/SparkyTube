@@ -136,7 +136,7 @@ class AboutActivity : AppCompatActivity() {
             }
 
             Group("Built with") {
-                Credit("LazyLuno", "Our own C++ extractor, the fast default")
+                Credit("LazyLuno ${dev.sparkynox.sparkytube.extractor.LazyLuno.VERSION}", "Our own C++ extractor, the fast default")
                 Credit("NewPipe Extractor", "Full quality list and fallback")
                 Credit("Media3 / ExoPlayer", "Playback")
                 Credit("SponsorBlock", "Skip sponsor segments")
