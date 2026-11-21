@@ -77,7 +77,7 @@ namespace lazyluno { namespace innertube { bool ageGateSeen(); } }
 extern "C" JNIEXPORT jstring JNICALL
 Java_dev_sparkynox_sparkytube_extractor_LazyLuno_nativeResolve(JNIEnv* env, jobject, jstring jvid, jstring jcookie,
                                                                jstring jhl, jstring jgl, jstring jclients,
-                                                               jstring jvisitor) {
+                                                               jstring jvisitor, jstring jpot) {
     std::call_once(gInit, [&] {
         jclass c = env->FindClass("dev/sparkynox/sparkytube/extractor/LazyLunoNet");
         if (c) {
@@ -111,6 +111,8 @@ Java_dev_sparkynox_sparkytube_extractor_LazyLuno_nativeResolve(JNIEnv* env, jobj
                 else if (n == "TVHTML5") cfg.spoof.clientOrder.push_back(ClientType::TVHTML5);
                 else if (n == "TVHTML5_SIMPLY") cfg.spoof.clientOrder.push_back(ClientType::TVHTML5_SIMPLY);
                 else if (n == "MWEB") cfg.spoof.clientOrder.push_back(ClientType::MWEB);
+                else if (n == "ANDROID_VR" || n == "VR") cfg.spoof.clientOrder.push_back(ClientType::ANDROID_VR);
+                else if (n == "WEB_CREATOR") cfg.spoof.clientOrder.push_back(ClientType::WEB_CREATOR);
                 else if (n == "WEB") cfg.spoof.clientOrder.push_back(ClientType::WEB);
                 else if (n == "AGE") cfg.spoof.authFirst = true;  // age-restricted: signed in clients first
                 i = j + 1;
@@ -122,6 +124,7 @@ Java_dev_sparkynox_sparkytube_extractor_LazyLuno_nativeResolve(JNIEnv* env, jobj
             }
         }
         cfg.visitorData = jstr(env, jvisitor);
+        cfg.spoof.poToken = jstr(env, jpot);
         Extractor ex(cfg);
         std::string cookie = jstr(env, jcookie);
         if (!cookie.empty()) ex.setAuth(AuthCookies::fromCookieString(cookie));

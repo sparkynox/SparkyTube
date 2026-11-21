@@ -57,6 +57,30 @@ ClientProfile getClientProfile(ClientType type) {
             .needsEmbedUrl     = false,
         };
 
+    // ── ANDROID_VR ────────────────────────────────────────────────────────────
+    // The Quest YouTube app. No po_token, no login, full adaptive ladder (144p up to 4K, h264/vp9/av1).
+    // Does not play age-restricted or made-for-kids videos, those go through the TV clients.
+    case ClientType::ANDROID_VR:
+        return {
+            .type             = ClientType::ANDROID_VR,
+            .clientName       = "ANDROID_VR",
+            .clientVersion    = "1.65.10",
+            .clientId         = "28",
+            .osName           = "Android",
+            .osVersion        = "12L",
+            .deviceMake       = "Oculus",
+            .deviceModel      = "Quest 3",
+            .platform         = "MOBILE",
+            .androidSdkVersion= 32,
+            .userAgent        = "com.google.android.apps.youtube.vr.oculus/1.65.10 "
+                                "(Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip",
+            .apiKey           = "AIzaSyA8eiZmM1FaDVjRy-df2KTyQ_vz_yYM39w",
+            .innertubeHost    = "www.youtube.com",
+            .requiresPoToken   = false,
+            .supportsAgeBypass = false,
+            .needsEmbedUrl     = false,
+        };
+
     // ── IOS ───────────────────────────────────────────────────────────────────
     case ClientType::IOS:
         return {

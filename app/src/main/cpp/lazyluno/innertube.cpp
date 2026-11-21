@@ -80,7 +80,10 @@ std::string playerRequest(const std::string& videoId, const SpoofConfig& spoof, 
 
     auto tryClient = [&](ClientType t, bool withAuth) -> std::string {
         auto profile = getClientProfile(t);
-        std::string body = buildInnertubeContext(profile, visitorData, {}, hl, gl);
+        // the player PO token only goes to the clients that check it
+        const bool wantsPot = !spoof.poToken.empty() && t != ClientType::ANDROID_APP && t != ClientType::IOS &&
+                              t != ClientType::ANDROID_VR;
+        std::string body = buildInnertubeContext(profile, visitorData, wantsPot ? spoof.poToken : std::string{}, hl, gl);
         body.pop_back();  // drop the closing } and add the rest of the request
         body += ",\"videoId\":\"" + videoId + "\"";
         body += ",\"contentCheckOk\":true,\"racyCheckOk\":true";
@@ -115,8 +118,8 @@ std::string playerRequest(const std::string& videoId, const SpoofConfig& spoof, 
     };
 
     // the signed in TV client is the one that plays age-restricted videos for an adult account
-    static const ClientType kAuthClients[] = {ClientType::TVHTML5, ClientType::TV_EMBEDDED, ClientType::ANDROID_APP,
-                                              ClientType::WEB, ClientType::MWEB};
+    static const ClientType kAuthClients[] = {ClientType::TVHTML5, ClientType::TV_EMBEDDED, ClientType::WEB_CREATOR,
+                                              ClientType::MWEB, ClientType::WEB};
     if (spoof.authFirst && auth && auth->hasAuth()) {
         for (auto t : kAuthClients) {
             auto r = tryClient(t, true);
