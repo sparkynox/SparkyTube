@@ -2,10 +2,22 @@
 
 # v2.6
 
+## LazyLuno v1.1.0
+
+- **ANDROID_VR client**: the whole 144p to 1080p+ ladder without a PO token or a login (IOS kept answering with 0 streams). It runs in the background quality upgrade next to IOS and is first in the cascade
+- **Age-restricted videos**: signed in clients first, plus a PO token made for that video with the BotGuard script (the same one as `po_token.html`). Check Settings > Logs, tag `LazyLuno`, for `age-restricted ... PO token ready`
+- **Live is faster**: LIVE cards ask the HLS clients first, the player starts chunkless, near the live edge and capped at your default quality
+- LazyLuno now has a version number (Settings > About, `cpp/lazyluno/CHANGELOG.md`)
+
+## Also in v2.6
+
+- **Home screen widget**: add "SparkyTube" from the widget picker. Cover, title, like and play / pause for what is playing
+- **Red progress line** along the bottom of thumbnails, how far you got in a video
+
 ## Fixes
 
 - Mini player: autoplay and Play next no longer pop the video back up to the big player, the next video plays in the mini player
-- Playlists in Home, search and related (the "X videos" cards) now open the playlist page. Mixes still just play
+- Playlists in Home, search and related (the "49 videos" cards) now open the playlist page. Mixes still just play
 - Playlists and mixes show the channel picture (fetched once per channel and kept)
 - Top and bottom bar no longer stay hidden after scrolling the feed and opening a video: they come back when a video opens, when you leave the watch page (so the mini player has its place) and when the Shorts viewer closes
 - The Shorts tab in the bottom bar now opens the native Shorts player too, not the YouTube page
