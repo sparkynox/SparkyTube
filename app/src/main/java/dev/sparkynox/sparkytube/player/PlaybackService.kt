@@ -50,6 +50,9 @@ class PlaybackService : MediaSessionService() {
          * boundary. See buildMediaSourceFactory() below for the other half. */
         const val EXTRA_AUDIO_URL = "sparkytube_audio_url"
 
+        /** The service's player while the service lives, for the home screen widget (main thread only). */
+        @Volatile var currentPlayer: ExoPlayer? = null
+
         // set by MainActivity, the notification / lock screen Next and Previous buttons end up here
         var onSkipNext: (() -> Unit)? = null
         var onSkipPrevious: (() -> Unit)? = null
@@ -128,6 +131,13 @@ class PlaybackService : MediaSessionService() {
         })
 
         player = exoPlayer
+        currentPlayer = exoPlayer
+        // keeps the home screen widget in step with what plays
+        exoPlayer.addListener(object : Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) = dev.sparkynox.sparkytube.widget.NowPlayingWidget.refresh(this@PlaybackService)
+            override fun onMediaMetadataChanged(mediaMetadata: androidx.media3.common.MediaMetadata) =
+                dev.sparkynox.sparkytube.widget.NowPlayingWidget.refresh(this@PlaybackService)
+        })
         LunoVideoFx.init(this)
         LunoVideoFx.attach(exoPlayer)
         LunoFx.speedHook = { speed, pitch ->
@@ -226,7 +236,10 @@ class PlaybackService : MediaSessionService() {
                 val isHls = mediaItem.localConfiguration?.mimeType == androidx.media3.common.MimeTypes.APPLICATION_M3U8
 
                 if (isHls) {
-                    return HlsMediaSource.Factory(hlsDataSourceFactory).createMediaSource(mediaItem)
+                    // chunkless: start from the master playlist alone, no probe of the first segment, a few seconds faster to the first frame
+                    return HlsMediaSource.Factory(hlsDataSourceFactory)
+                        .setAllowChunklessPreparation(true)
+                        .createMediaSource(mediaItem)
                 }
 
                 val videoSource = ProgressiveMediaSource.Factory(dataSourceFactory)
@@ -267,6 +280,8 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        currentPlayer = null
+        dev.sparkynox.sparkytube.widget.NowPlayingWidget.refresh(this)
         LunoFx.speedHook = null
         LunoVideoFx.detach()
         mediaSession?.run {
