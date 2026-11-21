@@ -55,6 +55,9 @@ object WatchHistoryStore {
     fun savePosition(context: Context, videoId: String, positionMs: Long, durationMs: Long) {
         if (durationMs <= 0) return
         if (positionMs >= MIN_POSITION_MS) markWatched(context, videoId)
+        // the red line under thumbnails: how far this video got, kept even after the resume point is cleared
+        val pct = if (positionMs > durationMs - END_BUFFER_MS) 100 else (positionMs * 100 / durationMs).toInt().coerceIn(0, 100)
+        prefs(context).edit().putInt("pct_$videoId", pct).apply()
         // Don't bother persisting a save for something that isn't
         // resumable anyway (too early, or basically done) -- treat it
         // as "watched to completion" by just clearing any prior entry
@@ -68,6 +71,10 @@ object WatchHistoryStore {
             .putLong("dur_$videoId", durationMs)
             .apply()
     }
+
+    /** 0-100, how much of the video was watched here (0 = never started). */
+    fun getProgressPercent(context: Context, videoId: String?): Int =
+        if (videoId == null) 0 else prefs(context).getInt("pct_$videoId", 0)
 
     /** Returns the saved position in ms, or null if there's nothing to resume. */
     fun getPosition(context: Context, videoId: String): Long? {
