@@ -816,7 +816,9 @@ object InnerTubeClient {
             ?.optJSONObject("image")?.optJSONArray("sources")?.optJSONObject(0)?.optString("url")?.takeIf { it.isNotBlank() }
 
         return if (isVideo) {
-            HomeFeedItem(id, null, title, channel, thumb, avatar, badge ?: "", rest, channelId = findChannelId(l))
+            // the new layout keeps YouTube's watched line in its own overlay model
+            val seen = findFirst(thumbRoot, "thumbnailOverlayProgressBarViewModel")?.optInt("startPercent", 0) ?: 0
+            HomeFeedItem(id, null, title, channel, thumb, avatar, badge ?: "", rest, channelId = findChannelId(l), watchedPercent = seen)
         } else {
             val firstVideo = findFirst(l, "watchEndpoint")?.optString("videoId")?.takeIf { it.length == 11 }
             HomeFeedItem(firstVideo, id, title, channel, thumb, avatar, "", rest, itemCountText = badge, channelId = findChannelId(l))
