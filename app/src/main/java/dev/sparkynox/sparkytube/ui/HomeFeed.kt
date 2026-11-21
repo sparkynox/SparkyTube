@@ -245,10 +245,19 @@ internal fun VideoCard(item: HomeFeedItem, onOpen: () -> Unit, onMore: () -> Uni
                 modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
                 contentScale = ContentScale.Crop,
             )
-            // 18+ top left (yellow), Watched top right
             val ctx = LocalContext.current
+            // the red line YouTube draws along the bottom of a thumbnail: how much of it was watched
+            val progress = remember(item.videoId) {
+                maxOf(item.watchedPercent, dev.sparkynox.sparkytube.history.WatchHistoryStore.getProgressPercent(ctx, item.videoId))
+            }
+            if (progress > 0 && item.videoId != null) Box(
+                Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp).background(Color(0x66FFFFFF)),
+            ) {
+                Box(Modifier.fillMaxWidth(progress.coerceAtMost(100) / 100f).height(3.dp).background(Color(0xFFFF0000)))
+            }
+            // 18+ top left (yellow), Watched top right
             val is18 = remember(item.videoId) { item.ageRestricted || dev.sparkynox.sparkytube.history.AgeRestrictedStore.has(ctx, item.videoId) }
-            val seen = remember(item.videoId) { item.watchedPercent > 0 || dev.sparkynox.sparkytube.history.WatchHistoryStore.isWatched(ctx, item.videoId) }
+            val seen = remember(item.videoId) { progress > 0 || item.watchedPercent > 0 || dev.sparkynox.sparkytube.history.WatchHistoryStore.isWatched(ctx, item.videoId) }
             if (is18) Text(
                 "18+",
                 Modifier.align(Alignment.TopStart).padding(8.dp)
