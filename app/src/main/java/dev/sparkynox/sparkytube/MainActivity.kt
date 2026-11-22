@@ -191,7 +191,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             videoId = { lastResolvedVideoId },
             resolving = { isResolving },
             nativeActive = { isNativePlaybackActive },
-            enabled = { composeNav() && dev.sparkynox.sparkytube.settings.SettingsPrefs.isWebViewHistoryEnabled(this) },
+            enabled = { false }, // hidden WebView history sync is retired, InnerTube history does the job
         )
     }
 
