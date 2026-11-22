@@ -131,6 +131,7 @@ object NetCache {
         synchronized(cacheLock) {
             cache?.let { return it }
             return try {
+                CacheCleaner.await()
                 val dir = File(ctx.cacheDir, "media_cache")
                 SimpleCache(dir, LeastRecentlyUsedCacheEvictor(MAX_CACHE_BYTES), StandaloneDatabaseProvider(ctx)).also { cache = it }
             } catch (t: Throwable) {
