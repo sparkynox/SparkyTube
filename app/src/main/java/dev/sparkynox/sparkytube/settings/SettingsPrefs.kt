@@ -266,7 +266,13 @@ object SettingsPrefs {
      */
     enum class ExtractorMethod { AUTO, LOCAL_SERVER, NEWPIPE, INNERTUBEX, LAZYLUNO }
 
-    fun getExtractorMethod(context: Context): ExtractorMethod {
+    // The extractor is not a user choice any more: everyone is on LazyLuno (NewPipe stays inside it as the
+    // upgrade and fallback). Whatever an old install has stored, NewPipe / Auto / InnerTubeX included, is ignored.
+    @Suppress("UNUSED_PARAMETER")
+    fun getExtractorMethod(context: Context): ExtractorMethod = ExtractorMethod.LAZYLUNO
+
+    @Suppress("unused")
+    private fun getStoredExtractorMethod(context: Context): ExtractorMethod {
         // LazyLuno is the default (NewPipe stays as its fallback). yt-dlp is gone, so anyone who still
         // has it stored lands on the default too
         val stored = prefs(context).getString(KEY_EXTRACTOR_METHOD, ExtractorMethod.LAZYLUNO.name)
@@ -488,15 +494,16 @@ object SettingsPrefs {
     }
 
     // history sync: native stats pings (InnerTube) and the hidden WebView watch page, each on its own switch
-    fun isInnerTubeHistoryEnabled(context: Context): Boolean =
-        prefs(context).getBoolean(KEY_INNERTUBE_HISTORY, true)
+    // always on, not a setting: the hidden WebView history is gone, this is the only history sync
+    @Suppress("UNUSED_PARAMETER")
+    fun isInnerTubeHistoryEnabled(context: Context): Boolean = true
 
     fun setInnerTubeHistoryEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_INNERTUBE_HISTORY, enabled).apply()
     }
 
-    fun isWebViewHistoryEnabled(context: Context): Boolean =
-        prefs(context).getBoolean(KEY_WEBVIEW_HISTORY, true)
+    @Suppress("UNUSED_PARAMETER")
+    fun isWebViewHistoryEnabled(context: Context): Boolean = false
 
     fun setWebViewHistoryEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_WEBVIEW_HISTORY, enabled).apply()
