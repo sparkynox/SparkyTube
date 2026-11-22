@@ -21,7 +21,31 @@ object LazyLunoResolver {
     private val upgradePool = java.util.concurrent.Executors.newFixedThreadPool(4)
     // the TV clients always answered "no streams" without a PO token in testing, so only IOS is worth a try here
     // ANDROID_VR needs neither a PO token nor a login and answers with the whole 144p-4K ladder
-    private val UPGRADE_CLIENTS = listOf("ANDROID_VR", "IOS")
+    // the direct clients, in EchoMusic's measured order: VISIONOS serves whole files, ANDROID_VR 1.65.10 the full ladder.
+    // IOS is not asked any more: its urls are a ~1 MiB preview that googlevideo cuts with a 403
+    private val UPGRADE_CLIENTS = listOf("VISIONOS", "ANDROID_VR")
+
+    // googlevideo refused the streams of these videos: no direct clients for 10 minutes, NewPipe covers them
+    private val refused = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
+    fun onRefused(videoId: String) {
+        refused[videoId] = System.currentTimeMillis() + 10 * 60_000
+        fastStreams.remove(videoId)
+        LogRecorder.i(TAG, "googlevideo refused the streams of $videoId, direct clients skipped for 10 min")
+    }
+
+    private fun isRefused(videoId: String) = (refused[videoId] ?: 0L) > System.currentTimeMillis()
+
+    private fun visitorFor(ctx: Context): String =
+        dev.sparkynox.sparkytube.auth.Session.visitorData ?: PoTokenService.visitorDataBlocking(ctx) ?: ""
+
+    /** Called a moment after app start: fetches visitorData and starts the PO token, so the first video does not wait for them. */
+    fun prewarm(ctx: Context) {
+        Thread {
+            try { visitorFor(ctx) } catch (_: Throwable) { }
+            PoTokenService.warm(ctx)
+        }.start()
+    }
 
     // live broadcasts only answer with an HLS manifest, and the first client that has one is IOS
     private const val LIVE_CLIENTS = "IOS,ANDROID_VR,TVHTML5,MWEB"
@@ -189,13 +213,15 @@ object LazyLunoResolver {
     /** Blocking, run off the main thread. Other clients in parallel, merged with the fast pass. Null = nothing better. */
     fun upgrade(ctx: Context, videoId: String, first: StreamExtractor.ResolvedStream): StreamExtractor.ResolvedStream? {
         val base = fastStreams.remove(videoId) ?: return null
+        if (isRefused(videoId)) return null
+        val vd = visitorFor(ctx)
         val cookie = runCatching { CookieManager.getInstance().getCookie("https://www.youtube.com") }.getOrNull().orEmpty()
         val country = Locale.getDefault().country.ifBlank { "US" }
         val t0 = System.currentTimeMillis()
         val jobs = UPGRADE_CLIENTS.map { c ->
             upgradePool.submit<List<S>> {
                 try {
-                    val raw = LazyLuno.resolveJson(videoId, cookie, "en", country, c) ?: return@submit emptyList()
+                    val raw = LazyLuno.resolveJson(videoId, cookie, "en", country, c, vd) ?: return@submit emptyList()
                     val o = JSONObject(raw)
                     if (o.optBoolean("ok")) readStreams(o).also {
                         LogRecorder.i(TAG, "upgrade $c: ${it.size} streams, tallest ${it.maxOfOrNull { s -> s.h } ?: 0}p")
@@ -226,7 +252,7 @@ object LazyLunoResolver {
                 LogRecorder.i(TAG, "no PO token yet, started getting one")
             } else {
                 val (vd, pot) = tok
-                for (c in listOf("ANDROID_APP", "IOS")) {
+                for (c in listOf("ANDROID_APP")) {
                     try {
                         val raw = LazyLuno.resolveJson(videoId, cookie, "en", country, c, vd) ?: continue
                         val o = JSONObject(raw)
