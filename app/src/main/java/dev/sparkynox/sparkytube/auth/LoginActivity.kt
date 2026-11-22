@@ -27,6 +27,20 @@ class LoginActivity : AppCompatActivity() {
 
     private var done = false
 
+    private fun clearCookiesOf(urls: List<String>) {
+        val cm = CookieManager.getInstance()
+        for (u in urls) {
+            val host = u.removePrefix("https://")
+            val parent = host.substringAfter('.', host)
+            val names = cm.getCookie(u)?.split(';')?.map { it.substringBefore('=').trim() }?.filter { it.isNotEmpty() } ?: continue
+            for (n in names) {
+                cm.setCookie(u, "$n=; Max-Age=0; Path=/")
+                cm.setCookie(u, "$n=; Max-Age=0; Path=/; Domain=.$parent")
+                cm.setCookie(u, "$n=; Max-Age=0; Path=/; Domain=.$host")
+            }
+        }
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -69,7 +83,8 @@ class LoginActivity : AppCompatActivity() {
             settings.userAgentString = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36"
 
             // start from a clean jar so the account picker always shows
-            CookieManager.getInstance().removeAllCookies(null)
+            // only the Google / YouTube cookies: the social downloader sign ins (Instagram, X...) live in the same jar
+            clearCookiesOf(listOf("https://accounts.google.com", "https://www.google.com", "https://www.youtube.com", "https://m.youtube.com"))
             CookieManager.getInstance().flush()
 
             webViewClient = object : WebViewClient() {
