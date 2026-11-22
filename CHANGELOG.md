@@ -22,6 +22,12 @@
 
 ## Fixes
 
+- Social sign in pages (Instagram, Facebook, X, TikTok) stuck on the first frame: a proper Chrome string, the progress bar and chrome client the pages need, and no X-Requested-With header. Signing in to YouTube no longer wipes those sign ins either
+- Everyone is on LazyLuno: the Extractor Method setting is gone and stored NewPipe / Auto / InnerTubeX choices are ignored (NewPipe still works inside LazyLuno for the quality upgrade and as fallback)
+- The app cache is emptied every time SparkyTube starts (thumbnails, WebView cache, media cache). Downloads, logs and settings are not touched
+
+- Widget: tapping like or play/pause no longer crashes the app (the player was touched from a background thread)
+- Instagram links: the preview-bot page (og:video), the embed page JSON, the web query and the mobile API are tried in turn, and each step logs its HTTP code under the tag Social. Visitor cookies no longer count as a sign in
 - Mini player: autoplay and Play next no longer pop the video back up to the big player, the next video plays in the mini player
 - Playlists in Home, search and related (the "49 videos" cards) now open the playlist page. Mixes still just play
 - Playlists and mixes show the channel picture (fetched once per channel and kept)
@@ -35,7 +41,7 @@
 - **Native Shorts**: Shorts now open in a full screen vertical player (swipe up for the next one) instead of the YouTube page. Streams come from LazyLuno only, no NewPipe, at up to 720p with the muxed stream preferred so they start fast. The next Short is resolved and prepared while you watch. Tap to pause, like, comments, share, save, mute. The list carries on forever through the InnerTube reel endpoints
 - **Shorts shelf on the Home feed**: the "Shorts" shelf YouTube puts between videos is shown as a 2 column grid like m.youtube.com, with a menu on the header and on every card. Tap a card to open the Shorts player on it. It also shows in search and related lists
 - **Live streams**: live broadcasts now play natively (HLS) instead of the WebView player, with a LIVE / GO LIVE button, DVR seeking, and a LIVE tag on the watch page
-- **History sync switches**: Settings > History has "InnerTube history sync" (sends the same stats pings the web player sends, no hidden page, also marks watched Shorts) and "WebView history sync" (the old hidden watch page). Both are on by default, turn WebView off once InnerTube sync works for you. Check Settings > Logs (tag History) to see the pings
+- **InnerTube history sync**: watched videos and Shorts go into your YouTube history straight from the player, with the same stats pings the web player sends. It is always on (no switch) and the old hidden WebView history is gone. Check Settings > Logs (tag History) to see the pings
 - **Comments**: a Comments card on the watch page and a Comments button in Shorts open a sheet with Top / Newest sorting, endless scrolling and replies
 - **Download thumbnails**: "Save thumbnail" in the video menu and a "Thumbnail (image)" entry in both download dialogs save the biggest available jpg to Pictures/SparkyTube
 - **18+ and Watched badges**: thumbnails get a yellow 18+ badge (top left) on age-restricted videos and a Watched badge (top right) on videos you already played. The 18+ badge shows once an age gate has been seen for that video
