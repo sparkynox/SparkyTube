@@ -194,17 +194,6 @@ class SettingsComposeActivity : AppCompatActivity() {
                         { p.isDataSaverEnabled(this) }, { p.setDataSaverEnabled(this, it); StreamExtractor.clearCache() })
             )),
             Section("extraction", "Extraction", "code", "Extractors and fallbacks", listOf(
-                choice("extractor", "Extractor Method", "code",
-                        listOf("AUTO" to "Auto", "NEWPIPE" to "NewPipe", "INNERTUBEX" to "InnerTubeX", "LAZYLUNO" to "LazyLuno (default)"),
-                        { p.getExtractorMethod(this).name }, { p.setExtractorMethod(this, SettingsPrefs.ExtractorMethod.valueOf(it)) },
-                        sub = {
-                            when (it) {
-                                "NEWPIPE" -> "NewPipe only — skips the JS fast path"
-                                "INNERTUBEX" -> "InnerTubeX first (pure Kotlin), NewPipe takes over if it fails"
-                                "LAZYLUNO" -> "LazyLuno first (our own C++ extractor), quality upgrades and fallback come from NewPipe"
-                                else -> "Auto — JavaScript → NewPipe"
-                            }
-                        }),
                 toggle("piped", "Piped fallback", "globe",
                         "Fixes age-restricted videos by routing through a public Piped instance when NewPipe fails",
                         { p.isPipedFallbackEnabled(this) }, { p.setPipedFallbackEnabled(this, it) }),
@@ -302,14 +291,6 @@ class SettingsComposeActivity : AppCompatActivity() {
                         if (dev.sparkynox.sparkytube.logs.LogRecorder.getLastCrash(this) != null) "⚠ Last session crashed — tap to view"
                         else "Session log + crash reports"
                     }) { open(dev.sparkynox.sparkytube.logs.LogsActivity::class.java) }
-            )),
-            Section("history", "History", "list", "Save what you watch in your YouTube history", listOf(
-                toggle("ithistory", "InnerTube history sync", "pulse",
-                    "Adds watched videos and Shorts to your YouTube history straight from the player, no hidden page needed. Needs you to be signed in",
-                    { SettingsPrefs.isInnerTubeHistoryEnabled(this) }, { SettingsPrefs.setInnerTubeHistoryEnabled(this, it) }),
-                toggle("wvhistory", "WebView history sync", "globe",
-                    "Plays the real watch page in a hidden WebView so YouTube counts the view. Heavier, turn it off if InnerTube sync works for you",
-                    { SettingsPrefs.isWebViewHistoryEnabled(this) }, { SettingsPrefs.setWebViewHistoryEnabled(this, it) })
             )),
             Section("social", "Social downloader", "download", "Instagram, X, TikTok and Facebook: reels, videos, stories, pictures", listOf(
                 toggle("socialauto", "Download right after sharing", "download",
