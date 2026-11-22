@@ -130,26 +130,6 @@
                 android:resource="@xml/file_provider_paths" />
         </provider>
 
-        <!-- SparkyTube in the share menu: links from Instagram, X, TikTok, Facebook -->
-        <activity
-            android:name=".extractor.social.ShareReceiverActivity"
-            android:exported="true"
-            android:excludeFromRecents="true"
-            android:label="SparkyTube Downloader"
-            android:taskAffinity=""
-            android:theme="@style/Theme.SparkyTube.Share">
-            <intent-filter>
-                <action android:name="android.intent.action.SEND" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="text/plain" />
-            </intent-filter>
-        </activity>
-
-        <activity
-            android:name=".extractor.social.SocialLoginActivity"
-            android:exported="false"
-            android:theme="@style/Theme.SparkyTube.NoActionBar" />
-
         <receiver
             android:name=".widget.NowPlayingWidget"
             android:exported="false"
