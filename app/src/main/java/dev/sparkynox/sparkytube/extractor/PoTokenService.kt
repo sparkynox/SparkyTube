@@ -87,6 +87,9 @@ object PoTokenService {
         }
     }
 
+    /** Blocking: visitorData from the memory / prefs, else one request. ANDROID_VR and VISIONOS refuse a request without it. */
+    fun visitorDataBlocking(context: Context): String? = visitorData ?: loadVisitorData(context.applicationContext)
+
     private fun loadVisitorData(ctx: Context): String? {
         val prefs = ctx.getSharedPreferences("sparky_potoken", Context.MODE_PRIVATE)
         prefs.getString("visitor", null)?.let { return it }
