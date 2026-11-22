@@ -288,7 +288,17 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
      * controls appear reliably — see PlaybackService's class doc for why
      * the previous plain bindService() approach silently never posted one.
      */
+    // the video view shows the MediaController's video, except once the anime upscaler was used: then it is bound to the
+    // ExoPlayer itself so the effects pipeline gets a surface with a size (see LunoVideoFx.directSurface)
+    private fun bindVideoSurface() {
+        val c = mediaController ?: return
+        val target: androidx.media3.common.Player =
+            if (dev.sparkynox.sparkytube.fx.LunoVideoFx.directSurface) (PlaybackService.currentPlayer ?: c) else c
+        if (binding.exoPlayerView.player !== target) binding.exoPlayerView.player = target
+    }
+
     private fun connectMediaController() {
+        dev.sparkynox.sparkytube.fx.LunoVideoFx.surfaceHook = { bindVideoSurface() }
         val sessionToken = SessionToken(this, ComponentName(this, PlaybackService::class.java))
         val future = MediaController.Builder(this, sessionToken).buildAsync()
         controllerFuture = future
@@ -296,7 +306,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             try {
                 val controller = future.get()
                 mediaController = controller
-                binding.exoPlayerView.player = controller
+                bindVideoSurface()
                 controller.addListener(object : Player.Listener {
                     override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
                         // notification / lockscreen pause comes in as USER_REQUEST,
@@ -4232,6 +4242,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     }
 
     override fun onDestroy() {
+        dev.sparkynox.sparkytube.fx.LunoVideoFx.surfaceHook = null
         pollHandler.removeCallbacks(urlPollRunnable)
         controllerFuture?.let { MediaController.releaseFuture(it) }
         mediaController = null
