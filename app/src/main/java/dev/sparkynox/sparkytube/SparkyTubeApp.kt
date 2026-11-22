@@ -21,6 +21,8 @@ class SparkyTubeApp : Application() {
 
         // empty the cache folders on every start (before anything opens the media cache)
         dev.sparkynox.sparkytube.net.CacheCleaner.start(this)
+        // like Echo: the slow one-time work (visitorData, PO token) happens a moment after start, off the play path
+        android.os.Handler(mainLooper).postDelayed({ dev.sparkynox.sparkytube.extractor.LazyLunoResolver.prewarm(this) }, 2000)
 
         dev.sparkynox.sparkytube.net.RemoteConfig.init(this)
         dev.sparkynox.sparkytube.net.NetCache.init(this)

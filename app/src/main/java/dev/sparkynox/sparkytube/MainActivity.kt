@@ -433,6 +433,12 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                             // drop the cached (bad) entry and re-resolve
                             // the SAME video fresh (new signed URLs)
                             // rather than skipping it outright.
+                            // googlevideo said no (403 / 410 / 429): the direct clients are skipped for this video
+                            val refusedBy = generateSequence<Throwable>(error) { it.cause }
+                                .filterIsInstance<androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException>().firstOrNull()
+                            if (refusedBy != null && refusedBy.responseCode in listOf(403, 410, 429)) {
+                                dev.sparkynox.sparkytube.extractor.LazyLunoResolver.onRefused(failedVideoId)
+                            }
                             dev.sparkynox.sparkytube.extractor.StreamExtractor.invalidate(failedVideoId)
                             lastResolvedVideoId = null
                             resolveAndPlayNative(failedVideoId, fallbackTitle = "")
@@ -3784,41 +3790,46 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }
     }
 
-    // LazyLuno gave a quick first answer (usually only 360p). the other clients are asked in the background and
-    // when better qualities turn up they go into the picker, and playback moves up to the wanted one
-    // if the person hasn't picked a quality themselves in the meantime
+    // LazyLuno gave a quick first answer (usually only 360p). The direct clients (VISIONOS, ANDROID_VR) are asked in
+    // the background and answer with the whole ladder in well under a second; it goes into the picker and playback
+    // moves up to the wanted one if the person hasn't picked a quality themselves. NewPipe (3-5 s, adds 1440p / 4K)
+    // only runs when the direct clients did not get to 1080p.
     private fun startQualityUpgrade(videoId: String, first: StreamExtractor.ResolvedStream) {
         val startLabel = currentQualityLabel
         lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            // NewPipe starts right away next to the LazyLuno upgrade, it is the one that usually has the full ladder
             val t0 = android.os.SystemClock.elapsedRealtime()
-            val pipe = async { StreamExtractor.resolveFresh(videoId) }
-            var better = dev.sparkynox.sparkytube.extractor.LazyLunoResolver.upgrade(this@MainActivity, videoId, first)
-            if (better != null) {
-                pipe.cancel()
-            } else {
-                val np = pipe.await()
-                val firstBest = first.availableQualities.maxOfOrNull { it.resolutionValue } ?: 0
+            var best = first.availableQualities.maxOfOrNull { it.resolutionValue } ?: 0
+            val direct = dev.sparkynox.sparkytube.extractor.LazyLunoResolver.upgrade(this@MainActivity, videoId, first)
+            if (direct != null) {
+                best = direct.availableQualities.maxOfOrNull { it.resolutionValue } ?: best
+                applyQualityUpgrade(videoId, first, direct, startLabel)
+            }
+            if (best < 1080) {
+                val np = StreamExtractor.resolveFresh(videoId)
                 val npBest = np?.availableQualities?.maxOfOrNull { it.resolutionValue } ?: 0
                 dev.sparkynox.sparkytube.logs.LogRecorder.i(
-                    "LazyLuno", "NewPipe upgrade in ${android.os.SystemClock.elapsedRealtime() - t0} ms: ${firstBest}p -> ${npBest}p"
+                    "LazyLuno", "NewPipe upgrade in ${android.os.SystemClock.elapsedRealtime() - t0} ms: ${best}p -> ${npBest}p"
                 )
-                if (np != null && npBest > firstBest) better = np
+                if (np != null && npBest > best) applyQualityUpgrade(videoId, first, np, startLabel)
             }
-            val upgraded = better ?: return@launch
-            StreamExtractor.cacheResolved(videoId, upgraded)
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                if (lastResolvedVideoId != videoId || !isNativePlaybackActive) return@withContext
-                currentQualities = upgraded.availableQualities
-                topQuality = currentQualities.size > 1
-                if (upgraded.downloadAudios.isNotEmpty()) currentDownloadAudios = upgraded.downloadAudios
-                if (currentQualityLabel != startLabel) return@withContext // they chose one already
-                val wanted = StreamExtractor.preferredQualityTarget()
-                val idx = currentQualities.indices.minByOrNull { kotlin.math.abs(currentQualities[it].resolutionValue - wanted) }
-                    ?: return@withContext
-                val playingHeight = first.availableQualities.firstOrNull { it.label == startLabel }?.resolutionValue ?: 0
-                if (currentQualities[idx].resolutionValue > playingHeight) applyQuality(idx)
-            }
+        }
+    }
+
+    private suspend fun applyQualityUpgrade(
+        videoId: String, first: StreamExtractor.ResolvedStream, upgraded: StreamExtractor.ResolvedStream, startLabel: String?,
+    ) {
+        StreamExtractor.cacheResolved(videoId, upgraded)
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+            if (lastResolvedVideoId != videoId || !isNativePlaybackActive) return@withContext
+            currentQualities = upgraded.availableQualities
+            topQuality = currentQualities.size > 1
+            if (upgraded.downloadAudios.isNotEmpty()) currentDownloadAudios = upgraded.downloadAudios
+            if (currentQualityLabel != startLabel) return@withContext // they chose one already
+            val wanted = StreamExtractor.preferredQualityTarget()
+            val idx = currentQualities.indices.minByOrNull { kotlin.math.abs(currentQualities[it].resolutionValue - wanted) }
+                ?: return@withContext
+            val playingHeight = first.availableQualities.firstOrNull { it.label == startLabel }?.resolutionValue ?: 0
+            if (currentQualities[idx].resolutionValue > playingHeight) applyQuality(idx)
         }
     }
 
