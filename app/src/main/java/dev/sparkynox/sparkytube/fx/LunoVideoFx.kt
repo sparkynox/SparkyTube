@@ -37,6 +37,20 @@ object LunoVideoFx {
     private var effectsActive = false
     private val main = Handler(Looper.getMainLooper())
 
+    // ExoPlayer's effects pipeline has to know the size of the surface it draws to. The video view is bound to a
+    // MediaController, and a controller hands its surface to the player without a size ("width -1 must be positive",
+    // black screen, and every video after it failing the same way). So once the upscaler is used, the video view is
+    // bound to the ExoPlayer itself (same process), which sets its surface with a known size. MainActivity does the rebind.
+    @Volatile var directSurface = false
+        private set
+    var surfaceHook: (() -> Unit)? = null
+
+    private fun needDirectSurface() {
+        if (directSurface) return
+        directSurface = true
+        surfaceHook?.invoke()
+    }
+
     fun init(c: Context) {
         if (inited) return
         inited = true
@@ -71,6 +85,7 @@ object LunoVideoFx {
                     }
                     lastKey = ""
                     effectsActive = false
+                    needDirectSurface()
                     exo.setVideoEffects(emptyList())
                     exo.prepare()
                 }
@@ -100,6 +115,8 @@ object LunoVideoFx {
             // only sent to take effects off again after they were on
             if (list.isEmpty() && !effectsActive) return@post
             effectsActive = list.isNotEmpty()
+            // the surface with a size has to be in place before the pipeline starts
+            needDirectSurface()
             exo.setVideoEffects(list)
         }
     }
