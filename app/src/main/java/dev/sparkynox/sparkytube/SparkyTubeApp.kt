@@ -19,6 +19,9 @@ class SparkyTubeApp : Application() {
         Thread.setDefaultUncaughtExceptionHandler(dev.sparkynox.sparkytube.logs.CrashHandler(this))
         dev.sparkynox.sparkytube.logs.NativeCrash.install(this)
 
+        // empty the cache folders on every start (before anything opens the media cache)
+        dev.sparkynox.sparkytube.net.CacheCleaner.start(this)
+
         dev.sparkynox.sparkytube.net.RemoteConfig.init(this)
         dev.sparkynox.sparkytube.net.NetCache.init(this)
         dev.sparkynox.sparkytube.fx.LunoFx.init(this)
