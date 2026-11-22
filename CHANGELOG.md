@@ -2,12 +2,6 @@
 
 # v2.6
 
-## LazyLuno v2.0.0: social downloader
-
-- **Instagram, X (Twitter), TikTok, Facebook**: reels, videos, pictures, carousels, stories and profile pictures. Share a link from the other app to **SparkyTube Downloader** in the share menu and the best quality downloads. It lands on the Downloads screen
-- Settings > Social downloader: instant download on/off, "Download from a copied link", and sign in to each site (needed for Instagram stories and posts only your account can see)
-- Fixes without an update: query ids and patterns are in `lazyluno_rules.json` and refresh every 6 hours
-
 ## LazyLuno v1.1.0
 
 - **ANDROID_VR client**: the whole 144p to 1080p+ ladder without a PO token or a login (IOS kept answering with 0 streams). It runs in the background quality upgrade next to IOS and is first in the cascade
@@ -21,6 +15,8 @@
 - **Red progress line** along the bottom of thumbnails, how far you got in a video
 
 ## Fixes
+
+- Anime upscaler: black screen and every video after it failing (`width -1 must be positive`). The effects pipeline needs a surface with a known size and a MediaController hands its surface over without one, so once the upscaler is used the video view is now bound to the ExoPlayer itself
 
 - Social sign in pages (Instagram, Facebook, X, TikTok) stuck on the first frame: a proper Chrome string, the progress bar and chrome client the pages need, and no X-Requested-With header. Signing in to YouTube no longer wipes those sign ins either
 - Everyone is on LazyLuno: the Extractor Method setting is gone and stored NewPipe / Auto / InnerTubeX choices are ignored (NewPipe still works inside LazyLuno for the quality upgrade and as fallback)
