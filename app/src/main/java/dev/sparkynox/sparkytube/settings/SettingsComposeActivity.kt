@@ -292,30 +292,12 @@ class SettingsComposeActivity : AppCompatActivity() {
                         else "Session log + crash reports"
                     }) { open(dev.sparkynox.sparkytube.logs.LogsActivity::class.java) }
             )),
-            Section("social", "Social downloader", "download", "Instagram, X, TikTok and Facebook: reels, videos, stories, pictures", listOf(
-                toggle("socialauto", "Download right after sharing", "download",
-                    "Share a link to SparkyTube from the other app and the best quality starts downloading. Off: pick from a list first",
-                    { SettingsPrefs.isSocialAutoDownload(this) }, { SettingsPrefs.setSocialAutoDownload(this, it) }),
-                link("sociallink", "Download from a copied link", "download", { "Copy a link, then tap here" }) {
-                    startActivity(Intent(this, dev.sparkynox.sparkytube.extractor.social.ShareReceiverActivity::class.java)
-                        .putExtra(dev.sparkynox.sparkytube.extractor.social.ShareReceiverActivity.EXTRA_PASTE, true))
-                },
-                link("loginig", "Sign in to Instagram", "globe", { "Needed for stories and some posts" }) { socialLogin("instagram") },
-                link("loginfb", "Sign in to Facebook", "globe", { "For videos only your account can see" }) { socialLogin("facebook") },
-                link("loginx", "Sign in to X", "globe", { "For posts only your account can see" }) { socialLogin("x") },
-                link("logintt", "Sign in to TikTok", "globe", { "For videos that need an account" }) { socialLogin("tiktok") }
-            )),
             Section("about", "About", "file", "Version, developer and links", listOf(
                 link("about", "About SparkyTube", "file", { "Version ${appVersion()}, credits, links and licenses" }) {
                     open(AboutActivity::class.java)
                 }
             ))
         )
-    }
-
-    private fun socialLogin(site: String) {
-        startActivity(Intent(this, dev.sparkynox.sparkytube.extractor.social.SocialLoginActivity::class.java)
-            .putExtra(dev.sparkynox.sparkytube.extractor.social.SocialLoginActivity.EXTRA_SITE, site))
     }
 
     private fun appVersion(): String = try {
