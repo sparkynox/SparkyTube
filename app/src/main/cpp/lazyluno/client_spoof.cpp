@@ -70,7 +70,7 @@ ClientProfile getClientProfile(ClientType type) {
             .osVersion        = "12L",
             .deviceMake       = "Oculus",
             .deviceModel      = "Quest 3",
-            .platform         = "MOBILE",
+            .platform         = "",
             .androidSdkVersion= 32,
             .userAgent        = "com.google.android.apps.youtube.vr.oculus/1.65.10 "
                                 "(Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip",
@@ -185,15 +185,16 @@ ClientProfile getClientProfile(ClientType type) {
         return {
             .type           = ClientType::VISIONOS,
             .clientName     = "VISIONOS",
-            .clientVersion  = "1.04",
+            // values from EchoMusic's measured client list: the only one that serves complete files, no PO token, no login
+            .clientVersion  = "0.1",
             .clientId       = "101",
             .osName         = "visionOS",
-            .osVersion      = "26.6.0.23O770",
+            .osVersion      = "1.3.21O771",
             .deviceMake     = "Apple",
-            .deviceModel    = "RealityDevice17,1",
-            .platform       = "MOBILE",
-            .userAgent      = "com.google.ios.youtube/1.04 "
-                              "(RealityDevice17,1; U; CPU visionOS 26_6_0 like Mac OS X;)",
+            .deviceModel    = "RealityDevice14,1",
+            .platform       = "",
+            .userAgent      = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
+                              "(KHTML, like Gecko) Version/18.0 Safari/605.1.15",
             .apiKey         = "AIzaSyB-63vPrdThhKuerbB2N_l7Kwwcxj6yUAc",
             .innertubeHost  = "www.youtube.com",
             .requiresPoToken   = false,
