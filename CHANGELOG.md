@@ -2,6 +2,11 @@
 
 # v2.6
 
+## LazyLuno v1.2.0: EchoMusic's logic
+
+- The quality ladder (144p up to 1080p+) now comes from VISIONOS and ANDROID_VR (with visitorData) in well under a second. NewPipe only runs when they did not reach 1080p. IOS is dropped from the upgrade
+- Refused streams (403) are remembered per video, visitorData and the PO token are prepared right after start
+
 ## LazyLuno v1.1.0
 
 - **ANDROID_VR client**: the whole 144p to 1080p+ ladder without a PO token or a login (IOS kept answering with 0 streams). It runs in the background quality upgrade next to IOS and is first in the cascade
@@ -25,7 +30,7 @@
 - Widget: tapping like or play/pause no longer crashes the app (the player was touched from a background thread)
 - Instagram links: the preview-bot page (og:video), the embed page JSON, the web query and the mobile API are tried in turn, and each step logs its HTTP code under the tag Social. Visitor cookies no longer count as a sign in
 - Mini player: autoplay and Play next no longer pop the video back up to the big player, the next video plays in the mini player
-- Playlists in Home, search and related (the "49 videos" cards) now open the playlist page. Mixes still just play
+- Playlists in Home, search and related (the "x videos" cards) now open the playlist page. Mixes still just play
 - Playlists and mixes show the channel picture (fetched once per channel and kept)
 - Top and bottom bar no longer stay hidden after scrolling the feed and opening a video: they come back when a video opens, when you leave the watch page (so the mini player has its place) and when the Shorts viewer closes
 - The Shorts tab in the bottom bar now opens the native Shorts player too, not the YouTube page
