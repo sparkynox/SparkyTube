@@ -91,6 +91,8 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
     }
     var expanded by remember(nav.watchId) { mutableStateOf(false) }
     var showComments by remember(nav.watchId) { mutableStateOf(false) }
+    // the Playlist / Mix list under the player can be folded away with a tap on its title (it stays folded for the next videos)
+    var queueCollapsed by remember { mutableStateOf(false) }
     val list = rememberLazyListState()
     val nearEnd by remember {
         androidx.compose.runtime.derivedStateOf {
@@ -346,14 +348,24 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
                 item(key = "queue-title") {
                     val idx = panel.indexOfFirst { it.videoId == nav.watchId } + 1
                     val kind = if (nav.queue.isNotEmpty()) "Playlist" else "Mix"
-                    Text(
-                        kind + " \u2022 " + ((if (nav.queue.isNotEmpty()) info?.queueTitle else nav.autoMixTitle) ?: "Mix") + if (idx > 0) "  ($idx/${panel.size})" else "",
-                        Modifier.padding(horizontal = 16.dp),
-                        style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    )
+                    Row(
+                        Modifier.fillMaxWidth().clickable { queueCollapsed = !queueCollapsed }.padding(horizontal = 16.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            kind + " \u2022 " + ((if (nav.queue.isNotEmpty()) info?.queueTitle else nav.autoMixTitle) ?: "Mix") + if (idx > 0) "  ($idx/${panel.size})" else "",
+                            Modifier.weight(1f),
+                            style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        )
+                        androidx.compose.material3.Icon(
+                            if (queueCollapsed) androidx.compose.material.icons.Icons.Filled.KeyboardArrowDown
+                            else androidx.compose.material.icons.Icons.Filled.KeyboardArrowUp,
+                            if (queueCollapsed) "Show list" else "Hide list",
+                        )
+                    }
                 }
-                items(panel, key = { "q-" + it.videoId }) { q ->
+                if (!queueCollapsed) items(panel, key = { "q-" + it.videoId }) { q ->
                     val current = q.videoId == nav.watchId
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 12.dp).clip(RoundedCornerShape(14.dp))
