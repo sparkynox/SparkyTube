@@ -827,9 +827,11 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                         val dy = e2.y - sy
                         val dx = e2.x - (e1?.x ?: e2.x)
                         if (!isMiniPlayerActive && kotlin.math.abs(dy) > kotlin.math.abs(dx) && dy > 0f) {
+                            if (miniAnimator?.isRunning == true) return true
+                            if (!prepareMiniGeometry()) return false
                             miniSwipeDy = dy
-                            binding.exoPlayerView.translationY = dy * 0.6f
-                            nav.watchDrag = (dy / (resources.displayMetrics.heightPixels * 0.35f)).coerceIn(0f, 1f)
+                            // 1:1 with the finger: g[1] is how far down the bar is
+                            applyMiniProgress((dy / miniGeo!![1]).coerceIn(0f, 1f))
                             return true
                         }
                         return false
@@ -865,18 +867,23 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 holdBackSpeed = 0f
                 hideGestureOverlayNow()
             }
-            // finger lifted after dragging the video down: minimize, or spring back if it was a short drag
+            // velocity of the drag, for the flick-to-minimize decision
+            if (event.actionMasked == android.view.MotionEvent.ACTION_DOWN) {
+                miniVelocity?.recycle()
+                miniVelocity = android.view.VelocityTracker.obtain()
+            }
+            miniVelocity?.addMovement(event)
+            // finger lifted after dragging the video down: finish the move into the bar, or slide back
             if (event.actionMasked == android.view.MotionEvent.ACTION_UP || event.actionMasked == android.view.MotionEvent.ACTION_CANCEL) {
-                if (miniSwipeDy > 0f && !isPlayerFullscreen && !isMiniPlayerActive) {
-                    val far = miniSwipeDy > 90 * resources.displayMetrics.density
+                if (miniGeo != null && miniSwipeDy > 0f && !isPlayerFullscreen && !isMiniPlayerActive) {
+                    miniVelocity?.computeCurrentVelocity(1000)
+                    val vy = miniVelocity?.yVelocity ?: 0f
+                    val commit = event.actionMasked == android.view.MotionEvent.ACTION_UP && (miniProgress > 0.28f || vy > 1400f)
                     miniSwipeDy = 0f
-                    if (far && event.actionMasked == android.view.MotionEvent.ACTION_UP) {
-                        minimizeWithAnimation()
-                    } else {
-                        binding.exoPlayerView.animate().translationY(0f).setDuration(160).start()
-                        animateWatchDragTo(0f, 160)
-                    }
+                    settleMini(commit)
                 }
+                miniVelocity?.recycle()
+                miniVelocity = null
             }
             // Let PlayerView's own controls (play/pause/seek tap) still
             // receive the event too — we're only adding zoom/pan/double-tap-
@@ -1361,9 +1368,16 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }
         binding.exoPlayerView.clipToOutline = true
         binding.miniPlayerContainer.clipToOutline = true // rounds the blurred backdrop
-        binding.miniPlayerContainer.alpha = 0f
-        binding.miniPlayerContainer.translationY = 24 * resources.displayMetrics.density
-        binding.miniPlayerContainer.animate().alpha(1f).translationY(0f).setDuration(200).start()
+        if (miniFromSwipe) {
+            // the swipe already faded the bar in
+            binding.miniPlayerContainer.animate().cancel()
+            binding.miniPlayerContainer.alpha = 1f
+            binding.miniPlayerContainer.translationY = 0f
+        } else {
+            binding.miniPlayerContainer.alpha = 0f
+            binding.miniPlayerContainer.translationY = 24 * resources.displayMetrics.density
+            binding.miniPlayerContainer.animate().alpha(1f).translationY(0f).setDuration(200).start()
+        }
         bindMiniBar()
         // Controller UI (seek bar, quality gear, etc.) doesn't fit a
         // 160x90dp box — tapping the mini-player re-expands it instead.
@@ -3222,48 +3236,119 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }
     }
 
-    /**
-     * Swipe-down finish: the video flies and shrinks into the mini bar's thumbnail spot while the
-     * watch page fades out, then the real mini player takes over.
-     */
-    private fun minimizeWithAnimation() {
-        if (minimizing) return
+    // ---- swipe down to the mini player
+    // One progress value p drives all of it: 0 = the watch page, 1 = the player sitting in the mini bar. The video follows
+    // the finger 1:1 along its real path to the bar (the same transform the release animation continues with), the watch
+    // page fades out ahead of it, the bar fades in behind it, and the video's corners round off on the way. At the end the
+    // video is exactly where the bar puts it, so handing it over to the bar is not visible.
+    private var miniProgress = 0f
+    private var miniGeo: FloatArray? = null // dx, dy, scaleX, scaleY of the video at p = 1
+    private var miniAnimator: android.animation.ValueAnimator? = null
+    private var miniFromSwipe = false
+    private var miniVelocity: android.view.VelocityTracker? = null
+
+    private fun prepareMiniGeometry(): Boolean {
+        if (miniGeo != null) return true
         val v = binding.exoPlayerView
-        if (v.width == 0 || v.height == 0 || !isNativePlaybackActive) { v.translationY = 0f; nav.watchDrag = 0f; leaveWatch(); return }
-        minimizing = true
+        if (v.width == 0 || v.height == 0 || !isNativePlaybackActive || isMiniPlayerActive) return false
         val d = resources.displayMetrics.density
-        val loc = IntArray(2)
-        v.getLocationOnScreen(loc)
-        // thumbnail spot inside the bar: 10dp bar margin + 6dp, bar sits 72dp above the bottom and is 64dp tall
-        val targetCx = 16 * d + 48 * d
-        val targetCy = binding.root.height - (72 + 64) * d + 5 * d + 27 * d
-        val startTx = v.translationX
-        val startTy = v.translationY
-        val dx = targetCx - (loc[0] + v.width / 2f)
-        val dy = targetCy - (loc[1] + v.height / 2f)
-        val sx = 96 * d / v.width
-        val sy = 54 * d / v.height
-        val startDrag = nav.watchDrag
-        android.animation.ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 240
-            interpolator = android.view.animation.DecelerateInterpolator(1.4f)
-            addUpdateListener {
-                val t = it.animatedValue as Float
-                v.translationX = startTx + dx * t
-                v.translationY = startTy + dy * t
-                v.scaleX = 1f + (sx - 1f) * t
-                v.scaleY = 1f + (sy - 1f) * t
-                nav.watchDrag = startDrag + (1f - startDrag) * t
+        v.translationX = 0f; v.translationY = 0f; v.scaleX = 1f; v.scaleY = 1f
+        val vl = IntArray(2); v.getLocationOnScreen(vl)
+        val rl = IntArray(2); binding.root.getLocationOnScreen(rl)
+        // the bar: 10dp side margin, 72dp above the bottom, 64dp tall; the video sits 6dp in, 96x54dp, centred vertically
+        val cx = rl[0] + (10 + 6 + 48) * d
+        val cy = rl[1] + binding.root.height - 104 * d
+        miniGeo = floatArrayOf(cx - (vl[0] + v.width / 2f), cy - (vl[1] + v.height / 2f), 96 * d / v.width, 54 * d / v.height)
+
+        // the bar is put in place behind the video, invisible until the video gets close
+        binding.miniPlayerTitle.text = mediaController?.mediaMetadata?.title?.toString()?.takeIf { it.isNotBlank() } ?: nav.watchTitle
+        binding.miniPlayerPlayPause.setImageResource(if (mediaController?.isPlaying == true) R.drawable.ic_pause else R.drawable.ic_play)
+        dev.sparkynox.sparkytube.lunokit.blur.GlassBackdrop.load(binding.miniPlayerBackdrop, lastResolvedVideoId)
+        val c = binding.miniPlayerContainer
+        c.clipToOutline = true
+        c.alpha = 0f
+        c.translationY = 24 * d
+        c.visibility = View.VISIBLE
+        // the video is drawn above the bar (which has an elevation of 12dp)
+        (v.parent as? View)?.translationZ = 20 * d
+        v.clipToOutline = true
+        v.outlineProvider = object : android.view.ViewOutlineProvider() {
+            override fun getOutline(view: View, o: android.graphics.Outline) {
+                o.setRoundRect(0, 0, view.width, view.height, 12 * d * miniProgress / maxOf(view.scaleX, 0.05f))
             }
+        }
+        return true
+    }
+
+    private fun applyMiniProgress(p: Float) {
+        val g = miniGeo ?: return
+        val v = binding.exoPlayerView
+        miniProgress = p
+        v.translationX = g[0] * p
+        v.translationY = g[1] * p
+        v.scaleX = 1f + (g[2] - 1f) * p
+        v.scaleY = 1f + (g[3] - 1f) * p
+        v.invalidateOutline()
+        nav.watchDrag = p
+        val bar = ((p - 0.35f) / 0.65f).coerceIn(0f, 1f)
+        binding.miniPlayerContainer.alpha = bar
+        binding.miniPlayerContainer.translationY = (1f - bar) * 24 * resources.displayMetrics.density
+    }
+
+    private fun settleMini(commit: Boolean) {
+        if (miniGeo == null) return
+        miniAnimator?.cancel()
+        val to = if (commit) 1f else 0f
+        miniAnimator = android.animation.ValueAnimator.ofFloat(miniProgress, to).apply {
+            duration = if (commit) 230 else 190
+            interpolator = android.view.animation.DecelerateInterpolator(if (commit) 1.4f else 1.2f)
+            addUpdateListener { applyMiniProgress(it.animatedValue as Float) }
             addListener(object : android.animation.AnimatorListenerAdapter() {
+                private var cancelled = false
+                override fun onAnimationCancel(animation: android.animation.Animator) { cancelled = true }
                 override fun onAnimationEnd(animation: android.animation.Animator) {
-                    v.translationX = 0f; v.translationY = 0f; v.scaleX = 1f; v.scaleY = 1f
-                    minimizing = false
-                    leaveWatch()
+                    if (cancelled) return
+                    if (commit) completeMini() else cancelMini()
                 }
             })
             start()
         }
+    }
+
+    private fun resetMiniTransforms() {
+        val v = binding.exoPlayerView
+        (v.parent as? View)?.translationZ = 0f
+        v.translationX = 0f; v.translationY = 0f; v.scaleX = 1f; v.scaleY = 1f
+        miniGeo = null
+        miniProgress = 0f
+        minimizing = false
+    }
+
+    // the video is in the bar's spot: hand it to the bar (same place, same size, bar already fully visible)
+    private fun completeMini() {
+        resetMiniTransforms()
+        miniFromSwipe = true
+        leaveWatch()
+        miniFromSwipe = false
+    }
+
+    // let go too early: back to the watch page
+    private fun cancelMini() {
+        val v = binding.exoPlayerView
+        resetMiniTransforms()
+        v.clipToOutline = false
+        v.outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
+        binding.miniPlayerContainer.visibility = View.GONE
+        binding.miniPlayerContainer.alpha = 1f
+        binding.miniPlayerContainer.translationY = 0f
+        nav.watchDrag = 0f
+    }
+
+    private fun minimizeWithAnimation() {
+        if (minimizing) return
+        if (!prepareMiniGeometry()) { nav.watchDrag = 0f; leaveWatch(); return }
+        minimizing = true
+        settleMini(true)
     }
 
     private fun leaveWatch() {
