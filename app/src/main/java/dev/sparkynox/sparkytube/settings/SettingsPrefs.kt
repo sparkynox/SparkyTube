@@ -342,16 +342,18 @@ object SettingsPrefs {
     // public instance, no extra APK weight, so there's no real downside
     // to leaving it on for everyone. Mainly fixes age-restricted videos
     // that NewPipeExtractor's anonymous scraping can't get past.
-    fun isPipedFallbackEnabled(context: Context) =
-        prefs(context).getBoolean(KEY_PIPED_FALLBACK_ENABLED, true)
+    // retired: the Piped fallback never worked, no setting any more
+    @Suppress("UNUSED_PARAMETER")
+    fun isPipedFallbackEnabled(context: Context) = false
 
     fun setPipedFallbackEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_PIPED_FALLBACK_ENABLED, enabled).apply()
     }
 
     // InnerTubeX as the last link of the NewPipe chain. OFF by default (needs a PO token, experimental)
-    fun isInnerTubeXFallbackEnabled(context: Context) =
-        prefs(context).getBoolean(KEY_ITX_FALLBACK_ENABLED, false)
+    // retired together with the Extraction settings
+    @Suppress("UNUSED_PARAMETER")
+    fun isInnerTubeXFallbackEnabled(context: Context) = false
 
     fun setInnerTubeXFallbackEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_ITX_FALLBACK_ENABLED, enabled).apply()
