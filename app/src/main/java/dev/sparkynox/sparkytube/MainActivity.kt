@@ -648,7 +648,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     // cycle (matching how the button already shows the current value) is
     // faster than a dialog for the common case; the fixed step order
     // also makes the button's next value predictable without looking.
-    private val PLAYBACK_SPEEDS = floatArrayOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
+    private val PLAYBACK_SPEEDS = floatArrayOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f, 2.5f, 3f)
     private var currentPlaybackSpeed = 1f
 
     private fun formatSpeedLabel(speed: Float): String {
@@ -681,7 +681,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 onQuality = { showQualityPicker() },
                 onAudio = { showAudioTrackPicker() },
                 onMusic = { toggleMusicMode() },
-                onSpeed = { cyclePlaybackSpeed(speedLabelHolder) },
+                onSpeed = { showSpeedPicker() },
                 qualityLabel = { currentQualityLabel.ifBlank { "Auto" } },
                 qualities = { currentQualities.map { it.label } },
                 onPickQuality = { applyQuality(it) },
@@ -703,6 +703,21 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 },
             )
         )
+    }
+
+    // same kind of list as the quality picker
+    private fun showSpeedPicker() {
+        val labels = PLAYBACK_SPEEDS.map { if (it == 1f) "Normal" else formatSpeedLabel(it) }.toTypedArray()
+        val current = PLAYBACK_SPEEDS.indexOfFirst { it == currentPlaybackSpeed }.coerceAtLeast(0)
+        AlertDialog.Builder(this)
+            .setTitle("Playback speed")
+            .setSingleChoiceItems(labels, current) { dialog, which ->
+                currentPlaybackSpeed = PLAYBACK_SPEEDS[which]
+                mediaController?.setPlaybackSpeed(currentPlaybackSpeed)
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun cyclePlaybackSpeed(speedBtn: android.widget.TextView) {
@@ -746,6 +761,16 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                     // notification slider in between).
                     volumeFraction = -1f
                     return false
+                }
+
+                // hold to play at 2x, let go and it is back to what it was
+                override fun onLongPress(e: android.view.MotionEvent) {
+                    val c = mediaController ?: return
+                    if (videoScale > 1f || isMiniPlayerActive || isLiveStream || !c.isPlaying) return
+                    holdBackSpeed = currentPlaybackSpeed
+                    c.setPlaybackSpeed(2f)
+                    binding.exoPlayerView.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                    showGestureText("2x speed", R.drawable.ic_skip_next, hold = true)
                 }
 
                 override fun onSingleTapConfirmed(e: android.view.MotionEvent): Boolean {
@@ -835,6 +860,11 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         binding.exoPlayerView.setOnTouchListener { _, event ->
             scaleDetector.onTouchEvent(event)
             gestureDetector.onTouchEvent(event)
+            if ((event.actionMasked == android.view.MotionEvent.ACTION_UP || event.actionMasked == android.view.MotionEvent.ACTION_CANCEL) && holdBackSpeed > 0f) {
+                mediaController?.setPlaybackSpeed(holdBackSpeed)
+                holdBackSpeed = 0f
+                hideGestureOverlayNow()
+            }
             // finger lifted after dragging the video down: minimize, or spring back if it was a short drag
             if (event.actionMasked == android.view.MotionEvent.ACTION_UP || event.actionMasked == android.view.MotionEvent.ACTION_CANCEL) {
                 if (miniSwipeDy > 0f && !isPlayerFullscreen && !isMiniPlayerActive) {
@@ -861,8 +891,38 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
      * registered and which direction it seeked.
      */
     private fun showSeekFeedback(isForward: Boolean) {
-        val message = if (isForward) "+10s" else "-10s"
-        android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_SHORT).show()
+        showGestureText(
+            if (isForward) "+10 seconds" else "-10 seconds",
+            if (isForward) R.drawable.ic_skip_next else R.drawable.ic_skip_previous,
+        )
+    }
+
+    // speed before a hold-to-2x, 0 = no hold going on
+    private var holdBackSpeed = 0f
+
+    private fun hideGestureOverlayNow() {
+        gestureOverlayHideRunnable?.let { pollHandler.removeCallbacks(it) }
+        binding.gestureOverlay.animate().alpha(0f).setDuration(150).withEndAction {
+            binding.gestureOverlay.visibility = View.GONE
+        }.start()
+    }
+
+    /** The volume / brightness overlay with a line of text instead of the level bar: "+10 seconds", "2x speed". */
+    private fun showGestureText(text: String, iconRes: Int, hold: Boolean = false) {
+        val overlay = binding.gestureOverlay
+        binding.gestureOverlayIcon.setImageResource(iconRes)
+        binding.gestureOverlayMascot.setImageResource(R.drawable.mascot_happy)
+        binding.gestureOverlayBar.visibility = View.GONE
+        binding.gestureOverlayPercent.text = text
+        overlay.visibility = View.VISIBLE
+        overlay.alpha = 1f
+        gestureOverlayHideRunnable?.let { pollHandler.removeCallbacks(it) }
+        if (hold) return // stays until the finger lifts
+        val r = Runnable {
+            overlay.animate().alpha(0f).setDuration(200).withEndAction { overlay.visibility = View.GONE }.start()
+        }
+        gestureOverlayHideRunnable = r
+        pollHandler.postDelayed(r, 650)
     }
 
     // Total swipe distance (px) needed to go from 0% to 100% -- tuned so a
@@ -947,6 +1007,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         // touch, doesn't affect functionality either way.
         mascot.setImageResource(if (percent >= 50) R.drawable.mascot_happy else R.drawable.mascot_shy)
 
+        bar.visibility = View.VISIBLE
         bar.progress = percent.coerceIn(0, 100)
         percentText.text = "$label $percent%"
 
@@ -2911,7 +2972,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
     // bars back after a scroll hide, the watch page, the mini player or the Shorts viewer
     private fun restoreBars() {
-        if (isPlayerFullscreen || nav.shortsViewerOpen) return
+        if (isPlayerFullscreen || nav.shortsViewerOpen || isInPictureInPictureMode) return
         binding.topBar.visibility = View.VISIBLE
         binding.bottomNav.visibility = View.VISIBLE
         barsController?.show()
@@ -3101,19 +3162,22 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             val pool = if (nav.shorts.any { it.videoId == videoId }) nav.shorts else listOf(item)
             nav.openShorts(pool, pool.indexOfFirst { it.videoId == videoId })
             onShortsStarted()
-        } else if (playlistId != null && !playlistId.startsWith("RD")) {
-            // a real playlist opens its page (a Mix has no page, it just plays)
-            nav.push(
-                item.title.ifBlank { "Playlist" },
-                dev.sparkynox.sparkytube.homefeed.FeedState.Source.Browse("VL$playlistId")
-            )
         } else if (videoId != null) {
             openVideo(videoId, item.title, playlistId)
         } else if (playlistId != null) {
-            nav.push(
-                item.title.ifBlank { "Playlist" },
-                dev.sparkynox.sparkytube.homefeed.FeedState.Source.Browse("VL$playlistId")
-            )
+            // a playlist card that has no first video of its own: look it up and play it, the watch page lists the whole playlist.
+            // (A page pushed from the search screen would open under the search overlay, that is why tapping did nothing.)
+            dev.sparkynox.sparkytube.logs.LogRecorder.i("Open", "playlist $playlistId has no first video, looking it up")
+            lifecycleScope.launch {
+                val r = dev.sparkynox.sparkytube.homefeed.InnerTubeClient.fetchBrowse("VL$playlistId")
+                val first = r.items.firstOrNull { it.videoId != null }
+                if (first != null) {
+                    openVideo(first.videoId!!, first.title.ifBlank { item.title }, playlistId)
+                } else {
+                    nav.searchVisible = false
+                    nav.push(item.title.ifBlank { "Playlist" }, dev.sparkynox.sparkytube.homefeed.FeedState.Source.Browse("VL$playlistId"))
+                }
+            }
         } else {
             android.widget.Toast.makeText(this, "Couldn't open this item", android.widget.Toast.LENGTH_SHORT).show()
         }
@@ -3125,10 +3189,12 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     private fun openVideo(videoId: String, title: String, playlistId: String? = null, auto: Boolean = false, back: Boolean = false) {
         restoreBars()
         val stayMini = auto && isMiniPlayerActive && videoId != lastResolvedVideoId
+        // Play next while in picture-in-picture: the video keeps filling the PiP window, the watch page stays closed
+        val stayPip = auto && isInPictureInPictureMode
         nav.openWatch(videoId, title, playlistId, auto, back)
-        if (stayMini) {
+        if (stayMini || stayPip) {
             nav.watchVisible = false
-            keepMiniOnce = true
+            if (stayMini) keepMiniOnce = true
         }
         if (videoId == lastResolvedVideoId && isNativePlaybackActive) {
             // already playing (e.g. from the mini-player), just bring it back up
@@ -4135,9 +4201,13 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         if (isInPictureInPictureMode) {
             binding.topBar.visibility = View.GONE
             binding.bottomNav.visibility = View.GONE
-        } else if (!isPlayerFullscreen) {
-            binding.topBar.visibility = View.VISIBLE
-            binding.bottomNav.visibility = View.VISIBLE
+        } else {
+            if (!isPlayerFullscreen) {
+                binding.topBar.visibility = View.VISIBLE
+                binding.bottomNav.visibility = View.VISIBLE
+            }
+            // back from the PiP window: the video that is playing now gets its watch page again
+            if (nav.watchId != null && isNativePlaybackActive && !isMiniPlayerActive && !nav.watchVisible) nav.watchVisible = true
         }
     }
 
