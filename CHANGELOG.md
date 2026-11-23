@@ -21,6 +21,17 @@
 
 ## Fixes
 
+- Playlist cards ("49 videos") from search and Home now play: a playlist without a first video gets it looked up, then the watch page shows the whole playlist. The playlist page used to open under the search screen, that is why tapping did nothing
+- Picture-in-picture: Play next no longer turns the PiP window into the whole app (bars and feed), the next video keeps filling the window and the watch page is back when you expand it
+
+## Also new
+
+- Hold on the video to play at 2x, let go and it is back to normal
+- Playback speed is a list now like the quality one (0.25x to 3x)
+- Double tap +10 / -10 seconds shows the volume-style overlay instead of a toast
+- Tap the Playlist / Mix title under the player to fold the list away or show it again
+- The Extraction settings are gone (Piped fallback and InnerTubeX fallback are retired)
+
 - Anime upscaler: black screen and every video after it failing (`width -1 must be positive`). The effects pipeline needs a surface with a known size and a MediaController hands its surface over without one, so once the upscaler is used the video view is now bound to the ExoPlayer itself
 
 - Social sign in pages (Instagram, Facebook, X, TikTok) stuck on the first frame: a proper Chrome string, the progress bar and chrome client the pages need, and no X-Requested-With header. Signing in to YouTube no longer wipes those sign ins either
@@ -30,7 +41,7 @@
 - Widget: tapping like or play/pause no longer crashes the app (the player was touched from a background thread)
 - Instagram links: the preview-bot page (og:video), the embed page JSON, the web query and the mobile API are tried in turn, and each step logs its HTTP code under the tag Social. Visitor cookies no longer count as a sign in
 - Mini player: autoplay and Play next no longer pop the video back up to the big player, the next video plays in the mini player
-- Playlists in Home, search and related (the "x videos" cards) now open the playlist page. Mixes still just play
+- Playlists in Home, search and related (the "49 videos" cards) now open the playlist page. Mixes still just play
 - Playlists and mixes show the channel picture (fetched once per channel and kept)
 - Top and bottom bar no longer stay hidden after scrolling the feed and opening a video: they come back when a video opens, when you leave the watch page (so the mini player has its place) and when the Shorts viewer closes
 - The Shorts tab in the bottom bar now opens the native Shorts player too, not the YouTube page
