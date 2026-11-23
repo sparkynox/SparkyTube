@@ -31,6 +31,9 @@ import dev.sparkynox.sparkytube.auth.Session
 import dev.sparkynox.sparkytube.homefeed.InnerTubeClient
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -104,8 +107,9 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
 
     Surface(
         Modifier.fillMaxSize().graphicsLayer {
-            alpha = 1f - nav.watchDrag * 0.9f
-            translationY = nav.watchDrag * 90f
+            // gone by the time the video is 60% of the way into the bar
+            alpha = (1f - nav.watchDrag * 1.6f).coerceAtLeast(0f)
+            translationY = nav.watchDrag * 36f
         },
         color = if (LunoGlass.active) Color.Transparent else MaterialTheme.colorScheme.background,
     ) {
@@ -359,8 +363,8 @@ fun WatchScreen(nav: NavViewModel, onOpen: (HomeFeedItem) -> Unit, onMore: (Home
                             maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
                         androidx.compose.material3.Icon(
-                            if (queueCollapsed) androidx.compose.material.icons.Icons.Filled.KeyboardArrowDown
-                            else androidx.compose.material.icons.Icons.Filled.KeyboardArrowUp,
+                            if (queueCollapsed) Icons.Filled.KeyboardArrowDown
+                            else Icons.Filled.KeyboardArrowUp,
                             if (queueCollapsed) "Show list" else "Hide list",
                         )
                     }
