@@ -193,14 +193,6 @@ class SettingsComposeActivity : AppCompatActivity() {
                         "Blocks YouTube telemetry, disables images, starts videos at the lowest quality",
                         { p.isDataSaverEnabled(this) }, { p.setDataSaverEnabled(this, it); StreamExtractor.clearCache() })
             )),
-            Section("extraction", "Extraction", "code", "Extractors and fallbacks", listOf(
-                toggle("piped", "Piped fallback", "globe",
-                        "Fixes age-restricted videos by routing through a public Piped instance when NewPipe fails",
-                        { p.isPipedFallbackEnabled(this) }, { p.setPipedFallbackEnabled(this, it) }),
-                toggle("itxfallback", "InnerTubeX fallback", "zap",
-                        "Last-resort extractor for age-gated or blocked videos when NewPipe and Piped both fail",
-                        { p.isInnerTubeXFallbackEnabled(this) }, { p.setInnerTubeXFallbackEnabled(this, it) })
-            )),
             Section("downloads", "Downloads", "download", "Queue, progress and offline library", listOf(
                 toggle("download", "Download button", "download", "Shows the download button on videos",
                         { p.isDownloadEnabled(this) }, { p.setDownloadEnabled(this, it) }),
