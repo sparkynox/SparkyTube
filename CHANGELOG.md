@@ -21,6 +21,9 @@
 
 ## Fixes
 
+- Swipe down to the mini player, redone: the video follows your finger 1:1 along its real path to the bar and shrinks on the way, the watch page fades out ahead of it, the bar fades in behind it and the video's corners round off. Let go early and it slides back, flick it and it finishes the move. At the end the video is exactly where the bar puts it, so there is no jump and no second fade-in any more
+- Build fix: the Playlist / Mix fold icons in the watch screen
+
 - Playlist cards ("49 videos") from search and Home now play: a playlist without a first video gets it looked up, then the watch page shows the whole playlist. The playlist page used to open under the search screen, that is why tapping did nothing
 - Picture-in-picture: Play next no longer turns the PiP window into the whole app (bars and feed), the next video keeps filling the window and the watch page is back when you expand it
 
