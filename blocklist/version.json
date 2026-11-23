@@ -1,7 +1,7 @@
 {
- "filters_sha256": "0b509493232937c42d89a625e6c279461f7c7df66c0a1df04c6f4f08af34c7ab",
- "hosts": 56430,
- "hosts_sha256": "1bb351a2aa75106b763a070a3bf40abc0098b22152b9dacbc7c42b294c3cb293",
- "rules": 10893,
- "version": "2026-11-21"
+ "filters_sha256": "9599ae86c8dd23138f1cde9b21fb54c61b6fa6b7f9f1ffcc18cd67226318c12b",
+ "hosts": 55277,
+ "hosts_sha256": "ab2c93eb0bf37f514115da3f757cd78a1d05d003d5408ce00e4511996f2bab8d",
+ "rules": 10910,
+ "version": "2026-11-23"
 }
