@@ -95,6 +95,8 @@ object LazyLunoResolver {
             if (o.optBoolean("age") && cookie.isEmpty()) {
                 lastErrorMessage = "This video is age-restricted. Sign in with an adult account (Home tab) to watch it."
             }
+            // age-restricted and the native clients found nothing: read the signed in MWEB answer ourselves
+            if (useClients == "AGE" && cookie.isNotEmpty()) ageViaKotlin(ctx, videoId, playerTok, pot)?.let { return it }
             LogRecorder.w(TAG, "failed in ${System.currentTimeMillis() - t0} ms: $lastErrorMessage")
             return null
         }
@@ -123,6 +125,54 @@ object LazyLunoResolver {
     private fun withPot(url: String, pot: String?): String =
         if (pot == null || !url.contains("googlevideo.com") || url.contains("pot=")) url
         else url + (if (url.contains('?')) "&" else "?") + "pot=" + android.net.Uri.encode(pot)
+
+    /**
+     * Age-restricted videos, second try: the same /player answer the history code already gets (signed in, MWEB, with the
+     * video's PO token), read here. Whatever it holds is logged (status, how many formats have a plain url, how many are
+     * ciphered, whether it is SABR only), so the next log shows exactly what is in the way.
+     */
+    private fun ageViaKotlin(ctx: Context, videoId: String, playerTok: String, pot: String?): StreamExtractor.ResolvedStream? {
+        for ((client, id) in listOf("MWEB" to "2", "WEB" to "1")) {
+            try {
+                val body = JSONObject().put("videoId", videoId).put("contentCheckOk", true).put("racyCheckOk", true)
+                if (playerTok.isNotEmpty()) body.put("serviceIntegrityDimensions", JSONObject().put("poToken", playerTok))
+                val root = dev.sparkynox.sparkytube.homefeed.InnerTubeClient.post("player", body, client, id)
+                val status = root.optJSONObject("playabilityStatus")?.optString("status").orEmpty()
+                val sd = root.optJSONObject("streamingData")
+                val muxed = sd?.optJSONArray("formats")
+                val adaptive = sd?.optJSONArray("adaptiveFormats")
+                val all = ArrayList<S>()
+                var withUrl = 0
+                var ciphered = 0
+                fun scan(a: org.json.JSONArray?, isMuxed: Boolean) {
+                    if (a == null) return
+                    for (i in 0 until a.length()) {
+                        val f = a.getJSONObject(i)
+                        val url = f.optString("url")
+                        if (url.isEmpty()) { if (f.has("signatureCipher") || f.has("cipher")) ciphered++; continue }
+                        withUrl++
+                        val mime = f.optString("mimeType")
+                        val kind = if (isMuxed) "muxed" else if (mime.startsWith("audio")) "audio" else "video"
+                        all += S(withPot(url, pot), mime, f.optInt("height"), f.optLong("bitrate"), kind)
+                    }
+                }
+                scan(muxed, true)
+                scan(adaptive, false)
+                val hls = sd?.optString("hlsManifestUrl").orEmpty()
+                LogRecorder.i(TAG, "age fallback $client: status=$status, formats=${muxed?.length() ?: 0}+${adaptive?.length() ?: 0}, " +
+                    "plain url=$withUrl, ciphered=$ciphered, sabr=${sd?.has("serverAbrStreamingUrl") == true}, hls=${hls.isNotEmpty()}")
+                if (all.isEmpty() && hls.isEmpty()) continue
+                val d = root.optJSONObject("videoDetails")
+                build(
+                    ctx, d?.optString("title").orEmpty(), d?.optString("lengthSeconds")?.toLongOrNull() ?: 0L,
+                    d?.optBoolean("isLive") == true, hls, all,
+                )?.let { return it }
+            } catch (e: Exception) {
+                LogRecorder.w(TAG, "age fallback $client failed: ${e.message}")
+            }
+        }
+        return null
+    }
 
     private fun readStreams(o: JSONObject, pot: String? = null): List<S> {
         val arr = o.optJSONArray("streams") ?: return emptyList()
