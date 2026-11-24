@@ -210,6 +210,9 @@ object LazyLunoResolver {
 
     private const val MAX_WANTED = 1080
 
+    // from this length on playback starts from the adaptive streams (see resolveWithFallback)
+    private const val LONG_VIDEO_SECONDS = 15 * 60L
+
     /** Blocking, run off the main thread. Other clients in parallel, merged with the fast pass. Null = nothing better. */
     fun upgrade(ctx: Context, videoId: String, first: StreamExtractor.ResolvedStream): StreamExtractor.ResolvedStream? {
         val base = fastStreams.remove(videoId) ?: return null
@@ -281,8 +284,19 @@ object LazyLunoResolver {
     suspend fun resolveWithFallback(ctx: Context, videoId: String): StreamExtractor.ResolvedStream? {
         StreamExtractor.cached(videoId)?.let { return it }
         val t0 = android.os.SystemClock.elapsedRealtime()
-        val own = resolveFast(ctx, videoId)
+        var own = resolveFast(ctx, videoId)
         val ms = android.os.SystemClock.elapsedRealtime() - t0
+        if (own != null && own.partial && own.durationSeconds >= LONG_VIDEO_SECONDS) {
+            // The quick ANDROID answer is a plain progressive mp4 whose index (the moov box) lists every frame of the video:
+            // a 2 h video makes that several MB the player has to read before the first frame, a 10 h one minutes.
+            // VISIONOS / ANDROID_VR answer with fragmented mp4 / webm that has a tiny index at the start, so for long videos
+            // the upgrade (about 350 ms) is waited for and the video starts from those.
+            val up = upgrade(ctx, videoId, own)
+            if (up != null) {
+                LogRecorder.i("Resolve", "long video (${own.durationSeconds / 60} min): starting from the adaptive streams, ${own.availableQualities.size} -> ${up.availableQualities.size} qualities")
+                own = up
+            }
+        }
         if (own != null) {
             StreamExtractor.cacheResolved(videoId, own)
             return own
