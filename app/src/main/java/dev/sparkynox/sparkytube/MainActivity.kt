@@ -1357,6 +1357,11 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             originalPlayerLayoutParams = binding.exoPlayerView.layoutParams as android.widget.FrameLayout.LayoutParams
         }
 
+        // Moving the video view to the bar destroys its TextureView surface and ExoPlayer needs a few frames for the new one:
+        // that was the flicker. A still of the current frame is kept over the bar until the new surface shows a frame.
+        val stillFrame = try {
+            (binding.exoPlayerView.videoSurfaceView as? android.view.TextureView)?.getBitmap(192, 108)
+        } catch (_: Exception) { null }
         (binding.exoPlayerView.parent as? ViewGroup)?.removeView(binding.exoPlayerView)
         binding.miniPlayerContainer.addView(
             binding.exoPlayerView,
@@ -1373,6 +1378,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             }
         }
         binding.exoPlayerView.clipToOutline = true
+        stillFrame?.let { holdStillFrame(it) }
         binding.miniPlayerContainer.clipToOutline = true // rounds the blurred backdrop
         if (miniFromSwipe) {
             // the swipe already faded the bar in
@@ -1432,6 +1438,41 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         binding.exoPlayerView.animate().alpha(1f).translationY(0f).setDuration(240)
             .setInterpolator(android.view.animation.DecelerateInterpolator()).start()
         musicArt.sync()
+    }
+
+    // the still sits over the video in the bar (below the buttons) and fades out once the video renders again
+    private fun holdStillFrame(frame: android.graphics.Bitmap) {
+        val d = resources.displayMetrics.density
+        val still = android.widget.ImageView(this).apply {
+            setImageBitmap(frame)
+            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+            setBackgroundColor(android.graphics.Color.BLACK)
+            outlineProvider = object : android.view.ViewOutlineProvider() {
+                override fun getOutline(v: View, o: android.graphics.Outline) { o.setRoundRect(0, 0, v.width, v.height, 12 * d) }
+            }
+            clipToOutline = true
+        }
+        binding.miniPlayerContainer.addView(
+            still, 2,
+            android.widget.FrameLayout.LayoutParams((96 * d).toInt(), (54 * d).toInt()).apply {
+                gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
+                marginStart = (6 * d).toInt()
+            }
+        )
+        var dropped = false
+        val player = binding.exoPlayerView.player
+        lateinit var listener: androidx.media3.common.Player.Listener
+        fun drop() {
+            if (dropped) return
+            dropped = true
+            player?.removeListener(listener)
+            still.animate().alpha(0f).setDuration(140).withEndAction { binding.miniPlayerContainer.removeView(still) }.start()
+        }
+        listener = object : androidx.media3.common.Player.Listener {
+            override fun onRenderedFirstFrame() { drop() }
+        }
+        player?.addListener(listener)
+        still.postDelayed({ drop() }, 800) // a paused video may not render again, never keep the still for long
     }
 
     private var miniListener: androidx.media3.common.Player.Listener? = null
