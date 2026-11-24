@@ -370,6 +370,12 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                     }
 
                     override fun onPlaybackStateChanged(playbackState: Int) {
+                        if (playbackState == Player.STATE_READY && prepareAtMs > 0) {
+                            dev.sparkynox.sparkytube.logs.LogRecorder.i(
+                                "Player", "ready ${android.os.SystemClock.elapsedRealtime() - prepareAtMs} ms after prepare ($prepareDesc)"
+                            )
+                            prepareAtMs = 0
+                        }
                         if (playbackState == Player.STATE_ENDED) {
                             // an empty player reports "ended" too (that is what skipped the next video after a second)
                             val c = mediaController
@@ -2527,6 +2533,8 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }.build()
 
         controller.setMediaItem(itemBuilder.build())
+        prepareAtMs = android.os.SystemClock.elapsedRealtime()
+        prepareDesc = "${if (isHls) "hls" else if (audioUrl != null) "adaptive video+audio" else "muxed mp4"}, ${currentQualityLabel ?: "?"}"
         controller.prepare()
         if (startPositionMs > 0) controller.seekTo(startPositionMs)
         controller.play()
@@ -3196,6 +3204,10 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             android.widget.Toast.makeText(this, "Couldn't open this item", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
+
+    // for the "ready N ms after prepare" log line, to see where start-up time goes
+    private var prepareAtMs = 0L
+    private var prepareDesc = ""
 
     // autoplay / Play next while the mini player is showing: the next video plays in the mini player, the watch page stays closed
     private var keepMiniOnce = false
