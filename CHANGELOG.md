@@ -21,6 +21,8 @@
 
 ## Fixes
 
+- Long videos start much faster: from 15 minutes on, playback starts from the VISIONOS / ANDROID_VR adaptive streams (tiny index at the start) instead of the quick progressive 360p mp4, whose index lists every frame of the video (several MB for 2 h, minutes for 10 h). Settings > Logs now has a `Player: ready N ms after prepare (...)` line for every video, to see where the start-up time goes
+
 - Swipe down to the mini player, redone: the video follows your finger 1:1 along its real path to the bar and shrinks on the way, the watch page fades out ahead of it, the bar fades in behind it and the video's corners round off. Let go early and it slides back, flick it and it finishes the move. At the end the video is exactly where the bar puts it, so there is no jump and no second fade-in any more
 - Build fix: the Playlist / Mix fold icons in the watch screen
 
