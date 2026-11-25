@@ -21,6 +21,9 @@
 
 ## Fixes
 
+- The minimize button in the player controls (and the one in the old controls) left the watch page open behind the mini bar and moved the video with no animation. Both now do the same animated move as the swipe and close the watch page
+- Age-restricted videos that no native client can play are opened on YouTube's own page in the signed in WebView, instead of an error
+
 - Mini player flicker after the swipe: moving the video into the bar destroys its surface and the new one needs a few frames. A still of the last frame now stays over the bar until the video renders again
 - Age-restricted videos: when the native clients find nothing, the signed in MWEB answer is read in Kotlin (with the video's PO token). The log line `age fallback MWEB: status=..., plain url=N, ciphered=N, sabr=...` shows what is in the way if it still fails
 
