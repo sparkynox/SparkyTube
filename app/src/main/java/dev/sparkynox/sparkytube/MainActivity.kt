@@ -76,6 +76,109 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     // broken/dead stream doesn't retry forever -- falls through to
     // advanceToNextVideo() once the cap is hit.
     private var consecutivePlayerErrorCount = 0
+
+    // ---- connection trouble: stay on the video, retry, and ask when it does not work
+    private var netRetryCount = 0
+    private var retryVideoId: String? = null
+    private var retrySnackbar: com.google.android.material.snackbar.Snackbar? = null
+    private var networkWatcher: android.net.ConnectivityManager.NetworkCallback? = null
+
+    private fun isOnline(): Boolean {
+        val cm = getSystemService(android.net.ConnectivityManager::class.java) ?: return true
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
+        return caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+
+    private fun isNetworkError(e: androidx.media3.common.PlaybackException): Boolean {
+        when (e.errorCode) {
+            androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+            androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
+            androidx.media3.common.PlaybackException.ERROR_CODE_TIMEOUT -> return true
+        }
+        var t: Throwable? = e
+        while (t != null) {
+            if (t is java.net.UnknownHostException || t is java.net.SocketTimeoutException || t is java.net.ConnectException ||
+                t is java.net.SocketException || t is javax.net.ssl.SSLException || t is java.io.EOFException
+            ) return true
+            // a refused url (403 / 410 / 429) is not a network problem, that one is handled as before
+            if (t is androidx.media3.datasource.HttpDataSource.HttpDataSourceException &&
+                t !is androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException
+            ) return true
+            t = t.cause
+        }
+        return false
+    }
+
+    private fun onNetworkTrouble(videoId: String) {
+        retryVideoId = videoId
+        mediaController?.let { c ->
+            if (c.duration > 0) dev.sparkynox.sparkytube.history.WatchHistoryStore.savePosition(this, videoId, c.currentPosition, c.duration)
+        }
+        if (!isOnline()) {
+            netRetryCount = 0
+            showRetryBar("Connection lost", true)
+            waitForNetwork()
+            return
+        }
+        netRetryCount++
+        if (netRetryCount <= 4) {
+            dev.sparkynox.sparkytube.logs.LogRecorder.i("Player", "slow connection, retry $netRetryCount of 4 on the same video")
+            showRetryBar("Slow connection, trying again ($netRetryCount/4)", false)
+            pollHandler.postDelayed({ if (retryVideoId == videoId) retryCurrentVideo(keepBar = true) }, 1500L * netRetryCount)
+        } else {
+            netRetryCount = 0
+            showRetryBar("Couldn't load this video", true)
+        }
+    }
+
+    private fun showRetryBar(text: String, withButton: Boolean) {
+        if (isFinishing || isDestroyed) return
+        retrySnackbar?.dismiss()
+        val bar = com.google.android.material.snackbar.Snackbar.make(
+            binding.root, text,
+            if (withButton) com.google.android.material.snackbar.Snackbar.LENGTH_INDEFINITE else com.google.android.material.snackbar.Snackbar.LENGTH_LONG,
+        )
+        if (withButton) bar.setAction("Try again") { netRetryCount = 0; retryCurrentVideo() }
+        retrySnackbar = bar
+        bar.show()
+    }
+
+    // when the connection comes back, carry on with the video the person was on
+    private fun waitForNetwork() {
+        if (networkWatcher != null) return
+        val cm = getSystemService(android.net.ConnectivityManager::class.java) ?: return
+        val cb = object : android.net.ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: android.net.Network) {
+                runOnUiThread {
+                    stopWaitingForNetwork()
+                    if (retryVideoId != null) {
+                        android.widget.Toast.makeText(this@MainActivity, "Back online", android.widget.Toast.LENGTH_SHORT).show()
+                        retryCurrentVideo()
+                    }
+                }
+            }
+        }
+        networkWatcher = cb
+        try { cm.registerDefaultNetworkCallback(cb) } catch (_: Exception) { networkWatcher = null }
+    }
+
+    private fun stopWaitingForNetwork() {
+        val cb = networkWatcher ?: return
+        networkWatcher = null
+        try { getSystemService(android.net.ConnectivityManager::class.java)?.unregisterNetworkCallback(cb) } catch (_: Exception) { }
+    }
+
+    // reload the same video (fresh urls), it picks up where it was
+    private fun retryCurrentVideo(keepBar: Boolean = false) {
+        val id = retryVideoId ?: lastResolvedVideoId ?: nav.watchId ?: return
+        stopWaitingForNetwork()
+        if (!keepBar) retrySnackbar?.dismiss()
+        consecutivePlayerErrorCount = 0
+        dev.sparkynox.sparkytube.extractor.StreamExtractor.invalidate(id)
+        lastResolvedVideoId = null
+        resolveAndPlayNative(id, fallbackTitle = "")
+        lastResolvedVideoId = id
+    }
     private var lastErroredVideoId: String? = null
     private var isResolving = false
     // Bumped on every resolveAndPlayNative() call -- if a slower, older
@@ -370,6 +473,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                     }
 
                     override fun onPlaybackStateChanged(playbackState: Int) {
+                        if (playbackState == Player.STATE_READY) netRetryCount = 0
                         if (playbackState == Player.STATE_READY && prepareAtMs > 0) {
                             dev.sparkynox.sparkytube.logs.LogRecorder.i(
                                 "Player", "ready ${android.os.SystemClock.elapsedRealtime() - prepareAtMs} ms after prepare ($prepareDesc)"
@@ -426,6 +530,12 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                     // never got corrected either.
                     override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                         dev.sparkynox.sparkytube.logs.LogRecorder.w("Player", "error ${error.errorCodeName}: ${error.message}")
+                        // No connection or a slow one is not a broken video: never skip it, stay on it and retry / ask
+                        val netVideoId = lastResolvedVideoId
+                        if (netVideoId != null && (!isOnline() || isNetworkError(error))) {
+                            onNetworkTrouble(netVideoId)
+                            return
+                        }
                         val failedVideoId = lastResolvedVideoId
                         if (failedVideoId != null && failedVideoId == lastErroredVideoId) {
                             consecutivePlayerErrorCount++
@@ -579,10 +689,13 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         )
     }
 
+    private var musicVisualWasOn = false
+
     private fun applyMusicModeVisual() {
         val controller = mediaController
 
         if (isMusicModeActive) {
+            musicVisualWasOn = true
             // Actually disable the video track rather than just hiding
             // the surface -- setTrackTypeDisabled(TRACK_TYPE_VIDEO, true)
             // tells ExoPlayer to stop decoding/rendering video frames
@@ -639,6 +752,19 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             contentFrame?.visibility = View.VISIBLE
             binding.exoPlayerView.visibility = if (isNativePlaybackActive) View.VISIBLE else View.GONE
             binding.musicModeThumbnail.visibility = View.GONE
+            if (musicVisualWasOn && isNativePlaybackActive) {
+                // The video surface was hidden and the video renderer switched off. Coming back, the surface is a new one the
+                // player may not have picked up and the renderer may wait for a keyframe: put the view back on the player and
+                // seek to where it is, so frames start again instead of a black picture.
+                binding.exoPlayerView.post {
+                    val c = mediaController ?: return@post
+                    val p = binding.exoPlayerView.player
+                    binding.exoPlayerView.player = null
+                    binding.exoPlayerView.player = p
+                    c.seekTo(c.currentPosition)
+                }
+            }
+            musicVisualWasOn = false
         }
 
         musicArt.sync()
@@ -3929,6 +4055,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                     openWebPage("https://m.youtube.com/watch?v=$videoId")
                     return@launch
                 }
+                retryVideoId = videoId
                 showPlaybackErrorDialog()
                 return@launch
             }
@@ -4059,6 +4186,18 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     private fun showPlaybackErrorDialog() {
         if (isFinishing || isDestroyed) return
 
+        // no connection: say so, offer to try again, and carry on by itself when the connection is back
+        if (!isOnline()) {
+            waitForNetwork()
+            AlertDialog.Builder(this)
+                .setTitle("Connection lost")
+                .setMessage("There's no internet right now. SparkyTube will carry on when it's back, or try again yourself.")
+                .setPositiveButton("Try again") { _, _ -> retryCurrentVideo() }
+                .setNegativeButton("Close", null)
+                .show()
+            return
+        }
+
         // If InnerTubeX is the explicitly-selected Extractor Method, show its actual
         // error instead of the generic message
         val method = dev.sparkynox.sparkytube.settings.SettingsPrefs.getExtractorMethod(this)
@@ -4067,7 +4206,8 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 .setTitle("LazyLuno couldn't play this video")
                 .setMessage(dev.sparkynox.sparkytube.extractor.LazyLunoResolver.lastErrorMessage
                     ?: "LazyLuno failed with no specific error message.")
-                .setPositiveButton("OK", null)
+                .setPositiveButton("Try again") { _, _ -> retryCurrentVideo() }
+                .setNegativeButton("Close", null)
                 .setNeutralButton("Check Logs") { _, _ ->
                     startActivity(Intent(this, dev.sparkynox.sparkytube.logs.LogsActivity::class.java))
                 }
@@ -4480,6 +4620,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     }
 
     override fun onDestroy() {
+        stopWaitingForNetwork()
         dev.sparkynox.sparkytube.fx.LunoVideoFx.surfaceHook = null
         pollHandler.removeCallbacks(urlPollRunnable)
         controllerFuture?.let { MediaController.releaseFuture(it) }
