@@ -680,7 +680,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 musicOn = { isMusicModeActive },
                 downloadEnabled = { dev.sparkynox.sparkytube.settings.SettingsPrefs.isDownloadEnabled(this) },
                 audioTracks = { currentAudioTracks.size },
-                onMinimize = { enterMiniPlayerMode() },
+                onMinimize = { minimizePlayer() },
                 onFullscreen = { toggleFullscreenPlayer() },
                 onDownload = { showDownloadQualityPicker() },
                 onDownloadsList = { startActivity(Intent(this, dev.sparkynox.sparkytube.download.DownloadsActivity::class.java)) },
@@ -1112,7 +1112,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         downloadBtn.visibility = if (dev.sparkynox.sparkytube.settings.SettingsPrefs.isDownloadEnabled(this)) View.VISIBLE else View.GONE
         audioTrackBtnInPlayer?.setOnClickListener { showAudioTrackPicker() }
         audioTrackBtnInPlayer?.visibility = if (currentAudioTracks.size > 1) View.VISIBLE else View.GONE
-        minimizeBtn?.setOnClickListener { enterMiniPlayerMode() }
+        minimizeBtn?.setOnClickListener { minimizePlayer() }
         suggestionsBtn?.setOnClickListener { showSuggestionsPanel() }
         val musicModeBtn = binding.exoPlayerView.findViewById<View>(R.id.exo_music_mode_btn)
         musicModeBtn?.setOnClickListener { toggleMusicMode() }
@@ -3397,6 +3397,16 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         nav.watchDrag = 0f
     }
 
+    // The minimize buttons used to call enterMiniPlayerMode() alone: the bar appeared but the watch page stayed open behind it,
+    // and the video was moved without any animation. Now they take the same animated path as the swipe.
+    private fun minimizePlayer() {
+        when {
+            nav.watchVisible && !isPlayerFullscreen -> minimizeWithAnimation()
+            nav.watchVisible -> leaveWatch()
+            else -> enterMiniPlayerMode()
+        }
+    }
+
     private fun minimizeWithAnimation() {
         if (minimizing) return
         if (!prepareMiniGeometry()) { nav.watchDrag = 0f; leaveWatch(); return }
@@ -3910,6 +3920,15 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 // always blocked in AdBlockEngine), so there's no silent
                 // fallback here — show the user what happened instead of a
                 // broken black video area.
+                // age-restricted and every native client came back empty: the signed in WebView can still play it on
+                // YouTube's own page (googlevideo is let through there), so open that instead of an error
+                if (dev.sparkynox.sparkytube.history.AgeRestrictedStore.has(this@MainActivity, videoId) &&
+                    dev.sparkynox.sparkytube.auth.Session.loggedIn
+                ) {
+                    android.widget.Toast.makeText(this@MainActivity, "Age-restricted: opening it in YouTube's own player", android.widget.Toast.LENGTH_LONG).show()
+                    openWebPage("https://m.youtube.com/watch?v=$videoId")
+                    return@launch
+                }
                 showPlaybackErrorDialog()
                 return@launch
             }
