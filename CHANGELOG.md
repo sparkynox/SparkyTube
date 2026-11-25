@@ -21,6 +21,10 @@
 
 ## Fixes
 
+- Slow or lost connection no longer skips to the next video. A network problem keeps you on the video: it retries (4 times, a little longer each time, keeping your place) and then asks with a "Try again" bar. With no internet at all it says "Connection lost", waits, and carries on by itself when the connection is back. Only a video that is really broken is skipped, as before
+- The "couldn't play this video" dialog has a Try again button now
+- Black video after turning Music mode off: the video view is put back on the player and seeks to the current spot so frames start again
+
 - The minimize button in the player controls (and the one in the old controls) left the watch page open behind the mini bar and moved the video with no animation. Both now do the same animated move as the swipe and close the watch page
 - Age-restricted videos that no native client can play are opened on YouTube's own page in the signed in WebView, instead of an error
 
