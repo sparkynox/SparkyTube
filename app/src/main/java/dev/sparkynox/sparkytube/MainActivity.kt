@@ -83,7 +83,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     private var retrySnackbar: com.google.android.material.snackbar.Snackbar? = null
     private var networkWatcher: android.net.ConnectivityManager.NetworkCallback? = null
 
-    private fun isOnline(): Boolean {
+    private fun networkUp(): Boolean {
         val cm = getSystemService(android.net.ConnectivityManager::class.java) ?: return true
         val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
         return caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
@@ -114,7 +114,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         mediaController?.let { c ->
             if (c.duration > 0) dev.sparkynox.sparkytube.history.WatchHistoryStore.savePosition(this, videoId, c.currentPosition, c.duration)
         }
-        if (!isOnline()) {
+        if (!networkUp()) {
             netRetryCount = 0
             showRetryBar("Connection lost", true)
             waitForNetwork()
@@ -532,7 +532,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                         dev.sparkynox.sparkytube.logs.LogRecorder.w("Player", "error ${error.errorCodeName}: ${error.message}")
                         // No connection or a slow one is not a broken video: never skip it, stay on it and retry / ask
                         val netVideoId = lastResolvedVideoId
-                        if (netVideoId != null && (!isOnline() || isNetworkError(error))) {
+                        if (netVideoId != null && (!networkUp() || isNetworkError(error))) {
                             onNetworkTrouble(netVideoId)
                             return
                         }
@@ -4187,7 +4187,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         if (isFinishing || isDestroyed) return
 
         // no connection: say so, offer to try again, and carry on by itself when the connection is back
-        if (!isOnline()) {
+        if (!networkUp()) {
             waitForNetwork()
             AlertDialog.Builder(this)
                 .setTitle("Connection lost")
