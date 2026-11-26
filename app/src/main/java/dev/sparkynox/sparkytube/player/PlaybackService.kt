@@ -179,6 +179,7 @@ class PlaybackService : MediaSessionService() {
 
         mediaSession = MediaSession.Builder(this, skipPlayer)
             .setSessionActivity(sessionActivityPendingIntent)
+            .setBitmapLoader(ThumbBitmapLoader())
             .build()
 
         // Explicit: makes sure this service's notification always uses
