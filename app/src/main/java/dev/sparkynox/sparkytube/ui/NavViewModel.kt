@@ -295,6 +295,10 @@ class NavViewModel : ViewModel() {
         relatedToken = null
         watchVisible = true
 
+        loadWatch(videoId, playlistId)
+    }
+
+    private fun loadWatch(videoId: String, playlistId: String?) {
         watchJob?.cancel()
         watchJob = viewModelScope.launch {
             val info = InnerTubeClient.fetchWatch(videoId, playlistId)
@@ -308,6 +312,17 @@ class NavViewModel : ViewModel() {
                 if (watchId == videoId && items.size > 1) { autoMix = items; autoMixTitle = title }
             }
         }
+    }
+
+    /** Connection came back: reload the open watch page and any feed page that failed while offline. */
+    fun reloadAfterOffline() {
+        val id = watchId
+        if (id != null) {
+            val info = watchInfo
+            if (info == null || info.error != null || related.isEmpty()) loadWatch(id, watchPlaylistId)
+        }
+        pages.forEach { p -> if (p.feed.error != null || (p.feed.items.isEmpty() && !p.feed.loading)) p.feed.refresh() }
+        listOf(subs).forEach { f -> if (f.error != null) f.refresh() }
     }
 
     fun closeWatch() {
