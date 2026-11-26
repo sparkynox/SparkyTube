@@ -79,6 +79,12 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
     // ---- connection trouble: stay on the video, retry, and ask when it does not work
     private var netRetryCount = 0
+    private var resumeAtMs = -1L // exact spot to pick up from after a reload, beats the saved one
+    private var resumeForId: String? = null
+    private var firstFrameSeen = false
+    private var endStuckTicks = 0
+    private var netWasUp = true
+    private var liveNetCb: android.net.ConnectivityManager.NetworkCallback? = null
     private var retryVideoId: String? = null
     private var retrySnackbar: com.google.android.material.snackbar.Snackbar? = null
     private var networkWatcher: android.net.ConnectivityManager.NetworkCallback? = null
@@ -87,6 +93,21 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         val cm = getSystemService(android.net.ConnectivityManager::class.java) ?: return true
         val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
         return caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+
+    private fun rememberSpot(id: String) {
+        val c = mediaController ?: return
+        if (id == lastResolvedVideoId && c.currentMediaItem != null && c.duration > 0 && !c.isCurrentMediaItemLive) {
+            resumeAtMs = c.currentPosition
+            resumeForId = id
+        }
+    }
+
+    // connection is back (or Try again was tapped): ask InnerTube again for whatever failed while offline
+    private fun reviveInnerTube() {
+        dev.sparkynox.sparkytube.extractor.LazyLunoResolver.prewarm(this)
+        nav.reloadAfterOffline()
+        homeFeedVm.onShown()
     }
 
     private fun isNetworkError(e: androidx.media3.common.PlaybackException): Boolean {
@@ -124,7 +145,17 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         if (netRetryCount <= 4) {
             dev.sparkynox.sparkytube.logs.LogRecorder.i("Player", "slow connection, retry $netRetryCount of 4 on the same video")
             showRetryBar("Slow connection, trying again ($netRetryCount/4)", false)
-            pollHandler.postDelayed({ if (retryVideoId == videoId) retryCurrentVideo(keepBar = true) }, 1500L * netRetryCount)
+            pollHandler.postDelayed({
+                if (retryVideoId != videoId) return@postDelayed
+                val c = mediaController
+                // first tries just kick the same stream again, it keeps its spot and nothing gets re-resolved
+                if (netRetryCount <= 2 && c != null && c.currentMediaItem != null && c.playbackState == Player.STATE_IDLE) {
+                    c.prepare()
+                    c.play()
+                } else {
+                    retryCurrentVideo(keepBar = true)
+                }
+            }, 1500L * netRetryCount)
         } else {
             netRetryCount = 0
             showRetryBar("Couldn't load this video", true)
@@ -151,6 +182,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             override fun onAvailable(network: android.net.Network) {
                 runOnUiThread {
                     stopWaitingForNetwork()
+                    reviveInnerTube()
                     if (retryVideoId != null) {
                         android.widget.Toast.makeText(this@MainActivity, "Back online", android.widget.Toast.LENGTH_SHORT).show()
                         retryCurrentVideo()
@@ -174,6 +206,8 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         stopWaitingForNetwork()
         if (!keepBar) retrySnackbar?.dismiss()
         consecutivePlayerErrorCount = 0
+        if (!keepBar) reviveInnerTube()
+        rememberSpot(id)
         dev.sparkynox.sparkytube.extractor.StreamExtractor.invalidate(id)
         lastResolvedVideoId = null
         resolveAndPlayNative(id, fallbackTitle = "")
@@ -311,8 +345,61 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     // the video that is open is a live broadcast
     private var isLiveStream = false
 
+    // the video really finished: remember nothing, then move on to whatever is next
+    private fun handleVideoEnd() {
+        emitPluginEvent("videoend", "{}")
+        if (handledBogusEnd()) return
+        // watched to the end, nothing left to resume
+        lastResolvedVideoId?.let { dev.sparkynox.sparkytube.history.WatchHistoryStore.clearPosition(this@MainActivity, it) }
+        bogusEndRetryFor = null
+        if (!composeNav() && isMiniPlayerActive && extractVideoId(webView.url ?: "") != lastResolvedVideoId) {
+            // WebView is showing Home/Shorts/Subs/etc,
+            // not this video's watch page anymore — the
+            // related-videos DOM autoplay-next depends
+            // on isn't there, so there's nothing sane to
+            // advance to. Just close the mini-player.
+            exitMiniPlayerMode()
+            stopNativePlayback()
+            nav.closeWatch()
+        } else {
+            advanceToNextVideo()
+        }
+    }
+
+    // a video can sit on its last frame without ever saying "ended" (end card, audio a hair longer than the video): count it as over
+    private fun watchStuckAtEnd() {
+        val c = mediaController ?: return
+        val dur = c.duration
+        val near = !isResolving && dur > 0 && !isLiveStream && !c.isCurrentMediaItemLive && c.currentMediaItem != null &&
+            c.currentPosition >= dur - 700 && !userInitiatedPause &&
+            c.playbackState != Player.STATE_ENDED && c.playbackState != Player.STATE_IDLE
+        if (!near) { endStuckTicks = 0; return }
+        if (++endStuckTicks >= 3) {
+            endStuckTicks = 0
+            dev.sparkynox.sparkytube.logs.LogRecorder.w("Queue", "stuck on the last frame, treating it as ended")
+            handleVideoEnd()
+        }
+    }
+
+    // audio runs but no picture came: give the surface back to the player and nudge it
+    private fun checkFirstFrame(id: String, tries: Int) {
+        if (id != lastResolvedVideoId || firstFrameSeen || !isNativePlaybackActive || isMusicModeActive) return
+        val c = mediaController ?: return
+        if (c.playbackState != Player.STATE_READY || !c.playWhenReady) {
+            if (tries < 5) pollHandler.postDelayed({ checkFirstFrame(id, tries + 1) }, 2000L)
+            return
+        }
+        dev.sparkynox.sparkytube.logs.LogRecorder.w("Player", "no first frame after ready, rebinding the surface (try ${tries + 1})")
+        val p = binding.exoPlayerView.player
+        binding.exoPlayerView.player = null
+        binding.exoPlayerView.player = p
+        c.seekTo(c.currentPosition)
+        if (tries < 3) pollHandler.postDelayed({ checkFirstFrame(id, tries + 1) }, 2500L)
+    }
+
     private fun maybeSaveWatchPosition() {
         if (!isNativePlaybackActive) return
+        watchStuckAtEnd()
         updateChapterLabel()
         bgHistory.tick()
         innerHistory.tick()
@@ -472,6 +559,8 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                         }
                     }
 
+                    override fun onRenderedFirstFrame() { firstFrameSeen = true }
+
                     override fun onPlaybackStateChanged(playbackState: Int) {
                         if (playbackState == Player.STATE_READY) netRetryCount = 0
                         if (playbackState == Player.STATE_READY && prepareAtMs > 0) {
@@ -487,23 +576,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                                 dev.sparkynox.sparkytube.logs.LogRecorder.d("Queue", "ended ignored, nothing is loaded")
                                 return
                             }
-                            emitPluginEvent("videoend", "{}")
-                            if (handledBogusEnd()) return
-                            // watched to the end, nothing left to resume
-                            lastResolvedVideoId?.let { dev.sparkynox.sparkytube.history.WatchHistoryStore.clearPosition(this@MainActivity, it) }
-                            bogusEndRetryFor = null
-                            if (!composeNav() && isMiniPlayerActive && extractVideoId(webView.url ?: "") != lastResolvedVideoId) {
-                                // WebView is showing Home/Shorts/Subs/etc,
-                                // not this video's watch page anymore — the
-                                // related-videos DOM autoplay-next depends
-                                // on isn't there, so there's nothing sane to
-                                // advance to. Just close the mini-player.
-                                exitMiniPlayerMode()
-                                stopNativePlayback()
-                                nav.closeWatch()
-                            } else {
-                                advanceToNextVideo()
-                            }
+                            handleVideoEnd()
                         } else if (playbackState == Player.STATE_READY) {
                             // Real playback actually started -- clear the
                             // error-retry counter so a later, unrelated
@@ -555,6 +628,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                             if (refusedBy != null && refusedBy.responseCode in listOf(403, 410, 429)) {
                                 dev.sparkynox.sparkytube.extractor.LazyLunoResolver.onRefused(failedVideoId)
                             }
+                            rememberSpot(failedVideoId)
                             dev.sparkynox.sparkytube.extractor.StreamExtractor.invalidate(failedVideoId)
                             lastResolvedVideoId = null
                             resolveAndPlayNative(failedVideoId, fallbackTitle = "")
@@ -730,16 +804,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             // the real thumbnail loads, and stays up if the thumbnail
             // request ever fails, so music mode never shows a plain
             // black screen.
-            val thumbUrl = lastResolvedVideoId?.let { "https://i.ytimg.com/vi/$it/hqdefault.jpg" }
-            if (thumbUrl != null) {
-                binding.musicModeThumbnail.load(thumbUrl) {
-                    crossfade(true)
-                    placeholder(R.drawable.music_mode_bg)
-                    error(R.drawable.music_mode_bg)
-                }
-            } else {
-                binding.musicModeThumbnail.setImageResource(R.drawable.music_mode_bg)
-            }
+            dev.sparkynox.sparkytube.ui.ThumbLoader.load(binding.musicModeThumbnail, lastResolvedVideoId, R.drawable.music_mode_bg)
         } else {
             controller?.trackSelectionParameters = controller?.trackSelectionParameters
                 ?.buildUpon()
@@ -1873,6 +1938,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         if (bogusEndRetryFor == id) return false // already tried once, move on
         bogusEndRetryFor = id
         dev.sparkynox.sparkytube.logs.LogRecorder.w("Queue", "ended $pos ms into a $dur ms video, reloading it instead of skipping")
+        rememberSpot(id)
         dev.sparkynox.sparkytube.extractor.StreamExtractor.invalidate(id)
         lastResolvedVideoId = null
         resolveAndPlayNative(id, fallbackTitle = "")
@@ -1977,7 +2043,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 dev.sparkynox.sparkytube.lunokit.ambient.AmbientSampler.run(
                     texture = { binding.exoPlayerView.videoSurfaceView as? android.view.TextureView },
                     shouldSample = {
-                        isNativePlaybackActive && !isMiniPlayerActive && !isPlayerFullscreen &&
+                        isNativePlaybackActive && !isMiniPlayerActive && !isPlayerFullscreen && !isInPictureInPictureMode &&
                             nav.watchVisible && mediaController?.isPlaying == true
                     },
                 )
@@ -2733,6 +2799,9 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         controller.prepare()
         if (startPositionMs > 0) controller.seekTo(startPositionMs)
         controller.play()
+        firstFrameSeen = false
+        endStuckTicks = 0
+        if (!videoId.isNullOrBlank()) pollHandler.postDelayed({ checkFirstFrame(videoId, 0) }, 3000L)
 
         // Fresh media item just got set -- reset the save-throttle counter
         // so the next periodic save happens ~5s into THIS video, not
@@ -4047,6 +4116,9 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         // (meaning a newer resolveAndPlayNative call started since), this
         // call's result is stale and gets discarded.
         val myGeneration = ++resolveGeneration
+        val resumeOverride = if (resumeForId == videoId) resumeAtMs else -1L
+        resumeAtMs = -1L
+        resumeForId = null
         // Music mode is a global toggle now (see toggleMusicMode) -- it
         // stays whatever the user last set it to, applying to every new
         // video, instead of resetting to off each time a video loads.
@@ -4139,7 +4211,8 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
             // a saved spot too close to the end would just end the video again a second after it starts
             val durMs = resolved.durationSeconds * 1000
-            val savedPosition = if (isLiveStream) 0L else dev.sparkynox.sparkytube.history.WatchHistoryStore.getPosition(this@MainActivity, videoId)
+            val savedPosition = if (isLiveStream) 0L else if (resumeOverride >= 0) resumeOverride
+                else dev.sparkynox.sparkytube.history.WatchHistoryStore.getPosition(this@MainActivity, videoId)
                 ?.takeIf { durMs <= 0 || it < durMs - 20_000 } ?: 0L
             playOnController(
                 streamUrl = dataSaverQuality?.url ?: resolved.url,
@@ -4149,7 +4222,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 audioUrl = dataSaverQuality?.audioUrl ?: resolved.defaultAudioUrl,
                 videoId = videoId
             )
-            if (savedPosition > 0) {
+            if (savedPosition > 0 && resumeOverride < 0) {
                 android.widget.Toast.makeText(this@MainActivity, "Resumed from where you left off", android.widget.Toast.LENGTH_SHORT).show()
             }
             applyChapters(resolved.description, resolved.durationSeconds * 1000)
@@ -4523,6 +4596,17 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         // PIP chrome supplies its own minimal play/pause control.
         binding.exoPlayerView.useController = !isInPictureInPictureMode
         setPipLayout(isInPictureInPictureMode)
+        // the window change can leave the picture on a dead surface: hand it back, and keep playing if the user didn't pause
+        binding.exoPlayerView.postDelayed({
+            if (isFinishing || isDestroyed) return@postDelayed
+            val p = binding.exoPlayerView.player
+            binding.exoPlayerView.player = null
+            binding.exoPlayerView.player = p
+            val c = mediaController
+            if (c != null && !userInitiatedPause && c.currentMediaItem != null && !c.isPlaying &&
+                c.playbackState == Player.STATE_READY
+            ) c.play()
+        }, 350L)
         if (isInPictureInPictureMode) {
             binding.topBar.visibility = View.GONE
             binding.bottomNav.visibility = View.GONE
@@ -4604,6 +4688,29 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                 controller.play()
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        netWasUp = networkUp()
+        val cm = getSystemService(android.net.ConnectivityManager::class.java) ?: return
+        val cb = object : android.net.ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: android.net.Network) {
+                runOnUiThread {
+                    if (!netWasUp) reviveInnerTube()
+                    netWasUp = true
+                }
+            }
+            override fun onLost(network: android.net.Network) { netWasUp = false }
+        }
+        liveNetCb = cb
+        try { cm.registerDefaultNetworkCallback(cb) } catch (_: Exception) { liveNetCb = null }
+    }
+
+    override fun onStop() {
+        liveNetCb?.let { try { getSystemService(android.net.ConnectivityManager::class.java)?.unregisterNetworkCallback(it) } catch (_: Exception) { } }
+        liveNetCb = null
+        super.onStop()
     }
 
     override fun onResume() {
