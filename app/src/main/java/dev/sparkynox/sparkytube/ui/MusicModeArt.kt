@@ -5,7 +5,6 @@ import android.view.View
 import android.widget.FrameLayout
 import android.widget.ImageView
 import androidx.media3.ui.PlayerView
-import coil.load
 import dev.sparkynox.sparkytube.R
 
 // Music mode shows a picture instead of video. Two things used to break it:
@@ -58,15 +57,7 @@ class MusicModeArt(
                 miniImage.clipToOutline = true
             }
             miniImage.visibility = View.VISIBLE
-            val url = videoId()?.let { "https://i.ytimg.com/vi/$it/hqdefault.jpg" }
-            if (url != null) {
-                miniImage.load(url) {
-                    placeholder(R.drawable.music_mode_bg)
-                    error(R.drawable.music_mode_bg)
-                }
-            } else {
-                miniImage.setImageResource(R.drawable.music_mode_bg)
-            }
+            ThumbLoader.load(miniImage, videoId(), R.drawable.music_mode_bg)
         } else {
             if (miniImage.parent != null) mini.removeView(miniImage)
             if (music && nativeActive()) big.visibility = View.VISIBLE
