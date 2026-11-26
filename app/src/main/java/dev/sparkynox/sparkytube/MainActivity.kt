@@ -1406,7 +1406,30 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
             .hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
     }
 
+    // The player changes place (mini bar, watch page, fullscreen): it goes back to normal size and normal speed. A zoom (2x double
+    // tap / pinch) or a hold-to-2x that was still on used to travel along into the next place.
+    private fun normalizePlayer() {
+        if (videoScale != 1f || videoTranslationX != 0f || videoTranslationY != 0f) {
+            videoScale = 1f
+            videoTranslationX = 0f
+            videoTranslationY = 0f
+            applyVideoTransform()
+        }
+        endHoldSpeed()
+        val c = mediaController ?: return
+        if (holdBackSpeed == 0f && c.playbackParameters.speed != currentPlaybackSpeed) c.setPlaybackSpeed(currentPlaybackSpeed)
+    }
+
+    private fun endHoldSpeed() {
+        if (holdBackSpeed > 0f) {
+            mediaController?.setPlaybackSpeed(holdBackSpeed)
+            holdBackSpeed = 0f
+            hideGestureOverlayNow()
+        }
+    }
+
     private fun toggleFullscreenPlayer() {
+        endHoldSpeed()
         isPlayerFullscreen = !isPlayerFullscreen
         val params = binding.exoPlayerView.layoutParams
 
@@ -1474,6 +1497,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         if (isMiniPlayerActive || isPlayerFullscreen) return
         if (!isNativePlaybackActive) return
 
+        normalizePlayer()
         isMiniPlayerActive = true
         binding.exoPlayerView.animate().cancel()
         binding.exoPlayerView.alpha = 1f
@@ -1544,6 +1568,10 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     private fun exitMiniPlayerMode() {
         if (!isMiniPlayerActive) return
         isMiniPlayerActive = false
+        normalizePlayer()
+        binding.exoPlayerView.scaleX = 1f
+        binding.exoPlayerView.scaleY = 1f
+        binding.exoPlayerView.translationX = 0f
 
         binding.miniPlayerContainer.setOnClickListener(null)
         unbindMiniBar()
@@ -4543,6 +4571,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     }
 
     override fun onPause() {
+        endHoldSpeed()
         super.onPause()
         // YouTube rotates cookies, keep the saved copy of the active account fresh
         runCatching { dev.sparkynox.sparkytube.auth.AccountStore.syncActive() }
