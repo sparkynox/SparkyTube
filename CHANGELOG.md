@@ -21,6 +21,8 @@
 
 ## Fixes
 
+- Video turning 2x after playing in the mini player and going back up: whenever the player changes place (mini bar, watch page, fullscreen, app to the background) it goes back to normal size and normal speed. A zoom (double tap / pinch) or a hold-to-2x that was still on no longer travels into the next place
+
 - Slow or lost connection no longer skips to the next video. A network problem keeps you on the video: it retries (4 times, a little longer each time, keeping your place) and then asks with a "Try again" bar. With no internet at all it says "Connection lost", waits, and carries on by itself when the connection is back. Only a video that is really broken is skipped, as before
 - The "couldn't play this video" dialog has a Try again button now
 - Black video after turning Music mode off: the video view is put back on the player and seeks to the current spot so frames start again
