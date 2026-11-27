@@ -960,16 +960,6 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                     return false
                 }
 
-                // hold to play at 2x, let go and it is back to what it was
-                override fun onLongPress(e: android.view.MotionEvent) {
-                    val c = mediaController ?: return
-                    if (videoScale > 1f || isMiniPlayerActive || isLiveStream || !c.isPlaying) return
-                    holdBackSpeed = currentPlaybackSpeed
-                    c.setPlaybackSpeed(2f)
-                    binding.exoPlayerView.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
-                    showGestureText("2x speed", R.drawable.ic_skip_next, hold = true)
-                }
-
                 override fun onSingleTapConfirmed(e: android.view.MotionEvent): Boolean {
                     dev.sparkynox.sparkytube.ui.PlayerControlsVisibility.toggle()
                     hideSystemBarsInFullscreen()
@@ -1054,9 +1044,36 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                     return true
                 }
             }
-        )
+        ).apply { setIsLongpressEnabled(false) } // the 2x hold has its own 2s timer
 
+        val slop = android.view.ViewConfiguration.get(this).scaledTouchSlop
+        var tapX = 0f
+        var tapY = 0f
         binding.exoPlayerView.setOnTouchListener { _, event ->
+            if (isMiniPlayerActive) {
+                // in the bar the picture is just a button, tap or swipe up opens the player. no gestures, no hold speed
+                when (event.actionMasked) {
+                    android.view.MotionEvent.ACTION_DOWN -> { tapX = event.rawX; tapY = event.rawY }
+                    android.view.MotionEvent.ACTION_UP -> {
+                        val moved = kotlin.math.hypot(event.rawX - tapX, event.rawY - tapY)
+                        val up = tapY - event.rawY
+                        if (moved < slop || up > 24 * resources.displayMetrics.density) binding.miniPlayerContainer.performClick()
+                    }
+                }
+                return@setOnTouchListener true
+            }
+            when (event.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    cancelHoldTimer()
+                    tapX = event.x
+                    tapY = event.y
+                    holdRunnable = Runnable { startHoldSpeed() }.also { pollHandler.postDelayed(it, 2000L) }
+                }
+                android.view.MotionEvent.ACTION_MOVE ->
+                    if (holdBackSpeed == 0f && kotlin.math.hypot(event.x - tapX, event.y - tapY) > slop) cancelHoldTimer()
+                android.view.MotionEvent.ACTION_POINTER_DOWN -> cancelHoldTimer()
+                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> cancelHoldTimer()
+            }
             scaleDetector.onTouchEvent(event)
             gestureDetector.onTouchEvent(event)
             if ((event.actionMasked == android.view.MotionEvent.ACTION_UP || event.actionMasked == android.view.MotionEvent.ACTION_CANCEL) && holdBackSpeed > 0f) {
@@ -1103,6 +1120,23 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
     // speed before a hold-to-2x, 0 = no hold going on
     private var holdBackSpeed = 0f
+    private var holdRunnable: Runnable? = null
+
+    private fun cancelHoldTimer() {
+        holdRunnable?.let { pollHandler.removeCallbacks(it) }
+        holdRunnable = null
+    }
+
+    // finger stayed down for 2s on the video: play at 2x until it lifts
+    private fun startHoldSpeed() {
+        holdRunnable = null
+        val c = mediaController ?: return
+        if (videoScale > 1f || isMiniPlayerActive || isLiveStream || !c.isPlaying || holdBackSpeed > 0f) return
+        holdBackSpeed = currentPlaybackSpeed
+        c.setPlaybackSpeed(2f)
+        binding.exoPlayerView.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+        showGestureText("2x speed", R.drawable.ic_skip_next, hold = true)
+    }
 
     private fun hideGestureOverlayNow() {
         gestureOverlayHideRunnable?.let { pollHandler.removeCallbacks(it) }
@@ -1486,6 +1520,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     }
 
     private fun endHoldSpeed() {
+        cancelHoldTimer()
         if (holdBackSpeed > 0f) {
             mediaController?.setPlaybackSpeed(holdBackSpeed)
             holdBackSpeed = 0f
