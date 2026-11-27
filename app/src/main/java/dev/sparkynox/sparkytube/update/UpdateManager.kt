@@ -4,6 +4,10 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.core.content.FileProvider
 import dev.sparkynox.sparkytube.settings.SettingsPrefs
 import kotlinx.coroutines.CoroutineScope
@@ -50,13 +54,15 @@ object UpdateManager {
 
     enum class Phase { IDLE, CHECKING, DOWNLOADING, READY, ERROR }
 
-    @Volatile var phase = Phase.IDLE
-    @Volatile var latest: Latest? = null
-    @Volatile var lastCheckOk = false
-    @Volatile var error = ""
-    @Volatile var downloaded = 0L
-    @Volatile var total = 0L
-    @Volatile var speed = 0L
+    // compose state on purpose: the update screen watches these directly, so the progress card
+    // moves in release builds too (a counter trick to force redraws got optimised away there)
+    var phase by mutableStateOf(Phase.IDLE)
+    var latest by mutableStateOf<Latest?>(null)
+    var lastCheckOk by mutableStateOf(false)
+    var error by mutableStateOf("")
+    var downloaded by mutableLongStateOf(0L)
+    var total by mutableLongStateOf(0L)
+    var speed by mutableLongStateOf(0L)
     @Volatile var messages: List<Message> = emptyList()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
