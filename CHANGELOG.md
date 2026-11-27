@@ -38,6 +38,15 @@
 - Swipe down to the mini player, redone: the video follows your finger 1:1 along its real path to the bar and shrinks on the way, the watch page fades out ahead of it, the bar fades in behind it and the video's corners round off. Let go early and it slides back, flick it and it finishes the move. At the end the video is exactly where the bar puts it, so there is no jump and no second fade-in any more
 - Build fix: the Playlist / Mix fold icons in the watch screen
 
+- Seeking or holding on a slow connection no longer restarts the video. A network error now kicks the same stream again first (it keeps its place) and only re-resolves the video if that does not work. When it does reload, it picks up at the exact second you were on instead of the last saved spot, and the "Resumed where you left off" toast only shows for a real resume
+- Old video frame stuck on a new video: if the player is ready but no first frame was drawn, the video surface is handed back to the player and nudged (checked a few times)
+- Autoplay not moving on: a video could sit on its last frame (end card, audio a bit longer than the video) without ever reporting "ended". If it stays within the last 700 ms for about 2 seconds, it now counts as finished and the next video starts
+- No internet then "Try again": when the connection comes back (or you tap Try again) InnerTube is asked again for the watch page, related videos, feed pages and the home feed, and the visitorData / PO token warm-up runs again. Before, they stayed empty until reopened
+- Black picture in music mode, the mini player and the notification on a slow or lost connection: thumbnails try high, then medium, then low quality and retry a few times if all of them fail. The notification / lock screen artwork has its own loader with the same fallback
+- Picture-in-picture lag and freezes: the ambient glow sampler is off while in PiP, and on entering / leaving PiP the video surface is handed back to the player and playback resumes if you did not pause it
+- Hold-to-2x now needs a 2 second hold on the video. Moving your finger, a second finger or a zoom cancels it, and letting go puts the speed back
+- Tapping the picture in the mini player (the thumbnail or video box) started the 2x speed instead of opening the player. In the bar the picture is now just a button: a tap or a swipe up opens the player
+
 - Playlist cards ("49 videos") from search and Home now play: a playlist without a first video gets it looked up, then the watch page shows the whole playlist. The playlist page used to open under the search screen, that is why tapping did nothing
 - Picture-in-picture: Play next no longer turns the PiP window into the whole app (bars and feed), the next video keeps filling the window and the watch page is back when you expand it
 
