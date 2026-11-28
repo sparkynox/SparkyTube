@@ -1,5 +1,18 @@
 # SparkyTube Changelog
 
+# v2.7 (in progress)
+
+## Less WebView
+
+- LunoViewer: the BotGuard PO token is now made by QuickJS (a small JavaScript engine in C) with a tiny browser shim, so no hidden WebView is needed for it. The WebView engine stays as the fallback: Auto tries QuickJS first and drops to the WebView if it fails
+- Settings, YouTube: "PO token engine" (Auto / QuickJS only / WebView only) and "Test PO token", which makes one token and tells you which engine did it and how long it took. Everything the engine says, including every browser feature the shim was missing ("shim miss: ..."), goes into Logs under PoToken
+- Removed Anime streaming (the anikoto wrapper) and "YT Settings" (YouTube's own settings page in the WebView), with their toggles and menu entries
+- Removed the retired hidden-WebView history player (BackgroundHistory) and the "Debug WebView" menu entry. History sync is InnerTube only
+
+## Fixes
+
+- Update screen: the progress card (bar, percent, size, speed, time left) did not move in release builds. The update state is now Compose state, so the screen updates by itself
+
 # v2.6
 
 ## LazyLuno v1.2.0: EchoMusic's logic

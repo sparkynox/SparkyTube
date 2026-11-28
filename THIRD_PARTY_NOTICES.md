@@ -13,6 +13,7 @@ These lists are dual licensed under **CC BY-SA 3.0** and **GPL v3 or later**. Th
 ## Code
 
 - **ed25519** (signature check for the remote config), by Orson Peters, zlib license: `app/src/main/cpp/ed25519/` (license file included there)
+- **QuickJS-ng** (JavaScript engine for the PO token, no WebView), by Fabrice Bellard, Charlie Gordon and the quickjs-ng contributors, MIT license: `app/src/main/cpp/third_party/quickjs/` (license file included there)
 - **AndroidX Media3** (ExoPlayer, OkHttp and Cronet data sources, effects), Apache License 2.0
 - **OkHttp**, Apache License 2.0
 - **Cronet** comes from Google Play services and is under its terms, it is not bundled in the APK
