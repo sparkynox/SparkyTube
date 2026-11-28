@@ -317,21 +317,6 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         val s = total % 60
         return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
     }
-    // saves what plays natively into the YouTube history, see history/BackgroundHistory.kt
-    private val bgHistory by lazy {
-        dev.sparkynox.sparkytube.history.BackgroundHistory(
-            webView = { webView },
-            container = binding.webViewContainer,
-            compose = binding.nativeHomeFeedCompose,
-            exo = binding.exoPlayerView,
-            controller = { mediaController },
-            videoId = { lastResolvedVideoId },
-            resolving = { isResolving },
-            nativeActive = { isNativePlaybackActive },
-            enabled = { false }, // hidden WebView history sync is retired, InnerTube history does the job
-        )
-    }
-
     // same job without the hidden WebView: stats pings through InnerTube, see history/InnerTubeHistory.kt
     private val innerHistory by lazy {
         dev.sparkynox.sparkytube.history.InnerTubeHistory(
@@ -401,7 +386,6 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         if (!isNativePlaybackActive) return
         watchStuckAtEnd()
         updateChapterLabel()
-        bgHistory.tick()
         innerHistory.tick()
         ticksSinceLastPositionSave++
         if (ticksSinceLastPositionSave < 8) return
@@ -443,33 +427,15 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     private var lastSkippedSegmentEnd: Double = -1.0
 
     companion object {
-        const val EXTRA_OPEN_YT_SETTINGS = "open_yt_settings"
         private const val HOME_URL = "https://m.youtube.com/"
-        private const val YT_SETTINGS_URL = "https://m.youtube.com/select_site"
-        private const val CRUNCHYROLL_URL = "https://anikoto.cz/home"
         private const val PREFS_NAME = "sparkytube_prefs"
         private const val KEY_FIRST_LAUNCH_DONE = "first_launch_done"
         private const val GITHUB_ISSUES_URL = "https://github.com/sparkynox/SparkyTube/issues"
-
-        // Domains the WebView is allowed to navigate its main frame to
-        // while in Crunchyroll mode. Anything else attempting a top-level
-        // redirect (the "https://crunchyroll.com -> https://hxjxjfg"
-        // pattern Sparky described — malicious/ad redirect chains that
-        // hijack the whole page, not just a sub-resource) gets blocked
-        // instead of followed. Google/YouTube domains stay allowed too
-        // since Crunchyroll uses Google sign-in.
-        private val CRUNCHYROLL_ALLOWED_HOST_SUFFIXES = listOf(
-            "anikoto.cz",
-            "anikoto.cz/home",
-            "sparkynox.github.io/sparkynox",
-            "accounts.google.com",
-            "google.com"
-        )
     }
 
     // Which site the WebView is currently showing — controls ad-domain
     // matching scope and popup/redirect filtering behavior.
-    private enum class BrowseMode { YOUTUBE, CRUNCHYROLL, CUSTOM_FEED }
+    private enum class BrowseMode { YOUTUBE, CUSTOM_FEED }
     private var browseMode = BrowseMode.YOUTUBE
 
     /**
@@ -2172,12 +2138,7 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         })
 
         dev.sparkynox.sparkytube.settings.YouTubeTheme.apply(this)
-        if (intent?.getBooleanExtra(EXTRA_OPEN_YT_SETTINGS, false) == true) {
-            hideNativeHomeFeed()
-            webView.loadUrl(YT_SETTINGS_URL)
-        } else {
-            webView.loadUrl(HOME_URL)
-        }
+        webView.loadUrl(HOME_URL)
         pollHandler.post(urlPollRunnable)
 
         handleSendIntent(intent)
@@ -2185,16 +2146,6 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        // MainActivity is singleTop, so tapping "YT Settings" while
-        // MainActivity is already alive in the background reuses this
-        // same instance instead of running onCreate again — without this,
-        // that path would silently do nothing.
-        if (intent.getBooleanExtra(EXTRA_OPEN_YT_SETTINGS, false)) {
-            browseMode = BrowseMode.YOUTUBE
-            binding.bottomNav.visibility = View.VISIBLE
-            hideNativeHomeFeed()
-            webView.loadUrl(YT_SETTINGS_URL)
-        }
         handleSendIntent(intent)
     }
 
@@ -2454,7 +2405,6 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         }
 
         val items = mutableListOf<Shortcut>()
-        items += Shortcut("Debug WebView", android.R.drawable.ic_menu_view) { bgHistory.showDebug() }
         items += Shortcut("Settings", android.R.drawable.ic_menu_manage) {
             startActivity(Intent(this, dev.sparkynox.sparkytube.settings.SettingsComposeActivity::class.java))
         }
@@ -2470,12 +2420,6 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         items += Shortcut("Appearance", android.R.drawable.ic_menu_gallery, settingsAt("appearance"))
         items += Shortcut("Player", R.drawable.ic_play, settingsAt("player"))
         items += Shortcut("Extraction", android.R.drawable.ic_menu_edit, settingsAt("extraction"))
-        items += Shortcut("YT Settings", android.R.drawable.ic_menu_share) {
-            browseMode = BrowseMode.YOUTUBE
-            stopNativePlayback()
-            hideNativeHomeFeed()
-            webView.loadUrl(YT_SETTINGS_URL)
-        }
         items += Shortcut("Update", android.R.drawable.stat_sys_download_done) {
             startActivity(Intent(this, dev.sparkynox.sparkytube.update.UpdateActivity::class.java))
         }
@@ -2485,48 +2429,12 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         items += Shortcut("Logs", android.R.drawable.ic_menu_info_details) {
             startActivity(Intent(this, dev.sparkynox.sparkytube.logs.LogsActivity::class.java))
         }
-        if (dev.sparkynox.sparkytube.settings.SettingsPrefs.isAnimeStreamingEnabled(this)) {
-            items += Shortcut(
-                if (browseMode == BrowseMode.CRUNCHYROLL) "YouTube" else "Anime",
-                R.drawable.ic_shorts
-            ) { toggleBrowseMode() }
-        } else if (browseMode == BrowseMode.CRUNCHYROLL) {
-            toggleBrowseMode()
-        }
         items += Shortcut("About", R.drawable.ic_about) { showAboutDialog() }
         items += Shortcut("Support", android.R.drawable.btn_star_big_off) { showSupportDialog() }
 
         overflowItems = items.map { dev.sparkynox.sparkytube.ui.OverflowItem(it.label, it.icon, it.run) }
     }
 
-    /**
-     * Switches the WebView between YouTube and Crunchyroll. Same screen,
-     * same WebView instance/ad-blocking infrastructure — just a different
-     * site loaded, with browseMode gating which behaviors apply (native
-     * ExoPlayer takeover and video-ID URL polling only make sense in
-     * YouTube mode; the Crunchyroll redirect allowlist only applies in
-     * Crunchyroll mode).
-     */
-    private fun toggleBrowseMode() {
-        if (browseMode == BrowseMode.CRUNCHYROLL) {
-            browseMode = BrowseMode.YOUTUBE
-            stopNativePlayback()
-            webView.loadUrl(HOME_URL)
-            binding.bottomNav.visibility = View.VISIBLE
-            if (composeNav()) showComposeHost()
-        } else {
-            stopNativePlayback()
-            nav.closeWatch()
-            hideNativeHomeFeed()
-            browseMode = BrowseMode.CRUNCHYROLL
-            webView.loadUrl(CRUNCHYROLL_URL)
-            // Home/Shorts/Subs/Library only make sense for YouTube — hide
-            // it entirely while on Crunchyroll rather than leave dead
-            // buttons that do nothing (or worse, silently switch back to
-            // YouTube) sitting on screen.
-            binding.bottomNav.visibility = View.GONE
-        }
-    }
 
     /**
      * Long-press-on-feed-card download flow -- resolves the video in the
@@ -2969,7 +2877,6 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
         if (now - lastWebViewRebuild < 5_000) return
         lastWebViewRebuild = now
         val url = webView.url?.takeIf { it.startsWith("http") }
-        bgHistory.stop(blank = false)
         binding.webViewContainer.removeView(webView)
         webView.destroy()
         setupWebView()
@@ -3134,24 +3041,6 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                     )
                 }
                 return super.shouldInterceptRequest(view, request)
-            }
-
-            override fun shouldOverrideUrlLoading(
-                view: WebView,
-                request: WebResourceRequest
-            ): Boolean {
-                if (browseMode != BrowseMode.CRUNCHYROLL) return false
-
-                val host = request.url.host ?: return false
-                val isAllowed = CRUNCHYROLL_ALLOWED_HOST_SUFFIXES.any {
-                    host == it || host.endsWith(".$it")
-                }
-                // Block the whole-page redirect (ad/malware chain landing
-                // the main frame somewhere outside Crunchyroll) instead of
-                // following it — exactly the
-                // "crunchyroll.com -> hxjxjfg.example -> blocked,
-                // crunchyroll.com/watch -> passed" behavior asked for.
-                return !isAllowed
             }
 
             override fun onReceivedError(
@@ -3430,14 +3319,12 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
 
     private fun showComposeHost() {
         ensureComposeHost()
-        bgHistory.leaveDebug()
         // a Short or channel page may still be playing in the WebView, stop it before hiding
-        // (the hidden history player is the exception, it stays alive underneath)
-        if (!bgHistory.active && webView.visibility == View.VISIBLE) {
+        if (webView.visibility == View.VISIBLE) {
             webView.evaluateJavascript("document.querySelectorAll('video').forEach(function(v){v.pause()})", null)
         }
         binding.nativeHomeFeedCompose.visibility = View.VISIBLE
-        webView.visibility = bgHistory.webViewVisibility()
+        webView.visibility = View.INVISIBLE
     }
 
     // Shorts and channel pages are YouTube's own mobile pages (real HTML5 player, subscribe, tabs).
@@ -3445,7 +3332,6 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     private fun openWebPage(url: String) {
         if (browseMode != BrowseMode.YOUTUBE) return
         cancelWebViewLogin()
-        bgHistory.stop(blank = false)
         leaveWatch()
         hideNativeHomeFeed()
         webView.loadUrl(url)
@@ -4378,8 +4264,6 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
     }
 
     private fun stopNativePlayback() {
-        // closing the video closes its background copy too
-        bgHistory.stop(blank = true)
         innerHistory.stop()
         isLiveStream = false
         nav.watchLive = false
