@@ -25,7 +25,6 @@ object SettingsPrefs {
     private const val KEY_AMBIENT_ENABLED = "ambient_enabled"
     private const val KEY_UPDATE_NOTIFICATIONS = "update_notifications"
     private const val KEY_EXPERIMENTAL_FEATURES = "experimental_features"
-    private const val KEY_ANIME_STREAMING_ENABLED = "anime_streaming_enabled"
     private const val KEY_ADBLOCK_ENABLED = "adblock_enabled"
     private const val KEY_DATA_SAVER_ENABLED = "data_saver_enabled"
     private const val KEY_NATIVE_HOME_FEED_ENABLED = "native_home_feed_enabled"
@@ -34,6 +33,7 @@ object SettingsPrefs {
     private const val KEY_CUSTOM_CSS = "custom_css"
     private const val KEY_CUSTOM_CSS_ENABLED = "custom_css_enabled"
     private const val KEY_RELATED_VIDEOS_FETCHER = "related_videos_fetcher"
+    private const val KEY_PO_TOKEN_ENGINE = "po_token_engine"
     private const val KEY_EXTRACTOR_METHOD = "extractor_method"
     private const val KEY_LOCAL_SERVER_TYPE = "local_server_type"
     private const val KEY_LOCAL_SERVER_URL = "local_server_url"
@@ -150,13 +150,6 @@ object SettingsPrefs {
         prefs(context).edit().putBoolean(KEY_EXPERIMENTAL_FEATURES, enabled).apply()
     }
 
-    fun isAnimeStreamingEnabled(context: Context) =
-        prefs(context).getBoolean(KEY_ANIME_STREAMING_ENABLED, true)
-
-    fun setAnimeStreamingEnabled(context: Context, enabled: Boolean) {
-        prefs(context).edit().putBoolean(KEY_ANIME_STREAMING_ENABLED, enabled).apply()
-    }
-
     fun isAdBlockEnabled(context: Context) =
         prefs(context).getBoolean(KEY_ADBLOCK_ENABLED, true)
 
@@ -239,6 +232,14 @@ object SettingsPrefs {
      * empty — the default, since it gets the JS speed win in the common
      * case without breaking the mini-player scenario.
      */
+    // which engine makes the BotGuard po token: AUTO (QuickJS, WebView if it fails), QUICKJS or WEBVIEW
+    fun getPoTokenEngine(context: Context): String =
+        prefs(context).getString(KEY_PO_TOKEN_ENGINE, "AUTO") ?: "AUTO"
+
+    fun setPoTokenEngine(context: Context, engine: String) {
+        prefs(context).edit().putString(KEY_PO_TOKEN_ENGINE, engine).apply()
+    }
+
     enum class RelatedVideosFetcher { JAVASCRIPT, NEWPIPE, AUTO }
 
     fun getRelatedVideosFetcher(context: Context): RelatedVideosFetcher {

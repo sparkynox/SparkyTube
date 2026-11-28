@@ -148,7 +148,7 @@ class SettingsComposeActivity : AppCompatActivity() {
     private fun buildSections(): List<Section> {
         val p = SettingsPrefs
         return listOf(
-            Section("features", "Features", "shield", "Ad blocking, SponsorBlock, anime streaming", listOf(
+            Section("features", "Features", "shield", "Ad blocking, SponsorBlock, dislike counts", listOf(
                 toggle("adblock", "Ad blocking", "shield", "Blocks ad/tracker domains and hides ad slots",
                         { p.isAdBlockEnabled(this) }, { p.setAdBlockEnabled(this, it) }),
                 toggle("blocklistupdate", "Better ad block list", "shield",
@@ -162,17 +162,19 @@ class SettingsComposeActivity : AppCompatActivity() {
                 toggle("ryd", "Return YouTube Dislike", "zap",
                         "Shows like and dislike counts on the watch screen (video id is sent to returnyoutubedislikeapi.com)",
                         { p.isDislikeCountEnabled(this) }, { p.setDislikeCountEnabled(this, it) }),
-                toggle("anime", "Anime streaming", "film", "Crunchyroll wrapper, reachable from the overflow menu",
-                        { p.isAnimeStreamingEnabled(this) }, { p.setAnimeStreamingEnabled(this, it) })
             )),
-            Section("youtube", "YouTube", "ext", "YouTube settings and related videos", listOf(
-                link("ytsettings", "YT Settings", "ext", { "Open YouTube's own settings page" }) {
-                        startActivity(Intent(this, MainActivity::class.java).apply {
-                            putExtra(MainActivity.EXTRA_OPEN_YT_SETTINGS, true)
-                            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                        })
-                        finish()
-                    },
+            Section("youtube", "YouTube", "ext", "Related videos, PO token", listOf(
+                choice("potengine", "PO token engine", "zap",
+                        listOf("AUTO" to "Auto (QuickJS, WebView if it fails)", "QUICKJS" to "QuickJS only (no WebView)", "WEBVIEW" to "WebView only"),
+                        { p.getPoTokenEngine(this) }, { p.setPoTokenEngine(this, it) },
+                        sub = { "Who runs BotGuard for the streaming token" }),
+                link("potest", "Test PO token", "play", { "Makes one token with the engine above, details in Logs" }) {
+                    android.widget.Toast.makeText(this, "Testing, this can take a few seconds", android.widget.Toast.LENGTH_SHORT).show()
+                    lifecycleScope.launch {
+                        val r = dev.sparkynox.sparkytube.extractor.PoTokenService.diagnose(this@SettingsComposeActivity)
+                        android.widget.Toast.makeText(this@SettingsComposeActivity, r, android.widget.Toast.LENGTH_LONG).show()
+                    }
+                },
                 choice("related", "Related videos fetcher", "list",
                         listOf("AUTO" to "Auto (recommended)", "JAVASCRIPT" to "JavaScript (fastest)", "NEWPIPE" to "NewPipe (most reliable)"),
                         { p.getRelatedVideosFetcher(this).name }, { p.setRelatedVideosFetcher(this, SettingsPrefs.RelatedVideosFetcher.valueOf(it)) },
