@@ -205,6 +205,18 @@ class PlaybackService : MediaSessionService() {
      * Falls back to a plain HLS or progressive source otherwise (360p
      * progressive streams and HLS manifests already contain audio).
      */
+    // googlevideo saying 403 / 410 / 429 won't change by asking again, so fail right away instead of the default
+    // 3 retries with a growing delay (that was ~5 s per refused stream). Everything else keeps the default behaviour
+    private val failFast = object : androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy() {
+        override fun getRetryDelayMsFor(loadErrorInfo: androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy.LoadErrorInfo): Long {
+            val e = loadErrorInfo.exception
+            if (e is androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException && e.responseCode in intArrayOf(403, 410, 429)) {
+                return androidx.media3.common.C.TIME_UNSET
+            }
+            return super.getRetryDelayMsFor(loadErrorInfo)
+        }
+    }
+
     private fun buildMediaSourceFactory(): MediaSource.Factory {
         // OkHttp (pooled, HTTP/2) + disk cache for progressive files; HLS skips the cache
         val dataSourceFactory = NetCache.cachedFactory(this)
@@ -239,11 +251,13 @@ class PlaybackService : MediaSessionService() {
                 if (isHls) {
                     // chunkless: start from the master playlist alone, no probe of the first segment, a few seconds faster to the first frame
                     return HlsMediaSource.Factory(hlsDataSourceFactory)
+                        .setLoadErrorHandlingPolicy(failFast)
                         .setAllowChunklessPreparation(true)
                         .createMediaSource(mediaItem)
                 }
 
                 val videoSource = ProgressiveMediaSource.Factory(dataSourceFactory)
+                    .setLoadErrorHandlingPolicy(failFast)
                     .createMediaSource(mediaItem)
 
                 if (audioUrl.isNullOrBlank()) {
@@ -254,6 +268,7 @@ class PlaybackService : MediaSessionService() {
                 // Adaptive stream (480p+) — video-only, mux in the separate audio track.
                 val audioItem = MediaItem.fromUri(Uri.parse(audioUrl))
                 val audioSource = ProgressiveMediaSource.Factory(dataSourceFactory)
+                    .setLoadErrorHandlingPolicy(failFast)
                     .createMediaSource(audioItem)
 
                 return MergingMediaSource(videoSource, audioSource)
