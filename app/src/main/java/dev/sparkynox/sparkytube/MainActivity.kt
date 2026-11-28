@@ -593,6 +593,16 @@ class MainActivity : AppCompatActivity(), JsBridge.VideoStateListener {
                                 .filterIsInstance<androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException>().firstOrNull()
                             if (refusedBy != null && refusedBy.responseCode in listOf(403, 410, 429)) {
                                 dev.sparkynox.sparkytube.extractor.LazyLunoResolver.onRefused(failedVideoId)
+                                // age-gated and googlevideo said no: re-resolving gives the same answer, YouTube's own signed-in page plays it
+                                if (dev.sparkynox.sparkytube.history.AgeRestrictedStore.has(this@MainActivity, failedVideoId) &&
+                                    dev.sparkynox.sparkytube.auth.Session.loggedIn
+                                ) {
+                                    consecutivePlayerErrorCount = 0
+                                    stopNativePlayback()
+                                    android.widget.Toast.makeText(this@MainActivity, "Age-restricted: opening it in YouTube's own player", android.widget.Toast.LENGTH_LONG).show()
+                                    openWebPage("https://m.youtube.com/watch?v=$failedVideoId")
+                                    return
+                                }
                             }
                             rememberSpot(failedVideoId)
                             dev.sparkynox.sparkytube.extractor.StreamExtractor.invalidate(failedVideoId)
