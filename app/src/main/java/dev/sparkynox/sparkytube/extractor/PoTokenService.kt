@@ -87,6 +87,32 @@ object PoTokenService {
         }
     }
 
+    /**
+     * Settings "Test PO token": one clean attestation + mint with the chosen engine, a short report back.
+     * The details (shim misses, errors) are in the app log under PoToken.
+     */
+    suspend fun diagnose(context: Context): String {
+        val ctx = context.applicationContext
+        val t0 = System.currentTimeMillis()
+        return try {
+            val vd = visitorData ?: loadVisitorData(ctx) ?: return "No visitorData, check the connection"
+            val p = BotGuardTokenProvider(ctx)
+            try {
+                val pair = p.mintPair("jNQXAC9IVRw", vd)
+                val ms = System.currentTimeMillis() - t0
+                if (pair == null) "Failed (${p.engineUsed}), see Logs, tag PoToken"
+                else "OK with ${p.engineUsed} in $ms ms, token length ${pair.second.length}"
+            } finally {
+                p.close()
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            LogRecorder.w(TAG, "diagnose failed: ${e.javaClass.simpleName} ${e.message}")
+            "Failed: ${e.message?.take(120)}"
+        }
+    }
+
     /** Blocking: visitorData from the memory / prefs, else one request. ANDROID_VR and VISIONOS refuse a request without it. */
     fun visitorDataBlocking(context: Context): String? = visitorData ?: loadVisitorData(context.applicationContext)
 

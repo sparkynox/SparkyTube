@@ -28,19 +28,21 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
-// PO tokens through BotGuard in a hidden WebView, same idea as NewPipe's PoTokenWebView:
+// PO tokens through BotGuard, same idea as NewPipe's PoTokenWebView:
 //  1. ask youtube for a BotGuard challenge (jnn/v1/Create)
-//  2. run its interpreter in a WebView and take a snapshot
+//  2. run its interpreter and take a snapshot. First choice is LunoJs (QuickJS + a browser shim, no WebView),
+//     if that fails the hidden WebView does it. Settings can force one of them
 //  3. trade the snapshot for an integrity token (jnn/v1/GenerateIT)
 //  4. the integrity token gives a "minter" that signs a content binding (visitorData / videoId) -> PO token
-// the WebView is only created when InnerTubeX needs it and is thrown away after 2 idle minutes (RAM).
+// the engine is only created when InnerTubeX needs it and is thrown away after 2 idle minutes (RAM).
 // token values are never logged
 class BotGuardTokenProvider(context: Context) : TokenProvider {
 
-    override val capabilities = TokenProviderCapabilities(
-        providers = setOf(PoTokenProviderKind.WEB_BOTGUARD),
-        usesWebView = true,
-    )
+    override val capabilities: TokenProviderCapabilities
+        get() = TokenProviderCapabilities(
+            providers = setOf(PoTokenProviderKind.WEB_BOTGUARD),
+            usesWebView = quick == null,
+        )
 
     private val app = context.applicationContext
     private val main = Handler(Looper.getMainLooper())
@@ -55,6 +57,12 @@ class BotGuardTokenProvider(context: Context) : TokenProvider {
     private val minted = ConcurrentHashMap<String, Pair<String, Long>>()
 
     @Volatile private var webView: WebView? = null
+    @Volatile private var quick: LunoJs? = null
+    @Volatile private var quickBroken = false
+
+    /** which engine made the current attestation: "QuickJS", "WebView" or "none" */
+    @Volatile var engineUsed = "none"
+        private set
     @Volatile private var pageLoaded = CompletableDeferred<Unit>()
     @Volatile private var minterReady = false
     @Volatile private var validUntil = 0L
@@ -62,8 +70,10 @@ class BotGuardTokenProvider(context: Context) : TokenProvider {
     private val destroyer = Runnable {
         webView?.destroy()
         webView = null
+        quick?.close()
+        quick = null
         minterReady = false
-        LogRecorder.i(TAG, "webview released (idle)")
+        LogRecorder.i(TAG, "engine released (idle)")
     }
 
     inner class Bridge {
@@ -148,6 +158,8 @@ class BotGuardTokenProvider(context: Context) : TokenProvider {
         minterReady = false
         validUntil = 0
         minted.clear()
+        quick?.close()
+        quick = null
         withContext(Dispatchers.Main) {
             main.removeCallbacks(destroyer)
             webView?.destroy()
@@ -176,11 +188,34 @@ class BotGuardTokenProvider(context: Context) : TokenProvider {
     // ---- attestation ----
 
     private suspend fun ensureReady() {
-        if (minterReady && System.currentTimeMillis() < validUntil && webView != null) return
+        if (minterReady && System.currentTimeMillis() < validUntil && (webView != null || quick != null)) return
+        val pref = dev.sparkynox.sparkytube.settings.SettingsPrefs.getPoTokenEngine(app)
+        val tryQuick = pref != "WEBVIEW" && LunoJs.available && !(quickBroken && pref == "AUTO")
+        if (tryQuick) {
+            try {
+                attest(true)
+                return
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                LogRecorder.w(TAG, "QuickJS attestation failed: ${e.javaClass.simpleName} ${e.message?.take(300)}")
+                reset()
+                if (pref == "QUICKJS") throw e
+                quickBroken = true
+                LogRecorder.i(TAG, "falling back to the WebView engine")
+            }
+        } else if (pref == "QUICKJS") {
+            throw IllegalStateException("QuickJS engine isn't available in this build")
+        }
+        attest(false)
+    }
+
+    private suspend fun attest(useQuick: Boolean) {
         val t0 = System.currentTimeMillis()
         minterReady = false
         minted.clear()
-        startWebView()
+        if (useQuick) startQuick() else startWebView()
+        engineUsed = if (useQuick) "QuickJS" else "WebView"
 
         LogRecorder.i(TAG, "attestation started")
         val challenge = parseChallenge(post("Create", "[\"$REQUEST_KEY\"]"))
@@ -202,7 +237,7 @@ class BotGuardTokenProvider(context: Context) : TokenProvider {
         // refresh a bit before it really expires
         validUntil = System.currentTimeMillis() + (ttlSec - 600).coerceAtLeast(300) * 1000
         minterReady = true
-        LogRecorder.i(TAG, "BotGuard ready in ${System.currentTimeMillis() - t0} ms (ttl ${ttlSec}s)")
+        LogRecorder.i(TAG, "BotGuard ready in ${System.currentTimeMillis() - t0} ms (ttl ${ttlSec}s, $engineUsed)")
     }
 
     private class Challenge(val interpreter: String, val program: String, val globalName: String)
@@ -279,7 +314,40 @@ class BotGuardTokenProvider(context: Context) : TokenProvider {
             ?: throw IllegalStateException("webview page didn't load")
     }
 
+    private suspend fun startQuick() {
+        withContext(Dispatchers.Main) { main.removeCallbacks(destroyer) }
+        if (quick != null) return
+        withContext(Dispatchers.IO) {
+            val q = LunoJs(UA)
+            forwardLog(q)
+            if (!q.alive) throw IllegalStateException("QuickJS didn't start (see the log above)")
+            try {
+                q.run(JS_CORE + "\n'ok'", 5_000)
+            } finally {
+                forwardLog(q)
+            }
+            quick = q
+        }
+    }
+
+    // shim output (console.log, "shim miss: ...") goes into the app log, that's what we fix from
+    private fun forwardLog(q: LunoJs) {
+        q.takeLog().lineSequence().filter { it.isNotBlank() }.take(40).forEach { LogRecorder.i(TAG, "qjs: ${it.take(220)}") }
+    }
+
     private suspend fun js(body: String, timeoutMs: Long, step: String = "js"): String {
+        val q = quick
+        if (q != null) {
+            return withContext(Dispatchers.IO) {
+                try {
+                    q.run("(async function(){ $body })()", timeoutMs)
+                } catch (e: IllegalStateException) {
+                    throw IllegalStateException("$step: ${e.message?.take(400)}")
+                } finally {
+                    forwardLog(q)
+                }
+            }
+        }
         val id = ids.incrementAndGet()
         val d = CompletableDeferred<String>()
         pending[id] = d
@@ -308,18 +376,9 @@ class BotGuardTokenProvider(context: Context) : TokenProvider {
         const val UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) " +
             "Chrome/131.0.0.0 Safari/537.36"
 
-        // no dollar signs in here, it's a kotlin raw string
-        val HTML = """
-<!doctype html><html><head><meta charset="utf-8"></head><body><script>
+        // the vm calls, shared by the WebView page and LunoJs. no dollar signs in here, it's a kotlin raw string
+        val JS_CORE = """
 var vmFn = null, snap = null, signalOut = [], minter = null;
-window.onerror = function (m) { console.log('error: ' + m); };
-
-function run(id, fn) {
-  Promise.resolve().then(fn).then(
-    function (r) { Android.done(id, String(r), ''); },
-    function (e) { Android.done(id, '', String((e && (e.stack || e.message)) || e)); }
-  );
-}
 function b64ToU8(s) {
   s = s.replace(/-/g, '+').replace(/_/g, '/');
   while (s.length % 4) s += '=';
@@ -364,6 +423,19 @@ async function setupMinter(integrityB64) {
 }
 function mintToken(idB64) {
   return u8ToB64Url(minter(b64ToU8(idB64)));
+}
+"""
+
+        val HTML = """
+<!doctype html><html><head><meta charset="utf-8"></head><body><script>
+""" + JS_CORE + """
+window.onerror = function (m) { console.log('error: ' + m); };
+
+function run(id, fn) {
+  Promise.resolve().then(fn).then(
+    function (r) { Android.done(id, String(r), ''); },
+    function (e) { Android.done(id, '', String((e && (e.stack || e.message)) || e)); }
+  );
 }
 </script></body></html>
 """
