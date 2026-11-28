@@ -78,12 +78,13 @@ object PoTokenService {
      * Blocking (call from a background thread, waits up to 12 s): visitorData + player token + GVS token for one video.
      * The age-restricted path needs the player token, the streams need the GVS one as &pot=.
      */
-    fun forVideo(context: Context, videoId: String): Triple<String, String, String>? = kotlinx.coroutines.runBlocking {
+    // gvsBinding: what the streaming token is tied to. Signed-in requests are tied to the account's id, anonymous ones to visitorData
+    fun forVideo(context: Context, videoId: String, gvsBinding: String? = null): Triple<String, String, String>? = kotlinx.coroutines.runBlocking {
         kotlinx.coroutines.withTimeoutOrNull(12_000) {
             val ctx = context.applicationContext
             val p = provider ?: BotGuardTokenProvider(ctx).also { provider = it }
             val vd = visitorData ?: loadVisitorData(ctx) ?: return@withTimeoutOrNull null
-            p.mintPair(videoId, vd)?.let { (player, gvs) -> Triple(vd, player, gvs) }
+            p.mintPair(videoId, vd, gvsBinding ?: vd)?.let { (player, gvs) -> Triple(vd, player, gvs) }
         }
     }
 

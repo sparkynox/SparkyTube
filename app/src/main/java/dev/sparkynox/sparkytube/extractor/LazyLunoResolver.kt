@@ -74,8 +74,11 @@ object LazyLunoResolver {
         var vd = ""
         var playerTok = ""
         if (useClients == "AGE") {
-            PoTokenService.forVideo(ctx, videoId)?.let { (v, pt, gvs) -> vd = v; playerTok = pt; pot = gvs }
-            LogRecorder.i(TAG, "age-restricted $videoId, PO token ${if (pot != null) "ready" else "not available"}")
+            // signed in: googlevideo ties the streaming token to the account id (the part before "||" of the datasync id),
+            // a token made for the visitor gets a 403 on signed-in urls
+            val accountId = dev.sparkynox.sparkytube.auth.Session.dataSyncId?.substringBefore("||")?.takeIf { it.isNotBlank() }
+            PoTokenService.forVideo(ctx, videoId, accountId)?.let { (v, pt, gvs) -> vd = v; playerTok = pt; pot = gvs }
+            LogRecorder.i(TAG, "age-restricted $videoId, PO token ${if (pot != null) "ready" else "not available"} (${if (accountId != null) "account" else "visitor"} bound)")
         }
         val raw = try {
             LazyLuno.resolveJson(videoId, cookie, "en", Locale.getDefault().country.ifBlank { "US" }, useClients, vd, playerTok)
