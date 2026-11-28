@@ -46,3 +46,21 @@ target_include_directories(lazyluno PRIVATE lazyluno/include third_party)
 target_compile_options(lazyluno PRIVATE -O2 -Wall -Wno-c++20-designator)
 target_link_options(lazyluno PRIVATE -Wl,-z,max-page-size=16384)
 target_link_libraries(lazyluno ${log-lib})
+
+# LunoViewer: headless JS (QuickJS + a small browser shim) so the BotGuard po token doesn't need a WebView
+set(QJS third_party/quickjs)
+add_library(lunoviewer SHARED
+    lunoviewer/lunojs.cpp
+    lunoviewer/lunojs_shim.cpp
+    lunoviewer/lunojs_jni.cpp
+    ${QJS}/quickjs.c
+    ${QJS}/dtoa.c
+    ${QJS}/libregexp.c
+    ${QJS}/libunicode.c)
+target_include_directories(lunoviewer PRIVATE lunoviewer ${QJS})
+target_compile_definitions(lunoviewer PRIVATE _GNU_SOURCE)
+set_source_files_properties(${QJS}/quickjs.c ${QJS}/dtoa.c ${QJS}/libregexp.c ${QJS}/libunicode.c
+    PROPERTIES COMPILE_FLAGS "-O2 -w")
+target_compile_options(lunoviewer PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-O2> $<$<COMPILE_LANGUAGE:CXX>:-Wall>)
+target_link_options(lunoviewer PRIVATE -Wl,-z,max-page-size=16384)
+target_link_libraries(lunoviewer ${log-lib})
